@@ -1,0 +1,2955 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>TerraPedia — BAB 05: Magnetosfer & Perisai</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN for utility layout alongside scoped TerraPedia CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Exact Three.js v0.143.0 Importmap matching TerraPedia Main Website -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.143.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.143.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    /* TerraPedia BAB 05 — arah: observatorium malam + atlas ilmiah (sama dengan BAB 01–04).
+       Chrome tenang: permukaan gelap bersih, hairline, satu aksen aurora.
+       Kekayaan warna hanya hidup di visualisasi 3D magnetosfer. Signature: kelompeng skala. */
+    :root{
+      --tp-bg-deep:#03060c;
+      --surface:rgba(12,18,30,.92);
+      --surface-2:rgba(17,24,40,.94);
+      --tp-accent:#5df0a8;
+      --tp-accent-border:rgba(93,240,168,.28);
+      --tp-cyan:#22d3ee;
+      --tp-amber:#f59e0b;
+      --tp-border:rgba(255,255,255,.08);
+      --tp-border-strong:rgba(255,255,255,.16);
+      --tp-text-main:#f1f5f9;
+      --tp-text-body:#cbd5e1;
+      --tp-text-muted:#94a3b8;
+      --shadow-float:0 12px 32px rgba(0,0,0,.38);
+      --radius-lg:16px;
+      --radius-md:12px;
+      --radius-sm:8px;
+      --font:'Inter',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent;-webkit-tap-highlight-color:transparent}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(148,163,184,.3);border-radius:8px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.5)}
+    button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+    html,body{height:100%}
+    html{overflow:hidden}
+    body{background:var(--tp-bg-deep);color:var(--tp-text-main);font-family:var(--font);overflow:hidden}
+
+    .font-mono-tech{font-family:var(--font-mono)}
+
+    /* Kanvas magnetosfer layar penuh (pola BAB 01) */
+    #viewportContainer{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:0;cursor:grab;touch-action:none;overflow:hidden;user-select:none}
+    #viewportContainer:active{cursor:grabbing}
+    #magnetoCanvas{display:block;width:100%;height:100%}
+
+    /* Overlay pin komponen 3D terproyeksi: fixed di atas kanvas, di bawah HUD */
+    #hudPinsContainer{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+
+    /* Pin komponen 3D (HTML disinkron dengan koordinat 3D) */
+    .hud-pin{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;transition:opacity .25s ease;z-index:20}
+    .hud-pin-inner{display:flex;align-items:center;gap:6px;padding:4px 10px 4px 7px;border-radius:999px;background:rgba(6,13,24,.85);border:1px solid rgba(93,240,168,.35);color:#e2e8f0;font-size:11px;font-weight:500;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.65);transition:border-color .18s ease,background-color .18s ease,color .18s ease}
+    .hud-pin.active .hud-pin-inner{background:rgba(93,240,168,.1);border-color:rgba(93,240,168,.5);color:#fff}
+    .hud-dot{width:8px;height:8px;border-radius:50%;background:#5df0a8;position:relative;flex:none}
+
+    /* Floating HUD shell (struktur kontainer sama persis dengan BAB 01–04) */
+    .ui-shell{position:fixed;inset:0;pointer-events:none;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
+    .top-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+    .brand-pill{pointer-events:auto;display:inline-flex;align-items:center;gap:12px;padding:8px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .brand-mark{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--tp-accent);font-size:12px;background:rgba(93,240,168,.1);border:1px solid rgba(93,240,168,.35);flex:none}
+    .brand-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .brand-title{font-weight:600;font-size:13px;letter-spacing:-.01em;color:#fff;white-space:nowrap}
+    .brand-sub{font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .brand-chapter{font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .top-controls{pointer-events:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .cam-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:var(--surface-2);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .cam-btn:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+    .cam-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .pill-group{display:inline-flex;gap:2px;padding:4px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .pill-group button{padding:4px 10px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--tp-text-muted);border:1px solid transparent;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .pill-group button:hover{color:#fff}
+    .pill-group button.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .exit-btn{width:32px;height:32px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--surface-2);border:1px solid var(--tp-border);color:var(--tp-text-muted);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .exit-btn:hover{color:#fda4af;background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35)}
+    .exit-btn svg{width:15px;height:15px;display:block}
+    /* Tombol ✕ berputar 90° saat hover (nicety dari versi modal) */
+    #exitModuleBtn svg{transition:transform .2s ease}
+    #exitModuleBtn:hover svg,#exitModuleBtn:focus-visible svg{transform:rotate(90deg)}
+
+    .touch-prompt{align-self:center;margin-top:26px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--tp-text-body);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .prompt-dot{width:8px;height:8px;border-radius:9999px;background:var(--tp-accent);flex:none}
+
+    /* Dock melayang terpusat tengah bawah (pola bottom-dock BAB 01) */
+    .bottom-dock{pointer-events:auto;align-self:center;width:fit-content;max-width:90vw;background:var(--surface);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:12px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-float);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .layer-pills{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 3px;cursor:grab}
+    .layer-pills::-webkit-scrollbar{display:none;width:0;height:0}
+
+    .comp-pill{flex:0 0 auto;touch-action:pan-x;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);white-space:nowrap;font-size:12px;font-weight:500;color:var(--tp-text-body);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .comp-pill:hover{color:#fff;background:rgba(255,255,255,.08);border-color:var(--tp-border-strong)}
+    .comp-pill.active{color:#fff;background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .comp-pill .dot{width:8px;height:8px;border-radius:9999px;flex:none}
+
+    /* Baris telemetri angin surya di dalam dock */
+    .telemetry-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .pulse-dot{width:6px;height:6px;border-radius:9999px;background:var(--tp-accent);flex:none;animation:tpPulse 2.2s ease-in-out infinite}
+    @keyframes tpPulse{0%,100%{opacity:1}50%{opacity:.35}}
+    .metric-cell{text-align:center;min-width:56px}
+    .metric-label{font-size:9px;color:var(--tp-text-muted)}
+    .metric-value{font-family:var(--font-mono);font-size:11px;font-weight:500}
+
+    input[type="range"].tp-slider{-webkit-appearance:none;appearance:none;height:6px;background:rgba(30,41,59,.9);border-radius:999px;outline:none;border:1px solid rgba(93,240,168,.25);cursor:pointer}
+    input[type="range"].tp-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#5df0a8;cursor:pointer;border:2px solid #040811}
+    input[type="range"].tp-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#5df0a8;cursor:pointer;border:2px solid #040811}
+
+    .controls-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .toggle-row{display:flex;gap:6px;flex-wrap:wrap}
+    .scene-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .scene-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .scene-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .dot-dot{width:8px;height:8px;border-radius:9999px;flex:none}
+
+    .chapter-nav-row{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .chapter-next-card{display:inline-flex;align-items:center;gap:10px;max-width:100%;padding:6px 8px 6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.04);border:1px solid var(--tp-border);text-decoration:none;transition:border-color .18s ease,background-color .18s ease}
+    .chapter-next-card:hover{border-color:rgba(93,240,168,.4);background:rgba(93,240,168,.06)}
+    .chapter-next-text{display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+    .chapter-next-card.is-prev .chapter-next-text{align-items:flex-start}
+    .chapter-next-label{font-family:var(--font-mono);font-size:9px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .chapter-next-title{font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .18s ease}
+    .chapter-next-card:hover .chapter-next-title{color:var(--tp-accent)}
+    .chapter-next-arrow{width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .chapter-next-card:hover .chapter-next-arrow{color:var(--tp-accent);background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.4)}
+
+    /* Permukaan panel (dipakai popup inspeksi, drawer artikel & kontennya) */
+    .tp-glass{background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float)}
+    .tp-glass-subtle{background:var(--surface-2);border:1px solid rgba(148,163,184,.16)}
+    /* Kartu artikel (pola BAB 02) */
+    .tp-glass-card{background:var(--surface-2);border:1px solid var(--tp-border);transition:border-color .18s ease,background-color .18s ease}
+    .tp-glass-card:hover{border-color:var(--tp-border-strong)}
+    .tp-card-active{background:rgba(93,240,168,.1);border-color:rgba(93,240,168,.4) !important}
+
+    /* Tipografi artikel & rumus (dipertahankan) */
+    .article-section-title{display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:600;color:#5df0a8;margin-bottom:.5rem}
+    .formula-box{background:rgba(93,240,168,.08);border-left:3px solid #5df0a8;padding:12px 14px;border-radius:0 10px 10px 0}
+
+    /* --- Panel inspeksi komponen: popup samping kanan (pola info-popup BAB 01–04),
+           tersembunyi sampai komponen diklik --- */
+    #magnetoInfoPanel{position:fixed;right:16px;top:96px;width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 230px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;z-index:45;border-radius:var(--radius-lg);padding:16px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);user-select:text;opacity:0;pointer-events:none;transform:translateY(8px) scale(.98);transition:opacity .26s ease,transform .26s ease}
+    #magnetoInfoPanel.open{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+    #magnetoInfoCloseBtn{width:26px;height:26px;border-radius:8px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    #magnetoInfoCloseBtn:hover{color:#fff;background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.45)}
+
+    /* --- Overlay artikel (bekas drawer): drawer kanan desktop, sheet layar penuh mobile --- */
+    #articleOverlay{position:fixed;inset:0;z-index:60;pointer-events:none}
+    #articleOverlay.open{pointer-events:auto}
+    .cap-backdrop{position:absolute;inset:0;background:rgba(3,6,12,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .3s ease}
+    #articleOverlay.open .cap-backdrop{opacity:1}
+    .cap-panel{position:absolute;top:0;right:0;bottom:0;width:min(620px,48vw);display:flex;flex-direction:column;background:var(--surface-2);border-left:1px solid var(--tp-border);box-shadow:-25px 0 60px -18px rgba(0,0,0,.8);transform:translateX(103%);visibility:hidden;transition:transform .34s cubic-bezier(.16,1,.3,1),visibility .34s}
+    /* Signature: kelompeng skala di tepi kiri drawer artikel (sama dengan BAB 01–04) */
+    .cap-panel::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border-strong) 0 1px,transparent 1px 8px);pointer-events:none;z-index:5}
+    #articleOverlay.open .cap-panel{transform:translateX(0);visibility:visible}
+    .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--tp-border);background:rgba(7,12,24,.9)}
+    .cap-eyebrow{display:block;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-muted);white-space:nowrap}
+    .cap-title{font-size:13px;font-weight:600;color:#fff;margin-top:6px;line-height:1.35}
+    .cap-close{width:32px;height:32px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cap-close:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+    .cap-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 16px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+    .cap-tabs{display:flex;align-items:center;border-bottom:1px solid rgba(30,41,59,.9);gap:2px;padding-bottom:2px;margin-bottom:14px}
+    .cap-tabs button{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;font-size:12px;font-weight:500;border-bottom:2px solid transparent;color:var(--tp-text-muted);transition:color .18s ease,border-color .18s ease}
+    .cap-tabs button:hover{color:#e2e8f0}
+    .cap-tabs button.active{border-color:var(--tp-accent);color:var(--tp-accent)}
+    #drawerScrollBody{overflow:visible !important;padding:0 !important}
+
+    @media (max-width:720px){
+      .brand-sub{display:none}
+      #magnetoInfoPanel{left:12px;right:12px;top:58px;width:auto;max-height:46dvh}
+      .ui-shell{padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      .brand-pill{padding:6px 10px;gap:8px}
+      .brand-mark{width:26px;height:26px;border-radius:8px}
+      .brand-title{font-size:12px}
+      .brand-chapter{font-size:9px}
+      .cam-btn{padding:5px 9px;font-size:11px}
+      .pill-group button{padding:4px 8px;font-size:10px}
+      .exit-btn{width:30px;height:30px}
+      .touch-prompt{font-size:10px;padding:5px 11px}
+      .bottom-dock{max-width:calc(100vw - 24px);padding:8px 12px;gap:6px}
+      .comp-pill{padding:4px 9px;font-size:11px}
+      .scene-btn{padding:4px 8px;font-size:11px}
+      .controls-row{gap:8px;padding-top:6px}
+      .telemetry-row{gap:8px;padding-top:6px}
+      input[type="range"].tp-slider::-webkit-slider-thumb{width:20px;height:20px}
+      input[type="range"].tp-slider::-moz-range-thumb{width:20px;height:20px}
+      .chapter-next-card{padding:5px 6px 5px 10px}
+      .chapter-next-title{max-width:190px;font-size:11.5px}
+      .chapter-next-arrow{width:22px;height:22px}
+    }
+    @media (max-width:380px){
+      .top-controls{gap:4px}
+      .cam-btn{padding:4px 7px;font-size:10.5px}
+      .pill-group button{padding:4px 6px}
+      .brand-chapter{max-width:150px}
+      .chapter-next-title{max-width:140px;font-size:11px}
+      .scene-btn{padding:4px 6px;font-size:10.5px}
+      .comp-pill{padding:4px 7px;font-size:10.5px}
+      #magnetoInfoPanel{max-height:52dvh;padding:12px}
+    }
+    @media (max-width:640px){
+      .cap-panel{width:100%;left:0;right:0;top:auto;height:92dvh;border-left:none;border-top:1px solid var(--tp-border);border-radius:18px 18px 0 0;transform:translateY(104%);box-shadow:0 -25px 60px -18px rgba(0,0,0,.8)}
+      #articleOverlay.open .cap-panel{transform:translateY(0)}
+    }
+    @media (prefers-reduced-motion:reduce){
+      #magnetoInfoPanel,.cap-panel,.cap-backdrop,.touch-prompt,.hud-pin,.pulse-dot{transition:none;animation:none}
+    }
+  </style>
+<style id="tpNavStyle">
+    /* ====== TerraPedia NAV: bilah navigasi menjadi sidebar kiri penuh + tombol navbar ====== */
+    :root{--tp-nav-w:min(280px,86vw)}
+    .ui-shell .bottom-dock{
+      position:fixed;top:0;bottom:0;left:0;z-index:30;
+      width:var(--tp-nav-w);max-width:86vw;height:auto;max-height:none;
+      border-width:0 1px 0 0;border-radius:0 18px 18px 0;
+      overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+      padding:20px 14px calc(16px + env(safe-area-inset-bottom,0px));
+      transition:left .34s cubic-bezier(.22,.7,.2,1),visibility .34s;
+    }
+    html.nav-closed .ui-shell .bottom-dock{left:calc(-1 * var(--tp-nav-w));visibility:hidden}
+
+    /* Tombol navbar (handle) menempel di tepi kanan sidebar */
+    .nav-handle{position:fixed;top:50%;left:var(--tp-nav-w);transform:translateY(-50%);margin-left:-1px;z-index:41;width:26px;height:52px;display:inline-flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;color:var(--tp-text-muted);background:var(--surface);border:1px solid var(--tp-border);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 18px -10px rgba(0,0,0,.65);transition:left .34s cubic-bezier(.22,.7,.2,1),color .18s ease,background-color .18s ease}
+    .nav-handle:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .nav-handle svg{width:14px;height:14px;pointer-events:none}
+    .nav-handle .ic-open{display:none}
+    html.nav-closed .nav-handle{left:0}
+    html.nav-closed .nav-handle .ic-close{display:none}
+    html.nav-closed .nav-handle .ic-open{display:block}
+    .nav-handle:focus-visible{outline:2px solid rgba(93,240,168,.7);outline-offset:1px}
+
+    /* Kartu navigasi bab: fixed di ujung kiri & kanan viewport (di luar dock) */
+    .tp-nav-card{position:fixed;bottom:16px;z-index:40;pointer-events:auto;width:auto;max-width:min(330px,38vw)}
+    .tp-nav-card.tp-card-next{right:16px;transition:opacity .25s ease,visibility .25s}
+    .tp-nav-card.tp-card-prev{left:16px}
+
+    /* HUD atas (brand & bar petunjuk) mengambang di atas sidebar — tidak pernah bergeser */
+    .ui-shell .top-bar .brand-pill{position:relative;z-index:45}
+    .ui-shell .touch-prompt{position:relative;z-index:45}
+    /* (b) Ketinggian dock di desktop: isi naik, ruang kosong atas berkurang */
+    @media (min-width:901px){
+      .ui-shell .bottom-dock{padding-top:24px}
+    }
+
+    /* (e) Struktur item navbar seragam: lingkaran warna + nomor + nama */
+    .tp-pill-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-pill-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-text-muted,#94a3b8);flex:none}
+    button.active .tp-pill-num{color:inherit}
+
+    /* (d) Struktur floating text seragam: lingkaran warna + nomor + nama */
+    .tp-f-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-f-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-accent,#5df0a8);flex:none}
+
+    /* Tagline di area atas dock navigasi */
+    .tp-dock-tagline{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--tp-text-body,#cbd5e1);padding:0 2px 2px;white-space:nowrap}
+    .tp-dock-tagline::before{content:'';width:6px;height:6px;border-radius:9999px;background:var(--tp-accent,#5df0a8);box-shadow:0 0 0 3px rgba(93,240,168,.14);flex:none}
+    .tp-dock-tagline::after{content:'';height:1px;flex:1;min-width:12px;background:linear-gradient(90deg,rgba(93,240,168,.28),transparent)}
+
+    /* Mobile: sidebar menjadi drawer overlay */
+    @media (max-width:900px){
+      html:not(.nav-closed) .ui-shell .bottom-dock{box-shadow:18px 0 50px -18px rgba(0,0,0,.78)}
+      html:not(.nav-closed) .tp-card-prev{opacity:0;visibility:hidden;pointer-events:none}
+    }
+    @media (max-width:640px){
+      .tp-nav-card{max-width:calc(50vw - 24px)}
+      /* Judul kartu navigasi harus menyusut mengikuti kartu (anti tabrakan) */
+      .tp-nav-card .chapter-next-text{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden}
+      .tp-nav-card .chapter-next-title{max-width:100%}
+      .tp-nav-card .chapter-next-label{overflow:hidden;text-overflow:ellipsis}
+      .nav-handle{width:24px;height:44px}
+    }
+    @media (max-width:720px){
+      /* Pill brand compact (brand-sub disembunyikan) -> padding atas lebih pendek */
+      .ui-shell .bottom-dock{padding-top:16px}
+    }
+    /* ====== Mobile UX: target sentuh, scrim drawer, keterbacaan ====== */
+    @media (max-width:720px){
+      /* Tap target min 40px (pedoman iOS HIG / Material Design) */
+      #openArticleOverlayBtn{min-height:42px;padding-top:9px;padding-bottom:9px}
+      .cap-close{width:42px !important;height:42px !important;font-size:16px !important}
+      button[id*="lose" i],#exitModuleBtn{min-width:40px;min-height:40px}
+      button[id*="ang" i],button[data-lang]{min-width:42px;min-height:36px}
+      /* Area sentuh handle navigasi diperluas tanpa mengubah tampilan */
+      .nav-handle{overflow:visible}
+      .nav-handle::before{content:'';position:absolute;inset:-12px -14px}
+      /* Item di dalam drawer lebih nyaman disentuh */
+      .ui-shell .bottom-dock button{min-height:38px}
+      /* Judul & padding overlay artikel di layar sempit */
+      .cap-title{font-size:16px}
+      .cap-body{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+      /* Perluas area sentuh pin/label 3D (posisi visual tidak berubah) */
+      #tp3dLabels .tp-layer-label::before,
+      #labelsOverlayContainer .tp-3d-label::before,
+      #floatingPinsContainer .biome-3d-pin::before,
+      #hudPinsContainer .hud-pin::before,
+      #hotspotLayer .hotspot-pin::before{content:'';position:absolute;inset:-9px}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .ui-shell .bottom-dock,.nav-handle,.tp-nav-card{transition:none}
+    }
+  </style>
+</head>
+<body>
+  <!-- Panggung magnetosfer full-screen (pola BAB 01): kanvas Three.js statis + pin proyeksi -->
+  <div id="viewportContainer">
+    <canvas id="magnetoCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+    <!-- Dynamic 3D Projected HTML Pins Container -->
+    <div id="hudPinsContainer"></div>
+  </div>
+
+  <!-- PANEL INSPEKSI KOMPONEN (popup samping kanan, pola info-popup BAB 01–04):
+       tersembunyi sampai komponen diklik -->
+  <aside id="magnetoInfoPanel" class="tp-glass-subtle rounded-2xl p-4">
+    <div class="flex items-start justify-between gap-2 mb-2">
+      <span id="compCategoryBadge" class="font-mono-tech text-[10px] font-medium px-2 py-0.5 rounded bg-[#5df0a8]/10 text-[#5df0a8] border border-[#5df0a8]/30">
+        Komponen magnetosfer 01/07
+      </span>
+      <span id="compCoordTag" class="font-mono-tech text-[11px] text-slate-400">
+        R ≈ 10.2 R⊕
+      </span>
+      <button id="magnetoInfoCloseBtn" type="button" title="Tutup panel inspeksi" aria-label="Tutup panel inspeksi">✕</button>
+    </div>
+
+    <h2 id="compTitle" class="text-lg sm:text-xl font-semibold text-white mb-1">
+      Magnetopause &amp; Magnetosheath
+    </h2>
+    <p id="compSubtitle" class="text-xs font-medium text-emerald-300/90 mb-3">
+      Batas Keseimbangan Tekanan Dinamis Angin Surya vs Medan Geomagnetik
+    </p>
+
+    <p id="compDescription" class="text-xs sm:text-[13px] leading-relaxed text-slate-200 mb-4">
+      Memuat informasi ilmiah...
+    </p>
+
+    <!-- 4 Scientific Telemetry Metrics Grid for Selected Component -->
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <div class="bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80">
+        <div class="text-[10px] text-slate-400" data-i18n="statDistLabel">Jarak Geosentris</div>
+        <div id="compStatDist" class="font-mono-tech text-xs sm:text-sm font-medium text-[#5df0a8] mt-0.5">~10 R⊕ (63.700 km)</div>
+      </div>
+      <div class="bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80">
+        <div class="text-[10px] text-slate-400" data-i18n="statBFieldLabel">Kuat Medan Magnet (B)</div>
+        <div id="compStatB" class="font-mono-tech text-xs sm:text-sm font-medium text-cyan-300 mt-0.5">50 – 100 nT</div>
+      </div>
+      <div class="bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80">
+        <div class="text-[10px] text-slate-400" data-i18n="statPlasmaLabel">Kerapatan Plasma (n)</div>
+        <div id="compStatDensity" class="font-mono-tech text-xs sm:text-sm font-medium text-amber-300 mt-0.5">5 – 25 cm⁻³</div>
+      </div>
+      <div class="bg-slate-950/70 rounded-xl p-2.5 border border-slate-800/80">
+        <div class="text-[10px] text-slate-400" data-i18n="statTempLabel">Energi / Temperatur</div>
+        <div id="compStatTemp" class="font-mono-tech text-xs sm:text-sm font-medium text-slate-300 mt-0.5">10⁶ – 10⁷ K</div>
+      </div>
+    </div>
+
+    <!-- Physical Process / Mechanism Highlight -->
+    <div class="formula-box">
+      <div class="text-[10px] font-mono-tech text-[#5df0a8] mb-0.5" data-i18n="physMechanismLabel">
+        Mekanisme fisika utama
+      </div>
+      <p id="compMechanism" class="text-xs text-slate-200 leading-relaxed"></p>
+    </div>
+  </aside>
+
+  <!-- FLOATING HUD OVERLAY (struktur kontainer sama persis dengan BAB 01–04):
+       pointer-events:none di shell, pointer-events:auto hanya pada kartu/tombol interaktif -->
+  <div class="ui-shell">
+    <div>
+      <header class="top-bar">
+        <div class="brand-pill">
+          <span class="brand-mark">▲</span>
+          <div class="brand-col">
+            <span class="brand-title">TerraPedia 3D</span>
+            <span class="brand-chapter" data-i18n="chapterBadge">Bab 05 — Magnetosfer &amp; Perisai</span>
+            <span class="brand-sub" data-i18n="modalTitle">Struktur Magnetosfer dan Dinamika Aurora Bumi</span>
+          </div>
+        </div>
+
+        <!-- Pojok kanan atas: tombol artikel, sakelar bahasa (ID/EN), dan ✕ melayang tanpa bar memanjang -->
+        <div class="top-controls">
+          <button id="openArticleOverlayBtn" type="button" class="cam-btn" data-i18n="openArticleBtn">Artikel Ilmiah</button>
+          <div class="pill-group" role="group" aria-label="Language Switcher">
+            <button id="langBtnID" type="button" class="active">ID</button>
+            <button id="langBtnEN" type="button">EN</button>
+          </div>
+          <a id="exitModuleBtn" href="terrapedia.html" title="Keluar ke TerraPedia" aria-label="Keluar ke halaman utama TerraPedia" class="exit-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </a>
+        </div>
+      </header>
+
+      <!-- Pil petunjuk tepat di bawah kartu judul kiri atas -->
+      <div style="display:flex;justify-content:center">
+        <div class="touch-prompt">
+          <span class="prompt-dot"></span>
+          <span data-i18n="hudPrompt">Klik komponen atau pin 3D untuk inspeksi</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCK MELAYANG TERPUSAT TENGAH BAWAH: pemilih komponen + telemetri + kontrol + navigasi bab -->
+    <div class="bottom-dock" id="bottomDock">
+      <div class="tp-dock-tagline">Kenali Bumi Lebih Dalam</div>
+      <!-- Baris 1: Pemilih komponen (7 komponen, dinamis via JS; klik lagi = sembunyikan info) -->
+      <div class="layer-pills" id="componentPillBar"></div>
+
+      <!-- Baris 2: Live Solar Wind Telemetry Strip -->
+      <div class="telemetry-row">
+        <span class="pulse-dot"></span>
+        <span class="font-mono-tech text-[10px] text-slate-400 hidden lg:inline whitespace-nowrap" data-i18n="telemetryHeader">Telemetri angin surya</span>
+        <span id="stormBadge" class="font-mono-tech text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-400/30 whitespace-nowrap">
+          KP 2 · Tenang
+        </span>
+        <input id="solarWindSlider" type="range" min="300" max="1000" value="420" step="10" class="tp-slider flex-1 min-w-[90px] max-w-[220px]" aria-label="Solar Wind Speed" />
+        <span id="solarWindValue" class="font-mono-tech text-[11px] font-medium text-[#5df0a8] w-[68px] text-right">420 km/s</span>
+        <span class="hidden sm:block w-px h-5 bg-slate-700/80" aria-hidden="true"></span>
+        <div class="hidden sm:flex items-center gap-2 sm:gap-3">
+          <div class="metric-cell">
+            <div class="metric-label" data-i18n="metricMp">Magnetopause</div>
+            <div id="metricMpVal" class="metric-value text-cyan-300">10.2 R⊕</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label" data-i18n="metricBs">Bow Shock</div>
+            <div id="metricBsVal" class="metric-value text-amber-300">13.8 R⊕</div>
+          </div>
+          <div class="metric-cell">
+            <div class="metric-label" data-i18n="metricAurora">Daya Aurora</div>
+            <div id="metricAuroraVal" class="metric-value text-[#5df0a8]">38 GW</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Baris 3: Layer & Simulation Toggles + View Presets + Camera Actions -->
+      <div class="controls-row">
+        <div class="toggle-row">
+          <button id="toggleParticlesBtn" type="button" class="scene-btn active">
+            <span class="dot-dot" style="background:#5df0a8"></span>
+            <span data-i18n="btnParticles">Partikel Surya</span>
+          </button>
+          <button id="toggleFieldLinesBtn" type="button" class="scene-btn active">
+            <span class="dot-dot" style="background:#22d3ee"></span>
+            <span data-i18n="btnFieldLines">Garis Medan</span>
+          </button>
+          <button id="toggleSheathBtn" type="button" class="scene-btn active">
+            <span class="dot-dot" style="background:#fbbf24"></span>
+            <span data-i18n="btnBowShock">Bow Shock</span>
+          </button>
+          <button id="toggleVanAllenBtn" type="button" class="scene-btn active">
+            <span class="dot-dot" style="background:#a78bfa"></span>
+            <span data-i18n="btnVanAllen">Sabuk Van Allen</span>
+          </button>
+          <button id="toggleCoreBtn" type="button" class="scene-btn">
+            <span class="dot-dot" style="background:#fb7185"></span>
+            <span data-i18n="btnCoreCutaway">X-Ray Inti</span>
+          </button>
+          <button id="togglePinsBtn" type="button" class="scene-btn active">
+            <span data-i18n="btnLabels">Label 3D</span>
+          </button>
+        </div>
+
+        <!-- View Angle Preset Buttons -->
+        <div class="toggle-row">
+          <button id="btnViewProfile" type="button" class="scene-btn active" data-i18n="viewProfile">Profil Ilmiah</button>
+          <button id="btnViewIso" type="button" class="scene-btn" data-i18n="viewIso">3D Orbit</button>
+          <button id="btnViewPolar" type="button" class="scene-btn" data-i18n="viewPolar">Kutub &amp; Aurora</button>
+          <button id="btnViewSun" type="button" class="scene-btn" data-i18n="viewSun">Hulu Surya</button>
+        </div>
+
+        <!-- Orbit / Reset Camera Mini Bar -->
+        <div class="toggle-row">
+          <button id="btnAutoRotate" type="button" class="scene-btn" data-i18n="btnAutoRotate">Putar Otomatis</button>
+          <button id="btnResetCam" type="button" class="scene-btn scene-btn-neutral" data-i18n="btnResetCam">Reset Kamera</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tombol navbar: sembunyikan / tampilkan bilah navigasi samping -->
+    <button id="navHandleBtn" type="button" class="nav-handle" aria-expanded="true" aria-controls="bottomDock" aria-label="Sembunyikan navigasi bab" title="Sembunyikan navigasi bab">
+      <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+      <svg class="ic-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button>
+
+    <!-- Kartu navigasi bab: fixed di ujung kiri & kanan viewport -->
+    <a class="chapter-next-card is-prev tp-nav-card tp-card-prev" href="terrapedia_bab_04_vulkanologi_seismik.html" title="Buka BAB 04 — Vulkanologi &amp; Seismik" aria-label="Kembali ke BAB 04 — Vulkanologi dan Seismik">
+      <span class="chapter-next-arrow">←</span>
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="navFooterPrevLabel">Sebelumnya</span>
+        <span class="chapter-next-title" data-i18n="navFooterPrevTitle">BAB 04 — Vulkanologi &amp; Seismik</span>
+      </span>
+    </a>
+    <a class="chapter-next-card tp-nav-card tp-card-next" href="terrapedia_bab_06_hidrosfer_samudra_3d_ocean_cross_section_module.html" title="Buka BAB 06 — Hidrosfer &amp; Samudra" aria-label="Lanjut ke BAB 06 — Hidrosfer dan Samudra">
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="navFooterNextLabel">Berikutnya</span>
+        <span class="chapter-next-title" data-i18n="navFooterNextTitle">BAB 06 — Hidrosfer &amp; Samudra</span>
+      </span>
+      <span class="chapter-next-arrow">→</span>
+    </a>
+  </div>
+
+  <!-- =========================================================================
+       OVERLAY ARTIKEL (bekas drawer samping, pola info-popup BAB 01):
+       artikel lengkap BAB 05 & tabel parameter hanya tampil setelah
+       tombol "Artikel" diklik. Desktop: drawer kanan. Mobile: sheet penuh.
+       ========================================================================= -->
+  <div id="articleOverlay" aria-hidden="true">
+    <div class="cap-backdrop" data-overlay-close></div>
+    <section class="cap-panel" role="dialog" aria-modal="true" aria-label="Artikel BAB 05 — Magnetosfer &amp; Perisai">
+      <header class="cap-head">
+        <div class="min-w-0">
+          <span class="cap-eyebrow" data-i18n="capEyebrow">Artikel</span>
+          <h2 class="cap-title" data-i18n="modalTitle">Struktur Magnetosfer dan Dinamika Aurora Bumi</h2>
+        </div>
+        <button id="closeArticleOverlayBtn" type="button" class="cap-close" aria-label="Tutup artikel" title="Tutup artikel (Esc)">✕</button>
+      </header>
+      <div class="cap-body">
+
+        <!-- Sub-Navigation Tabs: disembunyikan (struktur artikel diseragamkan dengan BAB 02) -->
+        <div class="cap-tabs" style="display:none">
+          <button id="tabBtnArticle" type="button" class="active">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            <span data-i18n="tabArticle">Artikel BAB 05 Lengkap</span>
+          </button>
+          <button id="tabBtnData" type="button">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <span data-i18n="tabData">Parameter &amp; Rumus</span>
+          </button>
+        </div>
+
+        <!-- SCROLLABLE CONTENT BODY -->
+        <div id="drawerScrollBody" class="tp-scroll space-y-5 select-text">
+
+          <!-- VIEW 1: FULL PRESERVED BAB 05 SCIENTIFIC ARTICLE (ID & EN) -->
+          <article id="panelArticle" class="space-y-8 text-slate-200">
+            <!-- Section 01: Pengantar (pola kartu BAB 02) -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s0Tag">01 // PENGANTAR</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="artMainHeading">
+                Magnetosfer &amp; Perisai Pelindung Biosfer Bumi
+              </h2>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="artIntroLead">
+                Tanpa medan magnet global yang membentang puluhan ribu kilometer ke ruang angkasa, atmosfer Bumi akan terkikis habis oleh terpaan angin surya seperti yang terjadi pada planet Mars. Magnetosfer bertindak sebagai perisai elektromagnetik raksasa yang membelokkan radiasi kosmik dan partikel berenergi tinggi.
+              </p>
+            </section>
+
+            <!-- Section 02: Geodynamo -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s1Tag">02 // MESIN GEODINAMO</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="sec1Title">Mesin Geodinamo di Inti Luar Bumi</h2>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec1P1">
+                Medan magnet Bumi (geomagnetik) dibangkitkan pada kedalaman 2.890 hingga 5.150 km di bawah permukaan melalui proses <strong>Geodinamo Hidromagnetik</strong>. Inti luar Bumi terdiri dari logam cair besi (Fe) dan nikel (Ni) bersuhu ~4.500–5.500 °C yang bersifat konduktif secara elektrik.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec1P2">
+                Kombinasi tiga faktor utama—konveksi termal-komposisional akibat pendinginan inti dalam, gaya Coriolis dari rotasi Bumi setiap 24 jam, serta konduktivitas listrik besi cair—menciptakan arus listrik spiral (arus Eddy) yang menghasilkan medan magnet dipol raksasa dengan kemiringan sumbu sekitar <strong>11,5°</strong> terhadap sumbu rotasi geografis Bumi.
+              </p>
+            </section>
+
+            <!-- Section 03: Solar Wind & Asymmetric Shape -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s2Tag">03 // INTERAKSI ANGIN SURYA</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="sec2Title">Interaksi Angin Surya &amp; Deformasi Asimetris</h2>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec2P1">
+                Di ruang hampa tanpa gangguan eksternal, medan magnet Bumi akan berbentuk simetris seperti donat (dipol murni). Namun, Matahari secara kontinu menyemburkan <strong>Angin Surya (Solar Wind)</strong>—aliran plasma supersonik bermuatan (terutama proton H⁺ dan elektron e⁻) dengan kecepatan 300 hingga &gt;1.000 km/detik yang membawa <em>Interplanetary Magnetic Field</em> (IMF).
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec2P2">
+                Tekanan ram hidrodinamis angin surya (<span class="font-mono-tech text-emerald-300">P_ram = ρ·v²</span>) menekan sisi siang (dayside) magnetosfer hingga memampat pada jarak <strong>~6 hingga 10 jari-jari Bumi (R⊕)</strong>, sementara sisi malam (nightside) tertarik memanjang membentuk <strong>Ekor Magnetik (Magnetotail)</strong> yang membentang melampaui 200–1.000 R⊕ (jauh melewati orbit Bulan pada 60 R⊕).
+              </p>
+            </section>
+
+            <!-- Section 04: Bow Shock, Magnetosheath & Magnetopause -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s3Tag">04 // ANATOMI PERISAI</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="sec3Title">Anatomi Perisai: Bow Shock, Magnetosheath &amp; Magnetopause</h2>
+              <ul class="space-y-2 text-sm text-slate-300 leading-relaxed list-disc pl-4">
+                <li data-i18n="sec3Li1">
+                  <strong>Kejut Busur (Bow Shock, ~13–15 R⊕):</strong> Karena kecepatan angin surya melampaui kecepatan gelombang magnetosonik Alfvén (Mach 5–8), terbentuk gelombang kejut paraboloid berwarna keemasan di depan Bumi. Di sini plasma melambat secara mendadak menjadi subsonik dan suhunya melonjak drastis.
+                </li>
+                <li data-i18n="sec3Li2">
+                  <strong>Magnetosheath:</strong> Wilayah transisi turbulen di antara Bow Shock dan Magnetopause tempat partikel angin surya yang terpanaskan mengalir membelok mengelilingi perisai Bumi.
+                </li>
+                <li data-i18n="sec3Li3">
+                  <strong>Magnetopause (~10 R⊕ di titik subsolar):</strong> Lapisan batas arus listrik (Arus Chapman-Ferraro) tempat tekanan magnetik internal Bumi (<span class="font-mono-tech text-cyan-300">B² / 2μ₀</span>) tepat menyeimbangkan tekanan dinamis angin surya.
+                </li>
+              </ul>
+            </section>
+
+            <!-- Section 05: Lorentz Deflection & Van Allen Belts -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s4Tag">05 // GAYA LORENTZ &amp; SABUK RADIASI</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="sec4Title">Gaya Lorentz &amp; Sabuk Radiasi Van Allen</h2>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec4P1">
+                Mengapa partikel bermuatan tidak dapat menembus lurus ke permukaan Bumi? Setiap partikel bermuatan <span class="font-mono-tech">q</span> yang bergerak dengan kecepatan <span class="font-mono-tech">v</span> melintasi medan magnet <span class="font-mono-tech">B</span> mengalami <strong>Gaya Lorentz</strong> tegak lurus arah geraknya:
+              </p>
+              <div class="formula-box my-2">
+                <div class="font-mono-tech text-sm font-semibold text-white">F = q (E + v × B)</div>
+                <div class="text-[11px] text-slate-400 mt-0.5" data-i18n="sec4FormulaNote">
+                  Perkalian silang (v × B) memaksa proton dan elektron berbelok mengikuti lintasan heliks (gyromotion) di sepanjang garis medan magnet atau tersapu ke sisi luar magnetopause.
+                </div>
+              </div>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec4P2">
+                Sebagian partikel berenergi tinggi terperangkap di dalam <strong>Sabuk Radiasi Van Allen</strong> yang terdiri dari dua cincin toroidal: <em>Sabuk Dalam</em> (1,2–2,5 R⊕, didominasi proton energetik 10–100 MeV) dan <em>Sabuk Luar</em> (3,0–7,0 R⊕, didominasi elektron relativistik 0,1–10 MeV).
+              </p>
+            </section>
+
+            <!-- Section 06: Magnetic Reconnection, Plasma Sheet & Polar Aurora -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s5Tag">06 // REKONEKSI MAGNETIK &amp; AURORA</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="sec5Title">Rekoneksi Magnetik, Lembar Plasma &amp; Aurora Kutub</h2>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec5P1">
+                Ketika medan magnet antarplanet (IMF) mengarah ke selatan (<span class="font-mono-tech text-rose-300">B_z &lt; 0</span>), terjadi <strong>Rekoneksi Magnetik</strong> di magnetopause siang dan di dalam <strong>Lembar Plasma (Plasma Sheet)</strong> berwarna sian terang di tengah ekor magnetik.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed" data-i18n="sec5P2">
+                Energi magnetik yang tersimpan dilepaskan secara eksplosif seperti ketapel, melontarkan elektron dan proton di sepanjang garis medan menuju wilayah oval kutub utara dan selatan (melalui <em>Polar Cusp</em> dan arus Birkeland). Tumbukan partikel ini dengan atom Oksigen (O) dan molekul Nitrogen (N₂) di termosfer-ionosfer (ketinggian 80–400 km) memancarkan tirai cahaya <strong>Aurora Borealis</strong> (Utara) dan <strong>Aurora Australis</strong> (Selatan):
+              </p>
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <div class="bg-slate-950/70 p-2.5 rounded-lg border border-emerald-500/30">
+                  <div class="text-xs font-semibold text-[#5df0a8]" data-i18n="auroraGreenTitle">Hijau-Sian (λ = 557,7 nm)</div>
+                  <div class="text-[11px] text-slate-400" data-i18n="auroraGreenDesc">Eksitasi atom Oksigen (O) pada ketinggian 100–180 km.</div>
+                </div>
+                <div class="bg-slate-950/70 p-2.5 rounded-lg border border-purple-500/30">
+                  <div class="text-xs font-semibold text-purple-300" data-i18n="auroraVioletTitle">Ungu-Magenta (λ = 391–428 nm)</div>
+                  <div class="text-[11px] text-slate-400" data-i18n="auroraVioletDesc">Ionisasi molekul Nitrogen (N₂⁺) di tepi bawah aurora (~90 km).</div>
+                </div>
+              </div>
+            </section>
+          </article>
+
+          <!-- VIEW 2: SCIENTIFIC PARAMETERS TABLE & EQUATIONS -->
+          <div id="panelData" class="space-y-8">
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s6Tag">07 // PARAMETER ILMIAH</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="tableTitle">
+                Tabel Parameter Ilmiah Lapisan Magnetosfer Bumi
+              </h2>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="border-b border-slate-700 text-slate-400 font-mono-tech text-[10px]">
+                      <th class="py-2 pr-2" data-i18n="thZone">Wilayah / Struktur</th>
+                      <th class="py-2 px-2" data-i18n="thDist">Jarak (R⊕)</th>
+                      <th class="py-2 px-2" data-i18n="thField">Medan B (nT)</th>
+                      <th class="py-2 pl-2" data-i18n="thDensity">Plasma (cm⁻³)</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/80 font-mono-tech text-[11px]">
+                    <tr>
+                      <td class="py-2 pr-2 font-sans font-semibold text-lime-300" data-i18n="rowSw">Angin Surya Hulu (IMF)</td>
+                      <td class="py-2 px-2 text-slate-300">&gt; 15 R⊕</td>
+                      <td class="py-2 px-2 text-slate-300">3 – 10 nT</td>
+                      <td class="py-2 pl-2 text-slate-300">5 – 10</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 pr-2 font-sans font-semibold text-amber-300" data-i18n="rowBs">Bow Shock &amp; Sheath</td>
+                      <td class="py-2 px-2 text-slate-300">10 – 14 R⊕</td>
+                      <td class="py-2 px-2 text-slate-300">15 – 45 nT</td>
+                      <td class="py-2 pl-2 text-slate-300">15 – 35</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 pr-2 font-sans font-semibold text-cyan-300" data-i18n="rowMp">Magnetopause (Subsolar)</td>
+                      <td class="py-2 px-2 text-slate-300">~10.2 R⊕</td>
+                      <td class="py-2 px-2 text-slate-300">50 – 90 nT</td>
+                      <td class="py-2 pl-2 text-slate-300">1 – 15</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 pr-2 font-sans font-semibold text-purple-300" data-i18n="rowVa">Sabuk Radiasi Van Allen</td>
+                      <td class="py-2 px-2 text-slate-300">1.2 – 7.0 R⊕</td>
+                      <td class="py-2 px-2 text-slate-300">100 – 15.000 nT</td>
+                      <td class="py-2 pl-2 text-slate-300">10 – 1.000</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 pr-2 font-sans font-semibold text-[#5df0a8]" data-i18n="rowPs">Lembar Plasma (Ekor)</td>
+                      <td class="py-2 px-2 text-slate-300">10 – 100+ R⊕</td>
+                      <td class="py-2 px-2 text-slate-300">2 – 15 nT</td>
+                      <td class="py-2 pl-2 text-slate-300">0.1 – 1.0</td>
+                    </tr>
+                    <tr>
+                      <td class="py-2 pr-2 font-sans font-semibold text-emerald-300" data-i18n="rowSurface">Permukaan Bumi (Inti)</td>
+                      <td class="py-2 px-2 text-slate-300">1.0 R⊕ (6.371 km)</td>
+                      <td class="py-2 px-2 text-slate-300">25.000 – 65.000 nT</td>
+                      <td class="py-2 pl-2 text-slate-300">Ionosfer 10⁵</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!-- Key Equations Reference Card -->
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="s7Tag">08 // PERSAMAAN FUNDAMENTAL</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="eqHeader">
+                Persamaan Fundamental Magnetohidrodinamika (MHD)
+              </h2>
+              <div class="space-y-2.5 text-xs">
+                <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+                  <div class="font-mono-tech text-emerald-300 font-semibold">1. Jarak Standoff Chapman-Ferraro (R_mp)</div>
+                  <div class="font-mono-tech text-white my-1">R_mp / R⊕ = [ B₀² / (2 · μ₀ · ρ_sw · v_sw²) ]^(1/6)</div>
+                  <p class="text-[11px] text-slate-400" data-i18n="eq1Desc">
+                    Menentukan jarak hidung magnetopause. Saat kecepatan angin surya (v_sw) meningkat saat badai CME, R_mp menyusut mendekati Bumi.
+                  </p>
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+                  <div class="font-mono-tech text-cyan-300 font-semibold">2. Radius Giro Larmor (r_g)</div>
+                  <div class="font-mono-tech text-white my-1">r_g = (m · v_⊥) / (|q| · B)</div>
+                  <p class="text-[11px] text-slate-400" data-i18n="eq2Desc">
+                    Radius spiral partikel bermuatan yang terperangkap mengitari garis medan magnet Bumi.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================================
+       THREE.JS v0.143.0 MODULE SCRIPT: 3D MAGNETOSPHERE & BILINGUAL ENGINE
+       ========================================================================= -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* =========================================================================
+       1. BILINGUAL SCIENTIFIC DATA DICTIONARY (ID & EN)
+       ========================================================================= */
+    const I18N = {
+      id: {
+        chapterBadge: "Bab 05 — Magnetosfer & Perisai",
+        modalTitle: "Struktur Magnetosfer dan Dinamika Aurora Bumi",
+        viewProfile: "Profil Ilmiah",
+        viewIso: "3D Orbit",
+        viewPolar: "Kutub & Aurora",
+        viewSun: "Hulu Surya",
+        telemetryHeader: "Telemetri angin surya live",
+        metricMp: "Magnetopause",
+        metricBs: "Bow Shock",
+        metricAurora: "Daya Aurora",
+        btnParticles: "Partikel Surya",
+        btnFieldLines: "Garis Medan",
+        btnBowShock: "Bow Shock",
+        btnVanAllen: "Sabuk Van Allen",
+        btnCoreCutaway: "X-Ray Inti",
+        btnLabels: "Label 3D",
+        btnAutoRotate: "Putar Otomatis",
+        btnResetCam: "Reset Kamera",
+        tabArticle: "Artikel BAB 05 Lengkap",
+        tabData: "Parameter & Rumus",
+        openArticleBtn: "Artikel Ilmiah",
+        capEyebrow: "Artikel",
+        hudPrompt: "Klik komponen atau pin 3D untuk inspeksi",
+        statDistLabel: "Jarak Geosentris",
+        statBFieldLabel: "Kuat Medan Magnet (B)",
+        statPlasmaLabel: "Kerapatan Plasma (n)",
+        statTempLabel: "Energi / Temperatur",
+        physMechanismLabel: "Mekanisme fisika utama",
+        artBannerTag: "Ensiklopedia sains Bumi TerraPedia · BAB 05",
+        artMainHeading: "Magnetosfer & Perisai Pelindung Biosfer Bumi",
+        s0Tag: "01 // PENGANTAR",
+        s1Tag: "02 // MESIN GEODINAMO",
+        s2Tag: "03 // INTERAKSI ANGIN SURYA",
+        s3Tag: "04 // ANATOMI PERISAI",
+        s4Tag: "05 // GAYA LORENTZ &amp; SABUK RADIASI",
+        s5Tag: "06 // REKONEKSI MAGNETIK &amp; AURORA",
+        s6Tag: "07 // PARAMETER ILMIAH",
+        s7Tag: "08 // PERSAMAAN FUNDAMENTAL",
+        artIntroLead: "Tanpa medan magnet global yang membentang puluhan ribu kilometer ke ruang angkasa, atmosfer Bumi akan terkikis habis oleh terpaan angin surya seperti yang terjadi pada planet Mars. Magnetosfer bertindak sebagai perisai elektromagnetik raksasa yang membelokkan radiasi kosmik dan partikel berenergi tinggi.",
+        sec1Title: "Mesin Geodinamo di Inti Luar Bumi",
+        sec1P1: "Medan magnet Bumi (geomagnetik) dibangkitkan pada kedalaman 2.890 hingga 5.150 km di bawah permukaan melalui proses <strong>Geodinamo Hidromagnetik</strong>. Inti luar Bumi terdiri dari logam cair besi (Fe) dan nikel (Ni) bersuhu ~4.500–5.500 °C yang bersifat konduktif secara elektrik.",
+        sec1P2: "Kombinasi tiga faktor utama—konveksi termal-komposisional akibat pendinginan inti dalam, gaya Coriolis dari rotasi Bumi setiap 24 jam, serta konduktivitas listrik besi cair—menciptakan arus listrik spiral (arus Eddy) yang menghasilkan medan magnet dipol raksasa dengan kemiringan sumbu sekitar <strong>11,5°</strong> terhadap sumbu rotasi geografis Bumi.",
+        sec2Title: "Interaksi Angin Surya & Deformasi Asimetris",
+        sec2P1: "Di ruang hampa tanpa gangguan eksternal, medan magnet Bumi akan berbentuk simetris seperti donat (dipol murni). Namun, Matahari secara kontinu menyemburkan <strong>Angin Surya (Solar Wind)</strong>—aliran plasma supersonik bermuatan (terutama proton H⁺ dan elektron e⁻) dengan kecepatan 300 hingga >1.000 km/detik yang membawa <em>Interplanetary Magnetic Field</em> (IMF).",
+        sec2P2: "Tekanan ram hidrodinamis angin surya (<span class='font-mono-tech text-emerald-300'>P_ram = ρ·v²</span>) menekan sisi siang (dayside) magnetosfer hingga memampat pada jarak <strong>~6 hingga 10 jari-jari Bumi (R⊕)</strong>, sementara sisi malam (nightside) tertarik memanjang membentuk <strong>Ekor Magnetik (Magnetotail)</strong> yang membentang melampaui 200–1.000 R⊕ (jauh melewati orbit Bulan pada 60 R⊕).",
+        sec3Title: "Anatomi Perisai: Bow Shock, Magnetosheath & Magnetopause",
+        sec3Li1: "<strong>Kejut Busur (Bow Shock, ~13–15 R⊕):</strong> Karena kecepatan angin surya melampaui kecepatan gelombang magnetosonik Alfvén (Mach 5–8), terbentuk gelombang kejut paraboloid berwarna keemasan di depan Bumi. Di sini plasma melambat secara mendadak menjadi subsonik dan suhunya melonjak drastis.",
+        sec3Li2: "<strong>Magnetosheath:</strong> Wilayah transisi turbulen di antara Bow Shock dan Magnetopause tempat partikel angin surya yang terpanaskan mengalir membelok mengelilingi perisai Bumi.",
+        sec3Li3: "<strong>Magnetopause (~10 R⊕ di titik subsolar):</strong> Lapisan batas arus listrik (Arus Chapman-Ferraro) tempat tekanan magnetik internal Bumi (<span class='font-mono-tech text-cyan-300'>B² / 2μ₀</span>) tepat menyeimbangkan tekanan dinamis angin surya.",
+        sec4Title: "Gaya Lorentz & Sabuk Radiasi Van Allen",
+        sec4P1: "Mengapa partikel bermuatan tidak dapat menembus lurus ke permukaan Bumi? Setiap partikel bermuatan q yang bergerak dengan kecepatan v melintasi medan magnet B mengalami <strong>Gaya Lorentz</strong> tegak lurus arah geraknya:",
+        sec4FormulaNote: "Perkalian silang (v × B) memaksa proton dan elektron berbelok mengikuti lintasan heliks (gyromotion) di sepanjang garis medan magnet atau tersapu ke sisi luar magnetopause.",
+        sec4P2: "Sebagian partikel berenergi tinggi terperangkap di dalam <strong>Sabuk Radiasi Van Allen</strong> yang terdiri dari dua cincin toroidal: <em>Sabuk Dalam</em> (1,2–2,5 R⊕, didominasi proton energetik 10–100 MeV) dan <em>Sabuk Luar</em> (3,0–7,0 R⊕, didominasi elektron relativistik 0,1–10 MeV).",
+        sec5Title: "Rekoneksi Magnetik, Lembar Plasma & Aurora Kutub",
+        sec5P1: "Ketika medan magnet antarplanet (IMF) mengarah ke selatan (<span class='font-mono-tech text-rose-300'>B_z &lt; 0</span>), terjadi <strong>Rekoneksi Magnetik</strong> di magnetopause siang dan di dalam <strong>Lembar Plasma (Plasma Sheet)</strong> berwarna sian terang di tengah ekor magnetik.",
+        sec5P2: "Energi magnetik yang tersimpan dilepaskan secara eksplosif seperti ketapel, melontarkan elektron dan proton di sepanjang garis medan menuju wilayah oval kutub utara dan selatan (melalui <em>Polar Cusp</em> dan arus Birkeland). Tumbukan partikel ini dengan atom Oksigen (O) dan molekul Nitrogen (N₂) di termosfer-ionosfer (ketinggian 80–400 km) memancarkan tirai cahaya <strong>Aurora Borealis</strong> (Utara) dan <strong>Aurora Australis</strong> (Selatan):",
+        auroraGreenTitle: "Hijau-Sian (λ = 557,7 nm)",
+        auroraGreenDesc: "Eksitasi atom Oksigen (O) pada ketinggian 100–180 km.",
+        auroraVioletTitle: "Ungu-Magenta (λ = 391–428 nm)",
+        auroraVioletDesc: "Ionisasi molekul Nitrogen (N₂⁺) di tepi bawah aurora (~90 km).",
+        tableTitle: "Tabel Parameter Ilmiah Lapisan Magnetosfer Bumi",
+        thZone: "Wilayah / Struktur",
+        thDist: "Jarak (R⊕)",
+        thField: "Medan B (nT)",
+        thDensity: "Plasma (cm⁻³)",
+        rowSw: "Angin Surya Hulu (IMF)",
+        rowBs: "Bow Shock & Sheath",
+        rowMp: "Magnetopause (Subsolar)",
+        rowVa: "Sabuk Radiasi Van Allen",
+        rowPs: "Lembar Plasma (Ekor)",
+        rowSurface: "Permukaan Bumi (Inti)",
+        eqHeader: "Persamaan Fundamental Magnetohidrodinamika (MHD)",
+        eq1Desc: "Menentukan jarak hidung magnetopause. Saat kecepatan angin surya (v_sw) meningkat saat badai CME, R_mp menyusut mendekati Bumi.",
+        eq2Desc: "Radius spiral partikel bermuatan yang terperangkap mengitari garis medan magnet Bumi.",
+        navFooterPrevLabel: "Sebelumnya",
+        navFooterPrevTitle: "BAB 04 — Vulkanologi & Seismik",
+        navFooterNextLabel: "Berikutnya",
+        navFooterNextTitle: "BAB 06 — Hidrosfer & Samudra"
+      },
+      en: {
+        chapterBadge: "CH 05 — Magnetosphere & Shield",
+        modalTitle: "Earth's Magnetosphere Structure & Aurora Dynamics",
+        viewProfile: "Scientific Profile",
+        viewIso: "3D Orbit",
+        viewPolar: "Poles & Aurora",
+        viewSun: "Upstream Sun",
+        telemetryHeader: "Live solar wind telemetry",
+        metricMp: "Magnetopause",
+        metricBs: "Bow Shock",
+        metricAurora: "Aurora Power",
+        btnParticles: "Solar Particles",
+        btnFieldLines: "Field Lines",
+        btnBowShock: "Bow Shock",
+        btnVanAllen: "Van Allen Belts",
+        btnCoreCutaway: "Core X-Ray",
+        btnLabels: "3D Labels",
+        btnAutoRotate: "Auto-Rotate",
+        btnResetCam: "Reset Camera",
+        tabArticle: "Full Chapter 05 Article",
+        tabData: "Parameters & Equations",
+        openArticleBtn: "Scientific Article",
+        capEyebrow: "Article",
+        hudPrompt: "Click a component or 3D pin to inspect",
+        statDistLabel: "Geocentric Distance",
+        statBFieldLabel: "Magnetic Field (B)",
+        statPlasmaLabel: "Plasma Density (n)",
+        statTempLabel: "Energy / Temperature",
+        physMechanismLabel: "Primary physical mechanism",
+        artBannerTag: "TerraPedia Earth science encyclopedia · CH 05",
+        artMainHeading: "The Magnetosphere & Protective Shield of Earth's Biosphere",
+        s0Tag: "01 // INTRODUCTION",
+        s1Tag: "02 // GEODYNAMO ENGINE",
+        s2Tag: "03 // SOLAR WIND INTERACTION",
+        s3Tag: "04 // SHIELD ANATOMY",
+        s4Tag: "05 // LORENTZ FORCE &amp; RADIATION BELTS",
+        s5Tag: "06 // MAGNETIC RECONNECTION &amp; AURORA",
+        s6Tag: "07 // SCIENTIFIC PARAMETERS",
+        s7Tag: "08 // FUNDAMENTAL EQUATIONS",
+        artIntroLead: "Without a global magnetic field extending tens of thousands of kilometers into space, Earth's atmosphere would be stripped away by the relentless solar wind, much like Mars. The magnetosphere acts as a planetary electromagnetic shield that deflects cosmic radiation and energetic charged particles.",
+        sec1Title: "The Geodynamo Engine in Earth's Outer Core",
+        sec1P1: "Earth's geomagnetic field is generated at depths of 2,890 to 5,150 km beneath the surface via the <strong>Hydromagnetic Geodynamo</strong> process. The liquid outer core consists of molten iron (Fe) and nickel (Ni) at ~4,500–5,500 °C that is highly electrically conductive.",
+        sec1P2: "The interplay of three key drivers—thermo-compositional convection from inner core freezing, Coriolis forces from Earth's 24-hour rotation, and liquid metal conductivity—generates helical electric Eddy currents that sustain a giant dipolar magnetic field tilted at roughly <strong>11.5°</strong> to Earth's geographic rotational axis.",
+        sec2Title: "Solar Wind Interaction & Asymmetric Deformation",
+        sec2P1: "In an empty vacuum without external forces, Earth's magnetic field would form a symmetric torus (pure dipole). However, the Sun continuously ejects the <strong>Solar Wind</strong>—a supersonic stream of magnetized plasma (protons H⁺ and electrons e⁻) flowing at 300 to >1,000 km/s carrying the <em>Interplanetary Magnetic Field</em> (IMF).",
+        sec2P2: "Hydrodynamic ram pressure from the solar wind (<span class='font-mono-tech text-emerald-300'>P_ram = ρ·v²</span>) compresses the dayside magnetosphere inward to <strong>~6 to 10 Earth radii (R⊕)</strong>, while stretching the nightside into an elongated <strong>Magnetotail</strong> reaching beyond 200–1,000 R⊕ (well past the Moon's orbit at 60 R⊕).",
+        sec3Title: "Anatomy of the Shield: Bow Shock, Magnetosheath & Magnetopause",
+        sec3Li1: "<strong>Bow Shock (~13–15 R⊕):</strong> Because the solar wind travels faster than the fast magnetosonic Alfvén wave speed (Mach 5–8), a golden paraboloid shockwave forms upstream of Earth where plasma abruptly decelerates to subsonic speeds and heats up.",
+        sec3Li2: "<strong>Magnetosheath:</strong> The turbulent transition region between the Bow Shock and Magnetopause where shocked, heated solar wind plasma deflects and flows around Earth's magnetic barrier.",
+        sec3Li3: "<strong>Magnetopause (~10 R⊕ at subsolar point):</strong> The current sheet boundary (Chapman-Ferraro current) where Earth's internal magnetic pressure (<span class='font-mono-tech text-cyan-300'>B² / 2μ₀</span>) exactly balances solar wind dynamic pressure.",
+        sec4Title: "Lorentz Force Deflection & Van Allen Radiation Belts",
+        sec4P1: "Why can't charged solar particles penetrate straight down to Earth's surface? Every charged particle q moving at velocity v across a magnetic field B experiences the perpendicular <strong>Lorentz Force</strong>:",
+        sec4FormulaNote: "The cross product (v × B) forces protons and electrons into helical gyromotion trajectories around field lines or sweeps them around the exterior magnetopause.",
+        sec4P2: "A portion of energetic particles becomes trapped inside the <strong>Van Allen Radiation Belts</strong>, comprising two toroidal rings: the <em>Inner Belt</em> (1.2–2.5 R⊕, dominated by 10–100 MeV energetic protons) and the <em>Outer Belt</em> (3.0–7.0 R⊕, dominated by 0.1–10 MeV relativistic electrons).",
+        sec5Title: "Magnetic Reconnection, Plasma Sheet & Polar Aurora",
+        sec5P1: "When the Interplanetary Magnetic Field (IMF) points southward (<span class='font-mono-tech text-rose-300'>B_z &lt; 0</span>), <strong>Magnetic Reconnection</strong> occurs at the dayside magnetopause and within the glowing cyan <strong>Plasma Sheet</strong> in the center of the magnetotail.",
+        sec5P2: "Stored magnetic energy snaps like an elastic slingshot, accelerating electrons and protons along magnetic field lines into the northern and southern polar ovals (via the <em>Polar Cusps</em> and Birkeland currents). Collisions with Oxygen (O) atoms and Nitrogen (N₂) molecules in the upper atmosphere (80–400 km altitude) ignite the shimmering curtains of <strong>Aurora Borealis</strong> and <strong>Aurora Australis</strong>:",
+        auroraGreenTitle: "Green-Cyan (λ = 557.7 nm)",
+        auroraGreenDesc: "Atomic Oxygen (O) excitation at 100–180 km altitude.",
+        auroraVioletTitle: "Violet-Magenta (λ = 391–428 nm)",
+        auroraVioletDesc: "Ionized molecular Nitrogen (N₂⁺) at the lower auroral edge (~90 km).",
+        tableTitle: "Scientific Parameter Table of Earth's Magnetospheric Layers",
+        thZone: "Region / Structure",
+        thDist: "Distance (R⊕)",
+        thField: "B-Field (nT)",
+        thDensity: "Plasma (cm⁻³)",
+        rowSw: "Upstream Solar Wind (IMF)",
+        rowBs: "Bow Shock & Sheath",
+        rowMp: "Magnetopause (Subsolar)",
+        rowVa: "Van Allen Radiation Belts",
+        rowPs: "Plasma Sheet (Tail)",
+        rowSurface: "Earth Surface (Core)",
+        eqHeader: "Fundamental Magnetohydrodynamic (MHD) Equations",
+        eq1Desc: "Determines the subsolar magnetopause standoff distance. Higher solar wind speed (v_sw) during CME storms compresses R_mp closer to Earth.",
+        eq2Desc: "Gyroradius of charged particles spiraling along Earth's magnetic field lines.",
+        navFooterPrevLabel: "Previous",
+        navFooterPrevTitle: "CH 04 — Volcanology & Seismology",
+        navFooterNextLabel: "Next",
+        navFooterNextTitle: "CH 06 — Hydrosphere & Oceans"
+      }
+    };
+
+    /* =========================================================================
+       2. 7 SELECTABLE MAGNETOSPHERE COMPONENTS DATABASE (ID & EN)
+       ========================================================================= */
+    const COMPONENTS_DB = [
+      {
+        id: 'solar_wind',
+        index: '01/07',
+        color: '#a3e635',
+        pos3D: new THREE.Vector3(-13.5, 4.2, 0),
+        camPos: new THREE.Vector3(-14, 7, 22),
+        camTarget: new THREE.Vector3(-8, 0, 0),
+        id_data: {
+          shortName: "Matahari & Angin Surya (IMF)",
+          title: "Matahari, Angin Surya & Medan Magnet Antarplanet (IMF)",
+          subtitle: "Aliran Plasma Supersonik & Garis Medan Magnet Surya",
+          coord: "Hulu > 15 R⊕ (1 AU)",
+          dist: "149,6 Juta km (1 AU)",
+          bField: "3 – 10 nT (IMF)",
+          density: "5 – 12 proton/cm³",
+          temp: "1,2 × 10⁵ K (v ≈ 400–900 km/s)",
+          desc: "Korona Matahari yang bersuhu jutaan Kelvin terus-menerus melontarkan aliran partikel bermuatan (terutama proton H⁺ dan elektron bebas) yang disebut Angin Surya. Aliran ini membawa garis-garis Medan Magnet Antarplanet (IMF, divisualisasikan sebagai garis vertikal kuning-hijau di sisi kiri) yang menabrak perisai magnetik Bumi dengan kecepatan supersonik Mach 5–8.",
+          mechanism: "Konduktivitas plasma yang sangat tinggi membuat garis medan magnet Matahari 'membeku' di dalam aliran plasma (Teorema Alfvén Frozen-in Flux) dan melengkung menyelimuti magnetosfer Bumi."
+        },
+        en_data: {
+          shortName: "Sun & Solar Wind (IMF)",
+          title: "The Sun, Solar Wind & Interplanetary Magnetic Field (IMF)",
+          subtitle: "Supersonic Magnetized Plasma Stream & Draping IMF Lines",
+          coord: "Upstream > 15 R⊕ (1 AU)",
+          dist: "149.6 Million km (1 AU)",
+          bField: "3 – 10 nT (IMF)",
+          density: "5 – 12 protons/cm³",
+          temp: "1.2 × 10⁵ K (v ≈ 400–900 km/s)",
+          desc: "The Sun's multi-million-Kelvin corona continuously expels a supersonic stream of charged particles (primarily protons H⁺ and electrons) known as the Solar Wind. Carrying vertical yellow-green Interplanetary Magnetic Field (IMF) lines from the left, this plasma slams into Earth's magnetic obstacle at Mach 5–8.",
+          mechanism: "High electrical conductivity freezes the solar magnetic field into the plasma flow (Alfvén's Frozen-in Flux Theorem), causing IMF lines to pile up and drape around Earth's bow shock."
+        }
+      },
+      {
+        id: 'bow_shock',
+        index: '02/07',
+        color: '#f59e0b',
+        pos3D: new THREE.Vector3(-8.2, 5.5, 0),
+        camPos: new THREE.Vector3(-6, 6, 21),
+        camTarget: new THREE.Vector3(-4, 0, 0),
+        id_data: {
+          shortName: "Kejut Busur (Bow Shock)",
+          title: "Kejut Busur (Bow Shock) & Magnetosheath",
+          subtitle: "Gelombang Kejut Supersonik & Zona Pembelokan Plasma Panas",
+          coord: "R ≈ 13.5 – 15 R⊕ (Hulu)",
+          dist: "~85.000 – 95.000 km",
+          bField: "15 – 45 nT (Terkompresi)",
+          density: "15 – 35 cm⁻³",
+          temp: "5 × 10⁶ K (Termal Kejut)",
+          desc: "Seperti gelombang air di depan haluan kapal cepat, Kejut Busur (Bow Shock) berwarna jingga-keemasan terbentuk sekitar 13–15 R⊕ di depan Bumi. Di batas kejut tanpa tumbukan (collisionless shock) ini, partikel angin surya diperlambat secara drastis dari kecepatan supersonik menjadi subsonik, sementara energi kinetiknya diubah menjadi panas di dalam lapisan Magnetosheath.",
+          mechanism: "Kondisi lompatan Rankine-Hugoniot MHD memampatkan kerapatan plasma dan membelokkan lintasan partikel bermuatan agar mengalir menyusuri sisi luar magnetopause."
+        },
+        en_data: {
+          shortName: "Bow Shock & Sheath",
+          title: "Bow Shock & Turbulent Magnetosheath",
+          subtitle: "Supersonic Collisionless Shockwave & Deflected Plasma Sheath",
+          coord: "R ≈ 13.5 – 15 R⊕ (Nose)",
+          dist: "~85,000 – 95,000 km",
+          bField: "15 – 45 nT (Compressed)",
+          density: "15 – 35 cm⁻³",
+          temp: "5 × 10⁶ K (Shock Heated)",
+          desc: "Like a water wave forming ahead of a speeding ship's bow, the golden-orange Bow Shock stands ~13–15 R⊕ upstream of Earth. Across this collisionless shockwave, solar wind particles abruptly decelerate from supersonic to subsonic speeds, converting kinetic energy into intense thermal heat within the Magnetosheath.",
+          mechanism: "MHD Rankine-Hugoniot jump conditions compress plasma density and magnetic field strength by ~3–4×, deflecting particle streamlines around the magnetopause obstacle."
+        }
+      },
+      {
+        id: 'magnetopause',
+        index: '03/07',
+        color: '#22d3ee',
+        pos3D: new THREE.Vector3(-5.6, -3.5, 0),
+        camPos: new THREE.Vector3(-3, 5, 19),
+        camTarget: new THREE.Vector3(-2, 0, 0),
+        id_data: {
+          shortName: "Magnetopause",
+          title: "Magnetopause (Batas Perisai Magnetik)",
+          subtitle: "Permukaan Keseimbangan Tekanan Dinamis vs Tekanan Magnetik",
+          coord: "R ≈ 10.2 R⊕ (Subsolar)",
+          dist: "~63.700 km (Sisi Siang)",
+          bField: "50 – 100 nT",
+          density: "1 – 15 cm⁻³ (Gradien Tajam)",
+          temp: "10⁶ – 10⁷ K",
+          desc: "Magnetopause adalah perbatasan luar sesungguhnya dari magnetosfer Bumi yang berbentuk seperti peluru. Di titik subsolar (~10 R⊕ di siang hari), tekanan magnetik internal Bumi tepat menahan tekanan tabrakan angin surya. Saat badai surya (CME) ekstrem terjadi, magnetopause dapat tertekan masuk hingga di bawah orbit satelit geostasioner (6,6 R⊕).",
+          mechanism: "Arus permukaan Chapman-Ferraro (J × B) mengalir melintasi magnetopause, memisahkan plasma angin surya dari rongga medan geomagnetik Bumi."
+        },
+        en_data: {
+          shortName: "Magnetopause",
+          title: "Magnetopause (Outer Magnetic Shield Boundary)",
+          subtitle: "Dynamic Pressure Equilibrium Surface & Chapman-Ferraro Sheet",
+          coord: "R ≈ 10.2 R⊕ (Subsolar)",
+          dist: "~63,700 km (Dayside)",
+          bField: "50 – 100 nT",
+          density: "1 – 15 cm⁻³ (Sharp Gradient)",
+          temp: "10⁶ – 10⁷ K",
+          desc: "The bullet-shaped Magnetopause marks the true outer boundary of Earth's magnetosphere. At the subsolar point (~10 R⊕), geomagnetic pressure exactly balances incoming solar wind ram pressure. During severe CME solar storms, it can be compressed inside geostationary satellite orbit (6.6 R⊕).",
+          mechanism: "Chapman-Ferraro surface currents (J × B) flow along the boundary, shielding the inner magnetosphere and deflecting incoming protons and electrons."
+        }
+      },
+      {
+        id: 'dipole_van_allen',
+        index: '04/07',
+        color: '#c084fc',
+        pos3D: new THREE.Vector3(-2.6, 2.2, 1.5),
+        camPos: new THREE.Vector3(0, 4.5, 14),
+        camTarget: new THREE.Vector3(0, 0, 0),
+        id_data: {
+          shortName: "Medan Dipol & Van Allen",
+          title: "Garis Medan Dipol & Sabuk Radiasi Van Allen",
+          subtitle: "Loop Medan Magnet Terkompresi & Cincin Partikel Terperangkap",
+          coord: "R ≈ 1.2 – 7.0 R⊕",
+          dist: "7.600 – 45.000 km",
+          bField: "100 – 15.000 nT",
+          density: "10 – 1.000 cm⁻³",
+          temp: "Energi Relativistik (0.1–100 MeV)",
+          desc: "Di bagian dalam magnetopause, garis-garis medan magnet tertutup melengkung keluar dari kutub magnetik selatan menuju kutub magnetik utara. Di sisi siang, loop ini tertekan rapat berwarna kuning-hijau dan sian. Di wilayah ini terdapat dua Sabuk Radiasi Van Allen berbentuk donat yang memerangkap proton dan elektron berenergi tinggi dalam cermin magnetik.",
+          mechanism: "Gaya Lorentz memaksa partikel melakukan 3 gerakan periodik: rotasi giro (gyromotion), pantulan antar-kutub (mirror bounce), dan hanyutan cincin (ring current drift)."
+        },
+        en_data: {
+          shortName: "Dipole Lines & Van Allen",
+          title: "Dipole Field Lines & Van Allen Radiation Belts",
+          subtitle: "Compressed Dayside Loops & Toroidal Trapped Particle Zones",
+          coord: "R ≈ 1.2 – 7.0 R⊕",
+          dist: "7,600 – 45,000 km",
+          bField: "100 – 15,000 nT",
+          density: "10 – 1,000 cm⁻³",
+          temp: "Relativistic (0.1–100 MeV)",
+          desc: "Inside the magnetopause, closed dipolar magnetic field lines arch between the southern and northern magnetic poles—tightly compressed on the dayside. Within this inner cavity lie the two toroidal Van Allen Radiation Belts, trapping high-energy protons and relativistic electrons in a magnetic bottle.",
+          mechanism: "Lorentz forces govern three adiabatic invariants: helical gyromotion around field lines, bounce motion between polar magnetic mirrors, and azimuthal ring drift."
+        }
+      },
+      {
+        id: 'magnetotail',
+        index: '05/07',
+        color: '#5df0a8',
+        pos3D: new THREE.Vector3(11.0, 0.4, 0),
+        camPos: new THREE.Vector3(7, 5, 22),
+        camTarget: new THREE.Vector3(7, 0, 0),
+        id_data: {
+          shortName: "Ekor Magnetik & Lembar Plasma",
+          title: "Ekor Magnetik (Magnetotail) & Lembar Plasma Sian",
+          subtitle: "Reservoir Energi Magnetik Malam & Jalur Rekoneksi Ketapel",
+          coord: "Sisi Malam 10 – 200+ R⊕",
+          dist: "65.000 – >1.200.000 km",
+          bField: "2 – 20 nT (Lobus & Lembar)",
+          density: "0.1 – 1.0 cm⁻³ (Plasma Sheet)",
+          temp: "10⁷ – 5 × 10⁷ K (keV Plasma)",
+          desc: "Sesuai visualisasi ilmiah referensi, terpaan angin surya menarik garis medan sisi malam menjadi Ekor Magnetik raksasa berwarna biru-ungu. Tepat di bidang ekuator tengahnya mengalir Lembar Plasma (Plasma Sheet) berwarna biru-sian terang yang bergelombang. Di sinilah garis medan berlawanan arah mengalami Rekoneksi Magnetik dan melontarkan plasma kembali ke kutub Bumi.",
+          mechanism: "Lembar arus netral (Neutral Current Sheet) memisahkan lobus ekor utara (medan mengarah ke Bumi) dan lobus selatan (medan menjauhi Bumi), memicu substorm geomagnetik."
+        },
+        en_data: {
+          shortName: "Magnetotail & Plasma Sheet",
+          title: "Magnetotail Lobes & Glowing Cyan Plasma Sheet",
+          subtitle: "Nightside Magnetic Energy Reservoir & Reconnection Slingshot",
+          coord: "Nightside 10 – 200+ R⊕",
+          dist: "65,000 – >1,200,000 km",
+          bField: "2 – 20 nT (Lobes & Sheet)",
+          density: "0.1 – 1.0 cm⁻³ (Plasma Sheet)",
+          temp: "10⁷ – 5 × 10⁷ K (keV Plasma)",
+          desc: "Matching the scientific reference visualization, solar wind drag stretches nightside field lines into sweeping blue-violet Magnetotail lobes. Running right through the center is the undulating, bright cyan Plasma Sheet & Neutral Sheet—where oppositely directed magnetic lines reconnect and slingshot superheated plasma back toward Earth's poles.",
+          mechanism: "A cross-tail neutral current sheet separates the northern tail lobe (field pointing toward Earth) and southern lobe (pointing away), powering geomagnetic substorms."
+        }
+      },
+      {
+        id: 'aurora',
+        index: '06/07',
+        color: '#38bdf8',
+        pos3D: new THREE.Vector3(0.4, 2.3, 0),
+        camPos: new THREE.Vector3(2.5, 5.5, 8.5),
+        camTarget: new THREE.Vector3(0, 1.0, 0),
+        id_data: {
+          shortName: "Aurora & Polar Cusp",
+          title: "Aurora Kutub (Borealis & Australis) & Corong Polar Cusp",
+          subtitle: "Pendaran Luminesensi Ionosfer & Corong Masuk Partikel Kutub",
+          coord: "Lintang Magnetik 65° – 75°",
+          dist: "Ketinggian 80 – 400 km",
+          bField: "50.000 – 60.000 nT (Kutub)",
+          density: "10⁴ – 10⁶ elektron/cm³",
+          temp: "Eksitasi Foton 1.5 – 10 keV",
+          desc: "Pada wilayah kutub utara dan selatan terdapat dua celah corong magnetik yang disebut Polar Cusp, serta zona oval tempat garis medan dari Lembar Plasma berujung. Saat elektron dan proton dari ekor magnetik dan cusp menghujam atmosfer atas, tumbukannya dengan atom Oksigen dan molekul Nitrogen menghasilkan pendaran hijau zamrud (#5df0a8) dan ungu-magenta yang menari-nari.",
+          mechanism: "Arus sejajar medan (Birkeland Field-Aligned Currents) mempercepat elektron ke termosfer; de-eksitasi atom O memancarkan foton hijau 557,7 nm dan merah 630,0 nm."
+        },
+        en_data: {
+          shortName: "Polar Aurora & Cusps",
+          title: "Polar Aurora (Borealis & Australis) & Polar Cusps",
+          subtitle: "Ionospheric Luminescence & Dayside/Nightside Particle Funnels",
+          coord: "Magnetic Lat 65° – 75°",
+          dist: "Altitude 80 – 400 km",
+          bField: "50,000 – 60,000 nT (Polar)",
+          density: "10⁴ – 10⁶ electrons/cm³",
+          temp: "1.5 – 10 keV Precipitating e⁻",
+          desc: "Above the northern and southern magnetic poles lie the funnel-shaped Polar Cusps and auroral ovals where plasma sheet field lines converge. When energetic electrons and protons precipitate down along these field lines into the upper atmosphere, collisions with Oxygen and Nitrogen ignite shimmering emerald-green (#5df0a8) and magenta-violet auroral curtains.",
+          mechanism: "Birkeland field-aligned currents accelerate electrons into the thermosphere; atomic Oxygen de-excitation emits 557.7 nm green photons while N₂⁺ emits violet-magenta bands."
+        }
+      },
+      {
+        id: 'earth_dynamo',
+        index: '07/07',
+        color: '#f43f5e',
+        pos3D: new THREE.Vector3(0, -1.6, 0),
+        camPos: new THREE.Vector3(0.5, 1.8, 7.5),
+        camTarget: new THREE.Vector3(0, 0, 0),
+        id_data: {
+          shortName: "Bumi & Inti Geodinamo",
+          title: "Bumi & Mesin Inti Geodinamo (Sumber Perisai)",
+          subtitle: "Konveksi Besi Cair Inti Luar & Sumbu Dipol Geomagnetik 11,5°",
+          coord: "Pusat 0.0 – 1.0 R⊕",
+          dist: "Radius Bumi 6.371 km",
+          bField: "30.000 – 65.000 nT (Permukaan)",
+          density: "Besi-Nikel Cair 10–12 g/cm³",
+          temp: "4.500 – 5.500 °C (Inti Luar)",
+          desc: "Di jantung seluruh sistem magnetosfer ini adalah planet Bumi kita. Melalui mode X-Ray Inti pada simulasi ini, Anda dapat melihat Inti Dalam padat dan Inti Luar besi-nikel cair yang terus berputar dan berkonveksi. Tanpa mesin geodinamo ini, perisai magnetosfer akan lenyap dan radiasi matahari akan merusak lapisan ozon serta biosfer Bumi.",
+          mechanism: "Persamaan induksi magnetohidrodinamika (∂B/∂t = ∇ × (v × B) + η∇²B) mempertahankan medan dipol Bumi melawan peluruhan difusi ohmik selama miliaran tahun."
+        },
+        en_data: {
+          shortName: "Earth & Geodynamo Core",
+          title: "Earth & The Liquid Outer Core Geodynamo Engine",
+          subtitle: "Molten Iron-Nickel Convection & 11.5° Tilted Dipole Source",
+          coord: "Origin 0.0 – 1.0 R⊕",
+          dist: "Earth Radius 6,371 km",
+          bField: "30,000 – 65,000 nT (Surface)",
+          density: "Liquid Fe-Ni 10–12 g/cm³",
+          temp: "4,500 – 5,500 °C (Outer Core)",
+          desc: "At the heart of this entire vast magnetic structure sits planet Earth. Activating Core X-Ray mode reveals the solid inner core and convective molten iron-nickel outer core. Without this self-sustaining geodynamo engine, the magnetosphere would vanish, exposing Earth's atmosphere and biosphere to lethal solar radiation.",
+          mechanism: "The MHD magnetic induction equation (∂B/∂t = ∇ × (v × B) + η∇²B) regenerates the geomagnetic dipole field against ohmic decay over billions of years."
+        }
+      }
+    ];
+
+    /* =========================================================================
+       3. APPLICATION STATE
+       ========================================================================= */
+    const state = {
+      lang: 'id',
+      selectedCompId: 'magnetotail', // Start highlighting the iconic Magnetotail & Plasma Sheet or overview
+      solarWindSpeed: 420,           // km/s (300 to 1000)
+      compressionFactor: 1.0,        // Dynamically computed from solarWindSpeed
+      stormFactor: 0.17,             // 0..1 normalized intensity
+      showParticles: true,
+      showFieldLines: true,
+      showBowShock: true,
+      showVanAllen: true,
+      showCoreCutaway: false,
+      showPins: true,
+      autoRotate: false
+    };
+
+    /* =========================================================================
+       4. THREE.JS SCENE, CAMERA, RENDERER & CONTROLS INITIALIZATION
+       ========================================================================= */
+    const canvas = document.getElementById('magnetoCanvas');
+    const viewportContainer = document.getElementById('viewportContainer');
+    const hudPinsContainer = document.getElementById('hudPinsContainer');
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030710, 0.0065);
+
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 300);
+    // Default camera position matches the scientific side-profile angle of the reference image
+    camera.position.set(1.5, 3.2, 26.5);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance',
+      alpha: true
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 4.2;
+    controls.maxDistance = 65;
+    controls.target.set(1.5, 0, 0);
+
+    // Camera smooth transition state
+    const camAnim = {
+      active: false,
+      startPos: new THREE.Vector3(),
+      endPos: new THREE.Vector3(),
+      startTarget: new THREE.Vector3(),
+      endTarget: new THREE.Vector3(),
+      progress: 0
+    };
+
+    function flyToCamera(targetPos, lookTarget) {
+      camAnim.active = true;
+      camAnim.progress = 0;
+      camAnim.startPos.copy(camera.position);
+      camAnim.endPos.copy(targetPos);
+      camAnim.startTarget.copy(controls.target);
+      camAnim.endTarget.copy(lookTarget);
+    }
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0x283c5f, 1.1);
+    scene.add(ambientLight);
+
+    // Sunlight coming from the far left (-X direction)
+    const sunLight = new THREE.DirectionalLight(0xfff4d6, 2.5);
+    sunLight.position.set(-40, 4, 6);
+    scene.add(sunLight);
+
+    const tailRimLight = new THREE.PointLight(0x00f2fe, 1.4, 35);
+    tailRimLight.position.set(10, 0, 4);
+    scene.add(tailRimLight);
+
+    /* =========================================================================
+       5. PROCEDURAL TEXTURES & STARFIELD BACKGROUND
+       ========================================================================= */
+    // Create glowing soft particle sprite texture
+    function createGlowTexture(innerColor = '#ffffff', midColor = '#5df0a8') {
+      const c = document.createElement('canvas');
+      c.width = 64;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0.0, innerColor);
+      grad.addColorStop(0.35, midColor);
+      grad.addColorStop(0.7, 'rgba(34, 211, 238, 0.2)');
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(c);
+    }
+
+    const particleSpriteTex = createGlowTexture('#ffffff', '#5df0a8');
+
+    // Procedural High-Contrast Earth Equirectangular Map
+    function createEarthTextures() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      // Deep ocean gradient
+      const oceanGrad = ctx.createLinearGradient(0, 0, 0, 512);
+      oceanGrad.addColorStop(0, '#071a33');
+      oceanGrad.addColorStop(0.5, '#0a2b54');
+      oceanGrad.addColorStop(1, '#071a33');
+      ctx.fillStyle = oceanGrad;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      // Subtle bathymetry grid/Continents procedural shapes
+      ctx.fillStyle = '#1b5e49';
+      const continents = [
+        // North & South America
+        [[180, 110], [260, 95], [290, 165], [250, 220], [275, 250], [335, 300], [315, 395], [285, 430], [265, 340], [235, 240], [185, 175]],
+        // Eurasia & Africa
+        [[460, 175], [510, 100], [640, 80], [810, 105], [855, 185], [775, 245], [710, 265], [630, 225], [595, 295], [565, 395], [515, 380], [485, 290], [445, 245]],
+        // Indonesia & Maritime Southeast Asia + Australia
+        [[755, 255], [820, 265], [835, 290], [765, 285]],
+        [[790, 325], [875, 320], [890, 385], [815, 395]],
+        // Greenland
+        [[335, 60], [395, 55], [380, 105], [340, 95]]
+      ];
+
+      continents.forEach(poly => {
+        ctx.beginPath();
+        poly.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+
+      // Add organic noise & mountain highlights
+      for (let i = 0; i < 1600; i++) {
+        const x = Math.random() * 1024;
+        const y = 50 + Math.random() * 412;
+        const r = 2 + Math.random() * 10;
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(93, 240, 168, 0.06)' : 'rgba(14, 165, 233, 0.05)';
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Polar ice caps
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.85)';
+      ctx.fillRect(0, 0, 1024, 26);
+      ctx.fillRect(0, 486, 1024, 26);
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    // Cosmic Background Stars & Distant Nebula Dust
+    function createStarfield() {
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = 2200;
+      const positions = new Float32Array(starCount * 3);
+      const colors = new Float32Array(starCount * 3);
+
+      for (let i = 0; i < starCount; i++) {
+        const r = 55 + Math.random() * 90;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+
+        const c = new THREE.Color();
+        c.setHSL(0.52 + Math.random() * 0.18, 0.6, 0.65 + Math.random() * 0.35);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+
+      starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      const starMat = new THREE.PointsMaterial({
+        size: 0.38,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false
+      });
+
+      const stars = new THREE.Points(starGeo, starMat);
+      scene.add(stars);
+    }
+    createStarfield();
+
+    /* =========================================================================
+       6. BUILD THE 3D MAGNETOSPHERE GROUPS & SCIENTIFIC GEOMETRIES
+       ========================================================================= */
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    // Sub-groups for clean selection & highlighting
+    const groups = {
+      solar_wind: new THREE.Group(),
+      bow_shock: new THREE.Group(),
+      magnetopause: new THREE.Group(),
+      dipole_van_allen: new THREE.Group(),
+      magnetotail: new THREE.Group(),
+      aurora: new THREE.Group(),
+      earth_dynamo: new THREE.Group()
+    };
+    Object.values(groups).forEach(g => rootGroup.add(g));
+
+    // Dynamic Group scaling container for compressible magnetosphere regions
+    const compressibleGroup = new THREE.Group();
+    rootGroup.add(compressibleGroup);
+    compressibleGroup.add(groups.bow_shock);
+    compressibleGroup.add(groups.magnetopause);
+    compressibleGroup.add(groups.dipole_van_allen);
+    compressibleGroup.add(groups.magnetotail);
+
+    //Clickable Raycast meshes list
+    const interactiveMeshes = [];
+    function registerInteractive(mesh, compId) {
+      mesh.userData.compId = compId;
+      interactiveMeshes.push(mesh);
+    }
+
+    /* -------------------------------------------------------------------------
+       6.1 EARTH, ATMOSPHERE, DARK HALO & GEODYNAMO CORE (Center Origin 0,0,0)
+       ------------------------------------------------------------------------- */
+    const EARTH_RADIUS = 1.35;
+    const earthTiltGroup = new THREE.Group();
+    // 11.5 degree magnetic dipole tilt
+    earthTiltGroup.rotation.z = THREE.MathUtils.degToRad(-11.5);
+    groups.earth_dynamo.add(earthTiltGroup);
+
+    const earthTex = createEarthTextures();
+    const earthGeo = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
+    const earthMat = new THREE.MeshStandardMaterial({
+      map: earthTex,
+      roughness: 0.65,
+      metalness: 0.15,
+      emissive: new THREE.Color(0x06182c),
+      emissiveIntensity: 0.45,
+      transparent: true,
+      opacity: 1.0
+    });
+    const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+    earthTiltGroup.add(earthMesh);
+    registerInteractive(earthMesh, 'earth_dynamo');
+
+    // Atmospheric Fresnel Glow Shell around Earth
+    const atmoShaderMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(0x38bdf8) },
+        uIntensity: { value: 1.1 }
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vViewPosition = -mvPosition.xyz;
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 uColor;
+        uniform float uIntensity;
+        varying vec3 vNormal;
+        varying vec3 vViewPosition;
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(vViewPosition);
+          float fresnel = pow(1.0 - abs(dot(normal, viewDir)), 2.8);
+          gl_FragColor = vec4(uColor, fresnel * uIntensity);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    const atmoMesh = new THREE.Mesh(new THREE.SphereGeometry(EARTH_RADIUS * 1.16, 48, 48), atmoShaderMat);
+    earthTiltGroup.add(atmoMesh);
+
+    // Inner Geodynamo Core (Visible when X-Ray Core mode or Earth Dynamo is selected)
+    const coreGroup = new THREE.Group();
+    earthTiltGroup.add(coreGroup);
+
+    // Solid Inner Core
+    const innerCoreMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(EARTH_RADIUS * 0.28, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfff7ed })
+    );
+    coreGroup.add(innerCoreMesh);
+
+    // Liquid Outer Core (Molten Iron-Nickel Geodynamo)
+    const outerCoreMat = new THREE.MeshBasicMaterial({
+      color: 0xf97316,
+      transparent: true,
+      opacity: 0.75,
+      wireframe: false
+    });
+    const outerCoreMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(EARTH_RADIUS * 0.56, 32, 32),
+      outerCoreMat
+    );
+    coreGroup.add(outerCoreMesh);
+
+    // Convective Geodynamo Eddy Current Spirals inside Outer Core
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const pts = [];
+      for (let t = -1; t <= 1; t += 0.08) {
+        const r = EARTH_RADIUS * 0.42;
+        const spiralAngle = angle + t * 4.5;
+        pts.push(new THREE.Vector3(
+          Math.cos(spiralAngle) * r * Math.sqrt(1 - t * t * 0.4),
+          t * EARTH_RADIUS * 0.46,
+          Math.sin(spiralAngle) * r * Math.sqrt(1 - t * t * 0.4)
+        ));
+      }
+      const cCurve = new THREE.CatmullRomCurve3(pts);
+      const cGeo = new THREE.TubeGeometry(cCurve, 32, 0.025, 6, false);
+      const cMat = new THREE.MeshBasicMaterial({ color: 0xfde047, transparent: true, opacity: 0.9 });
+      coreGroup.add(new THREE.Mesh(cGeo, cMat));
+    }
+    coreGroup.visible = false;
+
+    /* -------------------------------------------------------------------------
+       6.2 POLAR AURORA (BOREALIS & AUSTRALIS) & POLAR CUSP GLOW
+       (Matches the vivid green & magenta-violet polar glow in the reference image)
+       ------------------------------------------------------------------------- */
+    const auroraShaderMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uStorm: { value: 0.2 },
+        uColorGreen: { value: new THREE.Color(0x5df0a8) },
+        uColorMagenta: { value: new THREE.Color(0xd946ef) }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform float uStorm;
+        varying vec2 vUv;
+        varying float vWave;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          float wave = sin(uv.x * 25.0 + uTime * 3.5) * 0.06 * (1.0 + uStorm * 1.4)
+                     + cos(uv.x * 13.0 - uTime * 2.2) * 0.04;
+          pos.x += normal.x * wave;
+          pos.z += normal.z * wave;
+          vWave = wave;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uStorm;
+        uniform vec3 uColorGreen;
+        uniform vec3 uColorMagenta;
+        varying vec2 vUv;
+        varying float vWave;
+        void main() {
+          // Vertical curtain fade
+          float verticalFade = smoothstep(0.0, 0.25, vUv.y) * pow(1.0 - vUv.y, 1.4);
+          // Shimmering rays along curtain circumference
+          float rays = 0.55 + 0.45 * sin(vUv.x * 48.0 + uTime * 4.0) * cos(vUv.x * 19.0 - uTime * 2.5);
+          vec3 col = mix(uColorMagenta, uColorGreen, smoothstep(0.15, 0.65, vUv.y + vWave * 2.0));
+          float alpha = verticalFade * (0.45 + 0.55 * rays) * (0.85 + uStorm * 0.9);
+          gl_FragColor = vec4(col * (1.3 + uStorm * 0.8), alpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    // Northern Aurora Borealis & Southern Aurora Australis Curtains (2 concentric rings per pole)
+    function createAuroraCurtains() {
+      const radii = [EARTH_RADIUS * 0.44, EARTH_RADIUS * 0.54];
+      radii.forEach((r, idx) => {
+        const cylGeo = new THREE.CylinderGeometry(r * 1.22, r * 0.92, 0.55 + idx * 0.15, 72, 16, true);
+        // North Pole Curtain
+        const northMesh = new THREE.Mesh(cylGeo, auroraShaderMat);
+        northMesh.position.y = EARTH_RADIUS * 0.94;
+        earthTiltGroup.add(northMesh);
+        registerInteractive(northMesh, 'aurora');
+
+        // South Pole Curtain
+        const southMesh = new THREE.Mesh(cylGeo, auroraShaderMat);
+        southMesh.position.y = -EARTH_RADIUS * 0.94;
+        southMesh.rotation.x = Math.PI;
+        earthTiltGroup.add(southMesh);
+        registerInteractive(southMesh, 'aurora');
+      });
+
+      // Polar Cusp V-shaped Magenta/Green Funnel Glow (matching reference image directly above/below Earth)
+      const cuspConeGeo = new THREE.ConeGeometry(1.15, 2.2, 48, 1, true);
+      const cuspMat = new THREE.MeshBasicMaterial({
+        color: 0xd946ef,
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const northCusp = new THREE.Mesh(cuspConeGeo, cuspMat);
+      northCusp.position.set(-0.2, EARTH_RADIUS * 1.25, 0);
+      northCusp.rotation.x = Math.PI;
+      northCusp.rotation.z = 0.2;
+      groups.aurora.add(northCusp);
+      registerInteractive(northCusp, 'aurora');
+
+      const southCusp = new THREE.Mesh(cuspConeGeo, cuspMat);
+      southCusp.position.set(-0.2, -EARTH_RADIUS * 1.25, 0);
+      southCusp.rotation.z = -0.2;
+      groups.aurora.add(southCusp);
+      registerInteractive(southCusp, 'aurora');
+    }
+    createAuroraCurtains();
+
+    /* -------------------------------------------------------------------------
+       6.3 SUN CORONA SOURCE & VERTICAL IMF FIELD LINES (Far Left -X)
+       (Matches the vertical yellow-green IMF lines on the left of reference image)
+       ------------------------------------------------------------------------- */
+    const sunCoronaGroup = new THREE.Group();
+    sunCoronaGroup.position.set(-25, 0, 0);
+    groups.solar_wind.add(sunCoronaGroup);
+
+    // Sun glowing sphere & corona halo on far left
+    const sunMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(2.6, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a })
+    );
+    sunCoronaGroup.add(sunMesh);
+    registerInteractive(sunMesh, 'solar_wind');
+
+    const sunHaloMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = vUv - 0.5;
+          float d = length(p) * 2.0;
+          float glow = pow(max(0.0, 1.0 - d), 2.4);
+          vec3 col = mix(vec3(0.75, 0.95, 0.25), vec3(1.0, 0.92, 0.4), glow);
+          gl_FragColor = vec4(col, glow * 0.85);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const sunHaloPlane = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), sunHaloMat);
+    sunCoronaGroup.add(sunHaloPlane);
+
+    // Upstream Yellow-Green Background Aura (Left side of reference image)
+    const upstreamGlowMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uOpacity: { value: 0.34 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uOpacity;
+        varying vec2 vUv;
+        void main() {
+          // Fades from left (yellow-olive-green) toward the bow shock parabola
+          vec2 p = (vUv - 0.5) * vec2(44.0, 28.0);
+          float bowX = -7.8 + 0.048 * p.y * p.y;
+          float mask = 1.0 - smoothstep(bowX - 2.5, bowX + 1.5, p.x);
+          float vertFade = 1.0 - smoothstep(9.0, 14.0, abs(p.y));
+          vec3 yellowGreen = vec3(0.58, 0.68, 0.12);
+          gl_FragColor = vec4(yellowGreen, mask * vertFade * uOpacity);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const upstreamPlane = new THREE.Mesh(new THREE.PlaneGeometry(44, 28), upstreamGlowMat);
+    upstreamPlane.position.set(-4, 0, -0.5);
+    groups.solar_wind.add(upstreamPlane);
+
+    // Animated Vertical Interplanetary Magnetic Field (IMF) Lines (Streaming & draping over Bow Shock)
+    const imfLines = [];
+    const IMF_LINE_COUNT = 16;
+    for (let i = 0; i < IMF_LINE_COUNT; i++) {
+      const pointCount = 45;
+      const positions = new Float32Array(pointCount * 3);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const isCyanTint = i % 3 === 0;
+      const mat = new THREE.LineBasicMaterial({
+        color: isCyanTint ? 0x5df0a8 : 0xbef264,
+        transparent: true,
+        opacity: 0.65,
+        blending: THREE.AdditiveBlending
+      });
+      const line = new THREE.Line(geo, mat);
+      groups.solar_wind.add(line);
+      imfLines.push({
+        line,
+        phaseOffset: i / IMF_LINE_COUNT,
+        zOffset: (i % 2 === 0 ? 1 : -1) * ((i % 4) * 0.35)
+      });
+    }
+
+    function updateIMFLines(time, speedFactor) {
+      imfLines.forEach(item => {
+        const t = (item.phaseOffset + time * 0.065 * speedFactor) % 1.0;
+        // X ranges from -21 to -5.5
+        const baseX = -21.0 + t * 16.5;
+        const posAttr = item.line.geometry.attributes.position;
+        const count = posAttr.count;
+
+        for (let j = 0; j < count; j++) {
+          const yNorm = (j / (count - 1)) * 2 - 1; // -1 to 1
+          const y = yNorm * 13.5;
+
+          // As the vertical IMF line approaches the Bow Shock nose (x ~ -8.2 * compression), it drapes smoothly around it
+          const bowNose = -8.2 * state.compressionFactor;
+          const shockCurveX = bowNose + 0.055 * y * y;
+          let x = baseX;
+          if (x > shockCurveX - 2.2) {
+            const penetration = x - (shockCurveX - 2.2);
+            // Center near y=0 gets held back by bow shock, ends at high |y| keep moving forward (draping effect!)
+            const holdBack = Math.exp(-(y * y) / 28.0);
+            x -= penetration * 0.72 * holdBack;
+          }
+
+          posAttr.setXYZ(j, x, y, item.zOffset);
+        }
+        posAttr.needsUpdate = true;
+      });
+    }
+
+    /* -------------------------------------------------------------------------
+       6.4 BOW SHOCK & MAGNETOSHEATH (Golden-Orange Paraboloid Wave)
+       (Matches the warm golden-orange curved shock layer in the reference image)
+       ------------------------------------------------------------------------- */
+    // Build a custom 3D surface of revolution along the X axis for the Bow Shock
+    function createParaboloidGeometry(noseX, flareScale, maxX, radialSegs = 64, lengthSegs = 48) {
+      const geo = new THREE.BufferGeometry();
+      const vertices = [];
+      const uvs = [];
+      const normals = [];
+      const indices = [];
+
+      for (let i = 0; i <= lengthSegs; i++) {
+        const u = i / lengthSegs; // 0 at nose, 1 at tail end
+        const x = noseX + u * (maxX - noseX);
+        // Paraboloid radius r(x) = flareScale * sqrt(x - noseX)
+        const r = flareScale * Math.pow(Math.max(0, x - noseX), 0.56);
+
+        for (let j = 0; j <= radialSegs; j++) {
+          const v = j / radialSegs;
+          const theta = v * Math.PI * 2;
+          const y = r * Math.cos(theta);
+          const z = r * Math.sin(theta) * 0.88; // Slight equatorial flattening
+
+          vertices.push(x, y, z);
+          uvs.push(u, v);
+
+          const nx = -0.5;
+          const ny = Math.cos(theta);
+          const nz = Math.sin(theta);
+          const len = Math.hypot(nx, ny, nz);
+          normals.push(nx / len, ny / len, nz / len);
+        }
+      }
+
+      for (let i = 0; i < lengthSegs; i++) {
+        for (let j = 0; j < radialSegs; j++) {
+          const a = i * (radialSegs + 1) + j;
+          const b = (i + 1) * (radialSegs + 1) + j;
+          const c = (i + 1) * (radialSegs + 1) + (j + 1);
+          const d = i * (radialSegs + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+
+      geo.setIndex(indices);
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      return geo;
+    }
+
+    const bowShockShaderMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uHighlight: { value: 0 },
+        uStorm: { value: 0.2 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vViewPos;
+        void main() {
+          vUv = uv;
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewPos = -mvPos.xyz;
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uHighlight;
+        uniform float uStorm;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vViewPos;
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(vViewPos);
+          // Rim + cross-section glow matching the golden-orange band in the reference image
+          float rim = pow(1.0 - abs(dot(normal, viewDir)), 1.35);
+          float noseIntensity = pow(1.0 - vUv.x, 1.3);
+          float pulse = 0.88 + 0.12 * sin(vUv.x * 22.0 - uTime * 3.5);
+
+          vec3 goldColor = vec3(0.96, 0.58, 0.08);
+          vec3 amberColor = vec3(0.88, 0.38, 0.05);
+          vec3 col = mix(amberColor, goldColor, noseIntensity * pulse);
+          col += vec3(0.35, 0.85, 0.55) * uHighlight * 0.5;
+
+          float alpha = (0.14 + 0.36 * rim) * noseIntensity * (1.0 + uStorm * 0.45 + uHighlight * 0.6);
+          gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.78));
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+
+    const bowShockGeo = createParaboloidGeometry(-8.3, 3.85, 16.0, 64, 48);
+    const bowShockMesh = new THREE.Mesh(bowShockGeo, bowShockShaderMat);
+    groups.bow_shock.add(bowShockMesh);
+    registerInteractive(bowShockMesh, 'bow_shock');
+
+    // Add prominent golden-orange 2D cross-section glow band in XY plane so the side profile matches the reference image 100%
+    const sheathGlowPlaneMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uStorm: { value: 0.2 }
+      },
+      vertexShader: `
+        varying vec2 vPos;
+        void main() {
+          vPos = position.xy;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uStorm;
+        varying vec2 vPos;
+        void main() {
+          // Outer Bow Shock curve: x_bs = -8.3 + 0.055 * y^2
+          // Inner Magnetopause curve: x_mp = -5.6 + 0.082 * y^2
+          float xBs = -8.3 + 0.052 * vPos.y * vPos.y;
+          float xMp = -5.5 + 0.082 * vPos.y * vPos.y;
+
+          // Smooth band between xBs and xMp
+          float inBand = smoothstep(xBs - 1.2, xBs + 0.8, vPos.x) * (1.0 - smoothstep(xMp - 0.6, xMp + 1.8, vPos.x));
+          float xFade = 1.0 - smoothstep(-1.0, 12.0, vPos.x);
+          float yFade = 1.0 - smoothstep(10.5, 14.0, abs(vPos.y));
+
+          vec3 orangeGold = mix(vec3(0.85, 0.42, 0.04), vec3(0.98, 0.68, 0.12), smoothstep(xMp, xBs, vPos.x));
+          float alpha = inBand * xFade * yFade * (0.48 + uStorm * 0.22);
+          gl_FragColor = vec4(orangeGold, alpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const sheathGlowPlane = new THREE.Mesh(new THREE.PlaneGeometry(36, 28), sheathGlowPlaneMat);
+    sheathGlowPlane.position.set(-1, 0, -0.2);
+    groups.bow_shock.add(sheathGlowPlane);
+
+    /* -------------------------------------------------------------------------
+       6.5 MAGNETOPAUSE BOUNDARY SHELL (Shue et al. Bullet-Shaped Model)
+       ------------------------------------------------------------------------- */
+    const magnetopauseGeo = createParaboloidGeometry(-5.6, 2.55, 18.0, 56, 40);
+    const magnetopauseMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uHighlight: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vViewPos;
+        void main() {
+          vUv = uv;
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewPos = -mvPos.xyz;
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uHighlight;
+        varying vec2 vUv;
+        varying vec3 vNormal;
+        varying vec3 vViewPos;
+        void main() {
+          vec3 normal = normalize(vNormal);
+          vec3 viewDir = normalize(vViewPos);
+          float rim = pow(1.0 - abs(dot(normal, viewDir)), 2.0);
+          float grid = smoothstep(0.92, 0.98, abs(sin(vUv.x * 40.0 - uTime * 2.0))) * 0.25;
+          float noseFade = pow(1.0 - vUv.x * 0.85, 1.2);
+          vec3 col = mix(vec3(0.13, 0.82, 0.93), vec3(0.36, 0.94, 0.66), noseFade);
+          float alpha = (rim * 0.32 + grid * 0.4 + uHighlight * 0.25) * noseFade;
+          gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.65));
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const magnetopauseMesh = new THREE.Mesh(magnetopauseGeo, magnetopauseMat);
+    groups.magnetopause.add(magnetopauseMesh);
+    registerInteractive(magnetopauseMesh, 'magnetopause');
+
+    /* -------------------------------------------------------------------------
+       6.6 DIPOLE MAGNETIC FIELD LINES & VAN ALLEN RADIATION BELTS
+       (Matches the compressed dayside loops, polar cusps, and Van Allen belts)
+       ------------------------------------------------------------------------- */
+    const fieldLinesMaterials = [];
+
+    function createDipoleLoopCurve(L, azimuthAngle, isDayside) {
+      const pts = [];
+      const steps = 54;
+      for (let i = 0; i <= steps; i++) {
+        // Latitude lambda from -78 deg to +78 deg
+        const lambda = ((i / steps) * 2 - 1) * (Math.PI * 0.43);
+        const cosL = Math.cos(lambda);
+        let r = L * cosL * cosL;
+
+        // Dayside compression vs Nightside stretching
+        let xStretch = 1.0;
+        let yScale = 1.0;
+        if (isDayside) {
+          // Compress outer dayside loops so they flatten against the magnetopause nose
+          xStretch = Math.min(1.0, 4.9 / Math.max(2.2, L));
+          yScale = 1.0 + (L > 3.2 ? (L - 3.2) * 0.14 : 0);
+        } else {
+          // Nightside inner loops stretch toward the plasma sheet
+          xStretch = 1.0 + (L - 2.0) * 0.42;
+        }
+
+        const radialDist = r * Math.cos(lambda);
+        const x = radialDist * Math.cos(azimuthAngle) * xStretch;
+        const z = radialDist * Math.sin(azimuthAngle) * 0.85;
+        const y = r * Math.sin(lambda) * yScale;
+
+        pts.push(new THREE.Vector3(x, y, z));
+      }
+      return new THREE.CatmullRomCurve3(pts);
+    }
+
+    // Build Dayside Compressed Magnetic Field Loops (Warm yellow-green, white-cyan & emerald)
+    const daysideShells = [2.1, 2.7, 3.3, 3.9, 4.5, 5.1, 5.6];
+    const daysideAzimuths = [-0.55, -0.25, 0, 0.25, 0.55];
+    daysideShells.forEach((L, lIdx) => {
+      daysideAzimuths.forEach((az, azIdx) => {
+        // Angle pi points toward -X (Dayside / Sunward)
+        const curve = createDipoleLoopCurve(L, Math.PI + az, true);
+        const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(64));
+
+        // Color gradient from inner cyan-white to outer yellow-green matching reference image
+        const color = new THREE.Color().setHSL(0.24 + (1 - lIdx / daysideShells.length) * 0.22, 0.9, 0.65);
+        const mat = new THREE.LineBasicMaterial({
+          color,
+          transparent: true,
+          opacity: az === 0 ? 0.88 : 0.46,
+          blending: THREE.AdditiveBlending
+        });
+        fieldLinesMaterials.push(mat);
+        const line = new THREE.Line(geo, mat);
+        earthTiltGroup.add(line);
+      });
+    });
+
+    // Nightside Closed Inner Loops (connecting to the near-Earth plasma sheet)
+    const nightShells = [2.0, 2.6, 3.2, 3.9];
+    const nightAzimuths = [-0.4, 0, 0.4];
+    nightShells.forEach((L, lIdx) => {
+      nightAzimuths.forEach(az => {
+        const curve = createDipoleLoopCurve(L, az, false);
+        const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(64));
+        const mat = new THREE.LineBasicMaterial({
+          color: lIdx < 2 ? 0x38bdf8 : 0x00f2fe,
+          transparent: true,
+          opacity: az === 0 ? 0.82 : 0.45,
+          blending: THREE.AdditiveBlending
+        });
+        fieldLinesMaterials.push(mat);
+        earthTiltGroup.add(new THREE.Line(geo, mat));
+      });
+    });
+
+    // Polar Cusp Diverging Field Lines (sweeping from dayside nose over the poles into the high-latitude magnetotail)
+    function createCuspSweepingLines() {
+      const hemispheres = [1, -1]; // North (+1) & South (-1)
+      hemispheres.forEach(hemi => {
+        for (let i = 0; i < 9; i++) {
+          const zSpread = ((i / 8) - 0.5) * 4.5;
+          const heightFactor = 1.0 + (i % 3) * 0.25;
+          const pts = [
+            new THREE.Vector3(0, hemi * EARTH_RADIUS * 0.85, 0),
+            new THREE.Vector3(-1.4, hemi * 2.5 * heightFactor, zSpread * 0.25),
+            new THREE.Vector3(-3.6, hemi * 4.2 * heightFactor, zSpread * 0.45),
+            new THREE.Vector3(-1.5, hemi * 6.8 * heightFactor, zSpread * 0.7),
+            new THREE.Vector3(5.0, hemi * 8.6 * heightFactor, zSpread * 0.9),
+            new THREE.Vector3(15.0, hemi * 10.2 * heightFactor, zSpread * 1.1),
+            new THREE.Vector3(26.0, hemi * 11.4 * heightFactor, zSpread * 1.2)
+          ];
+          const curve = new THREE.CatmullRomCurve3(pts);
+          const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(70));
+          const mat = new THREE.LineBasicMaterial({
+            color: i % 2 === 0 ? 0x86efac : 0xe2e8f0,
+            transparent: true,
+            opacity: 0.65,
+            blending: THREE.AdditiveBlending
+          });
+          fieldLinesMaterials.push(mat);
+          groups.dipole_van_allen.add(new THREE.Line(geo, mat));
+        }
+      });
+    }
+    createCuspSweepingLines();
+
+    // Inner & Outer Van Allen Radiation Belts (Translucent Toroidal Rings around Earth)
+    const vanAllenGroup = new THREE.Group();
+    earthTiltGroup.add(vanAllenGroup);
+
+    const innerBeltMesh = new THREE.Mesh(
+      new THREE.TorusGeometry(2.15, 0.36, 24, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xf43f5e,
+        transparent: true,
+        opacity: 0.22,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    innerBeltMesh.rotation.x = Math.PI / 2;
+    vanAllenGroup.add(innerBeltMesh);
+    registerInteractive(innerBeltMesh, 'dipole_van_allen');
+
+    const outerBeltMesh = new THREE.Mesh(
+      new THREE.TorusGeometry(3.45, 0.62, 24, 64),
+      new THREE.MeshBasicMaterial({
+        color: 0xa855f7,
+        transparent: true,
+        opacity: 0.18,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      })
+    );
+    outerBeltMesh.rotation.x = Math.PI / 2;
+    vanAllenGroup.add(outerBeltMesh);
+    registerInteractive(outerBeltMesh, 'dipole_van_allen');
+
+    /* -------------------------------------------------------------------------
+       6.7 MAGNETOTAIL LOBES & GLOWING CYAN PLASMA SHEET (Right Side +X)
+       (Faithfully recreates the iconic bright cyan undulating ribbon & blue/purple
+        tail lines from the reference image!)
+       ------------------------------------------------------------------------- */
+    // 1. Deep Blue/Cyan Background Aura for the Magnetotail Cavity
+    const tailAuraMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uStorm: { value: 0.2 }
+      },
+      vertexShader: `
+        varying vec2 vPos;
+        void main() {
+          vPos = position.xy;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uStorm;
+        varying vec2 vPos;
+        void main() {
+          float xMask = smoothstep(-2.0, 4.0, vPos.x) * (1.0 - smoothstep(20.0, 28.0, vPos.x));
+          float maxR = 4.5 + vPos.x * 0.28;
+          float yNorm = abs(vPos.y) / maxR;
+          float yMask = 1.0 - smoothstep(0.65, 1.05, yNorm);
+
+          vec3 deepBlue = vec3(0.02, 0.32, 0.58);
+          vec3 tealGlow = vec3(0.05, 0.55, 0.68);
+          vec3 col = mix(tealGlow, deepBlue, yNorm);
+
+          float alpha = xMask * yMask * (0.35 + uStorm * 0.15);
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const tailAuraPlane = new THREE.Mesh(new THREE.PlaneGeometry(34, 26), tailAuraMat);
+    tailAuraPlane.position.set(12, 0, -0.3);
+    groups.magnetotail.add(tailAuraPlane);
+
+    // 2. Sweeping Blue, Indigo & Purple Magnetotail Lobe Field Lines (Northern & Southern Lobes)
+    const tailDynamicLines = [];
+
+    function createMagnetotailLines() {
+      const hemispheres = [1, -1];
+      // Lobe sweeping lines
+      hemispheres.forEach(hemi => {
+        for (let i = 0; i < 18; i++) {
+          const frac = i / 17; // 0 (near plasma sheet) to 1 (outer tail lobe)
+          const zOffset = ((i % 5) - 2) * 0.85;
+          const pts = [];
+          const numPts = 40;
+
+          for (let j = 0; j <= numPts; j++) {
+            const u = j / numPts;
+            const x = u * 27.0;
+            // Start near Earth's polar cap, arch out into the tail lobe
+            const yBase = hemi * (0.9 + frac * 6.8) * Math.pow(u, 0.38) + hemi * u * frac * 3.2;
+            // Subtle S-curve wave matching the reference image
+            const waveY = Math.sin(x * 0.22 - 0.8) * 0.45 * (1.0 - frac * 0.5);
+            pts.push(new THREE.Vector3(x, yBase + waveY, zOffset * u));
+          }
+
+          const curve = new THREE.CatmullRomCurve3(pts);
+          const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(60));
+
+          // Color spectrum: cyan near center -> royal blue -> purple/magenta in mid-lobe -> teal at outer edge
+          const col = new THREE.Color();
+          if (frac < 0.25) {
+            col.setHex(0x00f2fe);
+          } else if (frac < 0.65) {
+            col.lerpColors(new THREE.Color(0x3b82f6), new THREE.Color(0x9333ea), (frac - 0.25) / 0.4);
+          } else {
+            col.lerpColors(new THREE.Color(0x6366f1), new THREE.Color(0x38bdf8), (frac - 0.65) / 0.35);
+          }
+
+          const mat = new THREE.LineBasicMaterial({
+            color: col,
+            transparent: true,
+            opacity: frac < 0.25 ? 0.85 : 0.58,
+            blending: THREE.AdditiveBlending
+          });
+          fieldLinesMaterials.push(mat);
+          const line = new THREE.Line(geo, mat);
+          groups.magnetotail.add(line);
+        }
+      });
+
+      // U-Shaped Reconnected Hairpin Loops in the Distant Right Magnetotail (Exact match to bottom-right of reference photo!)
+      for (let k = 0; k < 12; k++) {
+        const apexX = 11.5 + k * 1.35;
+        const spreadY = 0.35 + k * 0.28;
+        const pts = [];
+        for (let t = -1; t <= 1; t += 0.05) {
+          const x = apexX + (t * t) * (16.0 - k * 0.4);
+          const y = t * spreadY - 0.55 + Math.sin(x * 0.18) * 0.4;
+          const z = Math.sin(t * Math.PI) * 0.4;
+          pts.push(new THREE.Vector3(x, y, z));
+        }
+        const curve = new THREE.CatmullRomCurve3(pts);
+        const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(50));
+        const mat = new THREE.LineBasicMaterial({
+          color: k < 4 ? 0xa855f7 : 0x38bdf8,
+          transparent: true,
+          opacity: 0.65,
+          blending: THREE.AdditiveBlending
+        });
+        fieldLinesMaterials.push(mat);
+        groups.magnetotail.add(new THREE.Line(geo, mat));
+      }
+    }
+    createMagnetotailLines();
+
+    // 3. THE ICONIC GLOWING CYAN PLASMA SHEET / NEUTRAL SHEET RIBBON
+    // Look at the reference image: a brilliant cyan ribbon curves from Earth's nightside pole,
+    // dips slightly, and sweeps upward to the right across the entire magnetotail!
+    const plasmaSheetLinesCount = 28;
+    const plasmaSheetLines = [];
+
+    for (let i = 0; i < plasmaSheetLinesCount; i++) {
+      const pointCount = 65;
+      const positions = new Float32Array(pointCount * 3);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+      const spreadFrac = (i / (plasmaSheetLinesCount - 1)) - 0.5; // -0.5 to +0.5
+      const isCoreLine = Math.abs(spreadFrac) < 0.22;
+
+      const mat = new THREE.LineBasicMaterial({
+        color: isCoreLine ? 0x00ffff : (spreadFrac > 0 ? 0x5df0a8 : 0x3b82f6),
+        transparent: true,
+        opacity: isCoreLine ? 0.92 : 0.55,
+        blending: THREE.AdditiveBlending
+      });
+      const line = new THREE.Line(geo, mat);
+      groups.magnetotail.add(line);
+      plasmaSheetLines.push({ line, spreadFrac, zOffset: spreadFrac * 3.2 });
+    }
+
+    // Add a volumetric glowing cyan shader ribbon for the Plasma Sheet core
+    const plasmaRibbonGeo = new THREE.PlaneGeometry(27, 4.2, 80, 16);
+    const plasmaRibbonMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uStorm: { value: 0.2 },
+        uHighlight: { value: 0 }
+      },
+      vertexShader: `
+        uniform float uTime;
+        uniform float uStorm;
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          // Shift x so it starts at x = 0.8 (Earth nightside) and extends to x = 27.8
+          float xWorld = (uv.x) * 27.0 + 0.8;
+          pos.x = xWorld;
+
+          // Iconic S-curve arch from the reference image: rises near Earth, dips mid-tail, sweeps up on right
+          float archNearEarth = sin(clamp(xWorld / 5.5, 0.0, 1.0) * 3.14159) * 1.15;
+          float tailSweep = (xWorld - 8.0) * 0.085 * smoothstep(3.0, 12.0, xWorld);
+          float dynamicWave = sin(xWorld * 0.32 - uTime * (2.2 + uStorm * 3.0)) * (0.28 + uStorm * 0.35) * smoothstep(1.5, 8.0, xWorld);
+
+          // Narrow waist near x=3, flaring wider in deep tail
+          float ribbonThickness = 0.22 + smoothstep(0.0, 24.0, xWorld) * 0.85;
+          pos.y = pos.y * ribbonThickness + archNearEarth + tailSweep + dynamicWave;
+
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uStorm;
+        uniform float uHighlight;
+        varying vec2 vUv;
+        void main() {
+          float centerDist = abs(vUv.y - 0.5) * 2.0;
+          float coreGlow = pow(max(0.0, 1.0 - centerDist), 2.6);
+          float flowPulse = 0.8 + 0.2 * sin(vUv.x * 35.0 - uTime * 5.0);
+          float edgeFade = smoothstep(0.0, 0.06, vUv.x) * (1.0 - smoothstep(0.88, 1.0, vUv.x));
+
+          vec3 brightCyan = vec3(0.05, 0.96, 1.0);
+          vec3 deepBlue = vec3(0.12, 0.42, 0.95);
+          vec3 col = mix(deepBlue, brightCyan, coreGlow) * (1.15 + uStorm * 0.6 + uHighlight * 0.5);
+
+          float alpha = coreGlow * flowPulse * edgeFade * (0.72 + uStorm * 0.25);
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    const plasmaRibbonMesh = new THREE.Mesh(plasmaRibbonGeo, plasmaRibbonMat);
+    groups.magnetotail.add(plasmaRibbonMesh);
+    registerInteractive(plasmaRibbonMesh, 'magnetotail');
+
+    function updatePlasmaSheetLines(time, stormFactor) {
+      plasmaSheetLines.forEach(item => {
+        const posAttr = item.line.geometry.attributes.position;
+        const count = posAttr.count;
+        for (let j = 0; j < count; j++) {
+          const u = j / (count - 1);
+          const x = 0.7 + u * 27.0;
+
+          // Match exact trajectory of the plasma sheet ribbon
+          const archNearEarth = Math.sin(Math.min(1.0, x / 5.5) * Math.PI) * 1.15;
+          const tailSweep = (x - 8.0) * 0.085 * THREE.MathUtils.smoothstep(x, 3.0, 12.0);
+          const dynamicWave = Math.sin(x * 0.32 - time * (2.2 + stormFactor * 3.0)) * (0.28 + stormFactor * 0.35) * THREE.MathUtils.smoothstep(x, 1.5, 8.0);
+          const spreadY = item.spreadFrac * (0.5 + u * 3.4);
+
+          const y = archNearEarth + tailSweep + dynamicWave + spreadY;
+          const z = item.zOffset * (0.25 + u * 0.75);
+          posAttr.setXYZ(j, x, y, z);
+        }
+        posAttr.needsUpdate = true;
+      });
+    }
+
+    /* =========================================================================
+       7. SOLAR WIND CHARGED PARTICLE SYSTEM & LORENTZ DEFLECTION STREAMLINES
+       ========================================================================= */
+    const PARTICLE_COUNT = 1150;
+    const particleGeo = new THREE.BufferGeometry();
+    const pPositions = new Float32Array(PARTICLE_COUNT * 3);
+    const pColors = new Float32Array(PARTICLE_COUNT * 3);
+    const pMeta = [];
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      // Assign particle role:
+      // 0 (72%): Solar wind deflected around Bow Shock & Magnetopause
+      // 1 (15%): Cusp funnel particles spiraling down into North/South Polar Aurora
+      // 2 (13%): Magnetotail Plasma Sheet reconnection particles streaming toward Earth's nightside poles
+      const rand = Math.random();
+      let role = 0;
+      if (rand > 0.87) role = 2;
+      else if (rand > 0.72) role = 1;
+
+      const y0 = (Math.random() - 0.5) * 20.0;
+      const z0 = (Math.random() - 0.5) * 12.0;
+
+      pMeta.push({
+        role,
+        progress: Math.random(),
+        speed: 0.16 + Math.random() * 0.12,
+        y0: Math.abs(y0) < 0.35 ? (y0 >= 0 ? 0.45 : -0.45) : y0,
+        z0,
+        hemi: y0 >= 0 ? 1 : -1,
+        spiralPhase: Math.random() * Math.PI * 2
+      });
+    }
+
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+    particleGeo.setAttribute('color', new THREE.BufferAttribute(pColors, 3));
+
+    const particleMat = new THREE.PointsMaterial({
+      size: 0.48,
+      map: particleSpriteTex,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.92,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const particleSystem = new THREE.Points(particleGeo, particleMat);
+    rootGroup.add(particleSystem);
+
+    const tmpColor = new THREE.Color();
+
+    function updateParticles(dt, time, speedMultiplier) {
+      const posAttr = particleGeo.attributes.position;
+      const colAttr = particleGeo.attributes.color;
+      const comp = state.compressionFactor;
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const m = pMeta[i];
+        m.progress += dt * m.speed * speedMultiplier;
+        if (m.progress > 1.0) {
+          m.progress %= 1.0;
+        }
+        const t = m.progress;
+
+        let x = 0, y = 0, z = 0;
+
+        if (m.role === 0) {
+          // ROLE 0: Supersonic Solar Wind -> Bow Shock Deceleration -> Lorentz Deflection around Magnetopause
+          x = -24.0 + t * 50.0;
+          const r0 = Math.hypot(m.y0, m.z0);
+          const angle = Math.atan2(m.z0, m.y0);
+
+          const bowX = (-8.3 + 0.052 * r0 * r0) * comp;
+          const mpR = 2.65 * comp * Math.pow(Math.max(0.0, x - (-5.6 * comp)), 0.54);
+
+          if (x < bowX) {
+            // Upstream undisturbed solar wind (Yellow-Green)
+            y = m.y0;
+            z = m.z0 * 0.5;
+            tmpColor.setHex(0xbef264);
+          } else {
+            // Inside Magnetosheath: smoothly deflect radially outward around the Magnetopause obstacle!
+            const deflectedR = Math.max(r0, Math.sqrt(r0 * r0 + mpR * mpR * 1.18));
+            const gyr = Math.sin(t * 28.0 + m.spiralPhase) * 0.16;
+            y = deflectedR * Math.cos(angle) + gyr;
+            z = (deflectedR * Math.sin(angle) + gyr) * 0.65;
+
+            // Color shifts from hot shock orange-gold to cyan-blue in downstream magnetosheath
+            const sheathFrac = THREE.MathUtils.clamp((x - bowX) / 14.0, 0, 1);
+            tmpColor.lerpColors(new THREE.Color(0xfbbf24), new THREE.Color(0x38bdf8), sheathFrac);
+          }
+        } else if (m.role === 1) {
+          // ROLE 1: Solar wind particles captured into the Polar Cusps -> Spiraling down into Aurora!
+          if (t < 0.45) {
+            // Approach from Sun toward dayside magnetopause nose
+            const u = t / 0.45;
+            x = -23.0 + u * (23.0 - 5.4 * comp);
+            y = m.hemi * (0.8 + u * 2.2);
+            z = m.z0 * 0.25 * (1.0 - u * 0.5);
+            tmpColor.setHex(0xfde047);
+          } else {
+            // Spiral down the Polar Cusp funnel into the North/South Auroral Oval
+            const u = (t - 0.45) / 0.55;
+            const funnelR = (1.0 - u) * 1.1 + 0.35;
+            const spiralAngle = u * 18.0 + m.spiralPhase;
+            x = THREE.MathUtils.lerp(-5.4 * comp, -0.2, u) + Math.cos(spiralAngle) * funnelR * 0.4;
+            y = m.hemi * THREE.MathUtils.lerp(3.2, EARTH_RADIUS * 0.95, u);
+            z = Math.sin(spiralAngle) * funnelR;
+            tmpColor.lerpColors(new THREE.Color(0x5df0a8), new THREE.Color(0xd946ef), u);
+          }
+        } else {
+          // ROLE 2: Magnetotail Plasma Sheet Reconnection Jet (Streaming earthward along the cyan ribbon)
+          // Travels from x = 25 inward to Earth's nightside poles (x = 0.5)
+          const u = t;
+          x = 25.0 * (1.0 - u) + 0.6;
+          const archNearEarth = Math.sin(Math.min(1.0, x / 5.5) * Math.PI) * 1.15;
+          const tailSweep = (x - 8.0) * 0.085 * THREE.MathUtils.smoothstep(x, 3.0, 12.0);
+          const dynamicWave = Math.sin(x * 0.32 - time * 2.5) * 0.32 * THREE.MathUtils.smoothstep(x, 1.5, 8.0);
+
+          if (x > 3.2) {
+            y = archNearEarth + tailSweep + dynamicWave + (m.y0 * 0.04);
+            z = m.z0 * 0.18;
+            tmpColor.setHex(0x00ffff);
+          } else {
+            // Split into Northern & Southern Auroral ovals near Earth!
+            const splitFrac = 1.0 - (x / 3.2);
+            y = m.hemi * splitFrac * (EARTH_RADIUS * 1.05) + archNearEarth * (1.0 - splitFrac);
+            z = Math.sin(splitFrac * 10.0 + m.spiralPhase) * 0.45;
+            tmpColor.setHex(0x5df0a8);
+          }
+        }
+
+        posAttr.setXYZ(i, x, y, z);
+        colAttr.setXYZ(i, tmpColor.r, tmpColor.g, tmpColor.b);
+      }
+
+      posAttr.needsUpdate = true;
+      colAttr.needsUpdate = true;
+    }
+
+    /* =========================================================================
+       8. UI RENDERING: 3D HUD PINS, PILL BAR, INSPECTOR & BILINGUAL SWITCHER
+       ========================================================================= */
+    const hudPinElements = {};
+
+    function initHUDPinsAndUI() {
+      hudPinsContainer.innerHTML = '';
+      const pillBar = document.getElementById('componentPillBar');
+      pillBar.innerHTML = '';
+
+      COMPONENTS_DB.forEach((comp, idx) => {
+        const langData = state.lang === 'id' ? comp.id_data : comp.en_data;
+        const isSelected = comp.id === state.selectedCompId;
+
+        // 1. Create 3D Projected HUD Pin (toggle: klik lagi = sembunyikan info)
+        const pin = document.createElement('button');
+        pin.type = 'button';
+        pin.className = `hud-pin ${isSelected ? 'active' : ''}`;
+        pin.innerHTML = `
+          <div class="hud-pin-inner">
+            <span class="hud-dot" style="background:${comp.color}"></span>
+            <span class="tp-f-num">${String(idx + 1).padStart(2, '0')}</span>
+            <span>${langData.shortName}</span>
+          </div>
+        `;
+        pin.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleComponent(comp.id);
+        });
+        hudPinsContainer.appendChild(pin);
+        hudPinElements[comp.id] = pin;
+
+        // 2. Create Quick-Selector Pill di dock bawah (toggle juga)
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.dataset.compId = comp.id;
+        pill.className = `comp-pill ${isSelected ? 'active' : ''}`;
+        pill.innerHTML = `
+          <span class="tp-pill-dot" style="background:${comp.color}"></span>
+          <span class="tp-pill-num">${String(idx + 1).padStart(2, '0')}</span>
+          <span>${langData.shortName}</span>
+        `;
+        pill.addEventListener('click', () => toggleComponent(comp.id));
+        pillBar.appendChild(pill);
+      });
+
+      updateInspectorDetailCard();
+    }
+
+    function updateInspectorDetailCard() {
+      const comp = COMPONENTS_DB.find(c => c.id === state.selectedCompId);
+      if (!comp) return; // Tidak ada komponen terpilih — panel tersembunyi
+      const d = state.lang === 'id' ? comp.id_data : comp.en_data;
+      const prefix = state.lang === 'id' ? 'Komponen magnetosfer' : 'Magnetosphere component';
+
+      document.getElementById('compCategoryBadge').textContent = `${prefix} ${comp.index}`;
+      document.getElementById('compCoordTag').textContent = d.coord;
+      document.getElementById('compTitle').textContent = d.title;
+      document.getElementById('compSubtitle').textContent = d.subtitle;
+      document.getElementById('compDescription').textContent = d.desc;
+      document.getElementById('compStatDist').textContent = d.dist;
+      document.getElementById('compStatB').textContent = d.bField;
+      document.getElementById('compStatDensity').textContent = d.density;
+      document.getElementById('compStatTemp').textContent = d.temp;
+      document.getElementById('compMechanism').textContent = d.mechanism;
+    }
+
+    function selectComponent(compId, moveCamera = true) {
+      state.selectedCompId = compId;
+      const comp = COMPONENTS_DB.find(c => c.id === compId);
+      if (!comp) return;
+
+      // Automatically reveal Core Cutaway if user clicks Earth & Geodynamo
+      if (compId === 'earth_dynamo') {
+        setCoreCutaway(true);
+      }
+
+      // Highlight selected shader uniforms
+      bowShockShaderMat.uniforms.uHighlight.value = compId === 'bow_shock' ? 1.0 : 0.0;
+      magnetopauseMat.uniforms.uHighlight.value = compId === 'magnetopause' ? 1.0 : 0.0;
+      plasmaRibbonMat.uniforms.uHighlight.value = compId === 'magnetotail' ? 1.0 : 0.0;
+
+      // Update active states on HUD pins and dock pills
+      Object.entries(hudPinElements).forEach(([id, el]) => {
+        el.classList.toggle('active', id === compId);
+      });
+
+      document.querySelectorAll('#componentPillBar button').forEach(btn => {
+        // Pola pill-group BAB 01: kelas aktif ditoggle, bukan className utuh
+        btn.classList.toggle('active', btn.dataset.compId === compId);
+      });
+
+      updateInspectorDetailCard();
+      showInfoPanel();
+
+      if (moveCamera && comp.camPos && comp.camTarget) {
+        flyToCamera(comp.camPos, comp.camTarget);
+      }
+    }
+
+    // Toggle seleksi komponen: klik komponen yang sama saat panel terbuka = sembunyikan (pola BAB 03/04)
+    function toggleComponent(compId) {
+      const infoPanel = document.getElementById('magnetoInfoPanel');
+      if (state.selectedCompId === compId && infoPanel.classList.contains('open')) {
+        deselectComponent();
+      } else {
+        // Kamera sudah di posisi komponen ini bila memang terpilih — jangan terbang ulang
+        selectComponent(compId, state.selectedCompId !== compId);
+      }
+    }
+
+    function deselectComponent() {
+      state.selectedCompId = null;
+
+      // Reset highlight shader
+      bowShockShaderMat.uniforms.uHighlight.value = 0.0;
+      magnetopauseMat.uniforms.uHighlight.value = 0.0;
+      plasmaRibbonMat.uniforms.uHighlight.value = 0.0;
+
+      // Pin & pill kembali netral
+      Object.values(hudPinElements).forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('#componentPillBar button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      hideInfoPanel();
+      flyToCamera(new THREE.Vector3(1.5, 3.2, 26.5), new THREE.Vector3(1.5, 0, 0));
+    }
+
+    function showInfoPanel() {
+      const infoPanel = document.getElementById('magnetoInfoPanel');
+      if (infoPanel) infoPanel.classList.add('open');
+    }
+
+    function hideInfoPanel() {
+      const infoPanel = document.getElementById('magnetoInfoPanel');
+      if (infoPanel) infoPanel.classList.remove('open');
+    }
+
+    // Apply Bilingual Translations across the entire modal
+    function applyLanguage(lang) {
+      state.lang = lang;
+      document.documentElement.lang = lang;
+
+      const dict = I18N[lang];
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.innerHTML = dict[key];
+        }
+      });
+
+      // Update Language Toggle Buttons (pola pill-group BAB 01)
+      const btnID = document.getElementById('langBtnID');
+      const btnEN = document.getElementById('langBtnEN');
+      btnID.classList.toggle('active', lang === 'id');
+      btnEN.classList.toggle('active', lang === 'en');
+
+      initHUDPinsAndUI();
+      updateSolarWindTelemetryUI();
+    }
+
+    /* =========================================================================
+       9. INTERACTIVE CONTROLS, RAYCASTING & TELEMETRY LOGIC
+       ========================================================================= */
+    function updateSolarWindTelemetryUI() {
+      const v = state.solarWindSpeed; // 300 to 1000 km/s
+      state.stormFactor = (v - 300) / 700;
+
+      // Chapman-Ferraro standoff scaling: R_mp proportional to v^(-1/3)
+      const mpR = (10.2 * Math.pow(420 / v, 0.33)).toFixed(1);
+      const bsR = (mpR * 1.35).toFixed(1);
+      const auroraGW = Math.round(28 + Math.pow(state.stormFactor, 1.5) * 420);
+
+      // Update 3D compression of dayside magnetosphere
+      state.compressionFactor = THREE.MathUtils.lerp(1.06, 0.72, state.stormFactor);
+      compressibleGroup.scale.set(state.compressionFactor, 1.0 - state.stormFactor * 0.1, 1.0 - state.stormFactor * 0.1);
+
+      // Update shader storm uniforms
+      auroraShaderMat.uniforms.uStorm.value = state.stormFactor;
+      bowShockShaderMat.uniforms.uStorm.value = state.stormFactor;
+      sheathGlowPlaneMat.uniforms.uStorm.value = state.stormFactor;
+      plasmaRibbonMat.uniforms.uStorm.value = state.stormFactor;
+      tailAuraMat.uniforms.uStorm.value = state.stormFactor;
+
+      // Update DOM metrics
+      document.getElementById('solarWindValue').textContent = `${v} km/s`;
+      document.getElementById('metricMpVal').textContent = `${mpR} R⊕`;
+      document.getElementById('metricBsVal').textContent = `${bsR} R⊕`;
+      document.getElementById('metricAuroraVal').textContent = `${auroraGW} GW`;
+
+      const badge = document.getElementById('stormBadge');
+      if (v < 500) {
+        badge.textContent = state.lang === 'id' ? 'KP 2 · Tenang' : 'KP 2 · Quiet';
+        badge.className = 'font-mono-tech text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-400/30';
+      } else if (v < 750) {
+        badge.textContent = state.lang === 'id' ? 'KP 5 · Badai G1' : 'KP 5 · G1 storm';
+        badge.className = 'font-mono-tech text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-400/40';
+      } else {
+        badge.textContent = state.lang === 'id' ? 'KP 8 · Badai CME G4' : 'KP 8 · G4 CME storm';
+        badge.className = 'font-mono-tech text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-400/50';
+      }
+    }
+
+    document.getElementById('solarWindSlider').addEventListener('input', (e) => {
+      state.solarWindSpeed = parseInt(e.target.value, 10);
+      updateSolarWindTelemetryUI();
+    });
+
+    // Core X-Ray Cutaway Helper
+    function setCoreCutaway(enabled) {
+      state.showCoreCutaway = enabled;
+      coreGroup.visible = enabled;
+      earthMat.opacity = enabled ? 0.35 : 1.0;
+      const btn = document.getElementById('toggleCoreBtn');
+      btn.classList.toggle('active', enabled);
+    }
+
+    // Layer Toggle Buttons
+    function setupToggleButton(btnId, stateKey, onToggle) {
+      const btn = document.getElementById(btnId);
+      btn.addEventListener('click', () => {
+        state[stateKey] = !state[stateKey];
+        const active = state[stateKey];
+        btn.classList.toggle('active', active);
+        onToggle(active);
+      });
+    }
+
+    setupToggleButton('toggleParticlesBtn', 'showParticles', (v) => {
+      particleSystem.visible = v;
+    });
+
+    setupToggleButton('toggleFieldLinesBtn', 'showFieldLines', (v) => {
+      fieldLinesMaterials.forEach(m => { m.visible = v; });
+      imfLines.forEach(item => { item.line.visible = v; });
+    });
+
+    setupToggleButton('toggleSheathBtn', 'showBowShock', (v) => {
+      groups.bow_shock.visible = v;
+      groups.magnetopause.visible = v;
+    });
+
+    setupToggleButton('toggleVanAllenBtn', 'showVanAllen', (v) => {
+      vanAllenGroup.visible = v;
+    });
+
+    document.getElementById('toggleCoreBtn').addEventListener('click', () => {
+      setCoreCutaway(!state.showCoreCutaway);
+    });
+
+    setupToggleButton('togglePinsBtn', 'showPins', (v) => {
+      hudPinsContainer.style.display = v ? 'block' : 'none';
+    });
+
+    // Camera Presets & Auto-Rotate
+    document.getElementById('btnAutoRotate').addEventListener('click', (e) => {
+      state.autoRotate = !state.autoRotate;
+      controls.autoRotate = state.autoRotate;
+      controls.autoRotateSpeed = 1.2;
+      e.currentTarget.classList.toggle('active', state.autoRotate);
+    });
+
+    document.getElementById('btnResetCam').addEventListener('click', () => {
+      flyToCamera(new THREE.Vector3(1.5, 3.2, 26.5), new THREE.Vector3(1.5, 0, 0));
+    });
+
+    document.getElementById('btnViewProfile').addEventListener('click', () => {
+      flyToCamera(new THREE.Vector3(1.5, 1.2, 26.5), new THREE.Vector3(1.5, 0, 0));
+    });
+    document.getElementById('btnViewIso').addEventListener('click', () => {
+      flyToCamera(new THREE.Vector3(-12, 12, 22), new THREE.Vector3(1, 0, 0));
+    });
+    document.getElementById('btnViewPolar').addEventListener('click', () => {
+      flyToCamera(new THREE.Vector3(0.5, 9.5, 6.5), new THREE.Vector3(0, 0.5, 0));
+    });
+    document.getElementById('btnViewSun').addEventListener('click', () => {
+      flyToCamera(new THREE.Vector3(-22, 5, 14), new THREE.Vector3(-5, 0, 0));
+    });
+
+    // Language Switcher Listeners
+    document.getElementById('langBtnID').addEventListener('click', () => applyLanguage('id'));
+    document.getElementById('langBtnEN').addEventListener('click', () => applyLanguage('en'));
+
+    // Right Drawer Tabs (Full Article | Data Table) — kini di dalam overlay artikel
+    const tabs = [
+      { btn: 'tabBtnArticle', panel: 'panelArticle' },
+      { btn: 'tabBtnData', panel: 'panelData' }
+    ];
+    tabs.forEach(t => {
+      document.getElementById(t.btn).addEventListener('click', () => {
+        tabs.forEach(other => {
+          const isTarget = other.btn === t.btn;
+          document.getElementById(other.panel).classList.toggle('hidden', !isTarget);
+          document.getElementById(other.btn).classList.toggle('active', isTarget);
+        });
+      });
+    });
+
+    // ===== Mode app-like BAB 01: overlay artikel (bekas drawer samping) =====
+    const articleOverlayEl = document.getElementById('articleOverlay');
+
+    function setArticleOverlay(open) {
+      articleOverlayEl.classList.toggle('open', open);
+      articleOverlayEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+      document.body.classList.toggle('article-overlay-open', open);
+    }
+
+    document.getElementById('openArticleOverlayBtn').addEventListener('click', () => setArticleOverlay(true));
+    document.getElementById('closeArticleOverlayBtn').addEventListener('click', () => setArticleOverlay(false));
+    articleOverlayEl.querySelector('.cap-backdrop').addEventListener('click', () => setArticleOverlay(false));
+
+    // Tombol tutup panel inspeksi komponen
+    document.getElementById('magnetoInfoCloseBtn').addEventListener('click', () => {
+      deselectComponent();
+    });
+
+    // Escape menutup overlay artikel dulu, lalu panel inspeksi komponen
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (articleOverlayEl.classList.contains('open')) {
+          setArticleOverlay(false);
+          return;
+        }
+        const infoPanel = document.getElementById('magnetoInfoPanel');
+        if (infoPanel && infoPanel.classList.contains('open')) {
+          deselectComponent();
+        }
+      }
+    });
+
+    // Raycasting on 3D Canvas Clicks
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    canvas.addEventListener('pointerdown', (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moveDist > 6) return; // Ignore drag orbits
+
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(interactiveMeshes, false);
+      if (intersects.length > 0) {
+        const hitCompId = intersects[0].object.userData.compId;
+        if (hitCompId) {
+          toggleComponent(hitCompId);
+        }
+      }
+    });
+
+    /* =========================================================================
+       10. RESPONSIVE VIEWPORT RESIZE & 3D HUD PIN PROJECTION LOOP
+       ========================================================================= */
+    function handleResize() {
+      const w = viewportContainer.clientWidth;
+      const h = viewportContainer.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      if (w > 900) {
+        // Offset X positif menggeser fokus render ke kiri — kompensasi popup
+        // inspeksi di kanan-atas agar pusat model tetap terlihat (pola BAB 04).
+        camera.setViewOffset(w, h, Math.round(w * 0.12), 0, w, h);
+      } else {
+        camera.clearViewOffset();
+      }
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', handleResize);
+
+    const projVec = new THREE.Vector3();
+    function updateHUDPinPositions() {
+      if (!state.showPins) return;
+      const w = viewportContainer.clientWidth;
+      const h = viewportContainer.clientHeight;
+
+      COMPONENTS_DB.forEach(comp => {
+        const pinEl = hudPinElements[comp.id];
+        if (!pinEl) return;
+
+        projVec.copy(comp.pos3D);
+        // Apply compression scaling to bow shock / magnetopause pins
+        if (comp.id === 'bow_shock' || comp.id === 'magnetopause') {
+          projVec.x *= state.compressionFactor;
+        }
+        projVec.project(camera);
+
+        // Hide if behind camera
+        if (projVec.z > 1.0) {
+          pinEl.style.opacity = '0';
+          pinEl.style.pointerEvents = 'none';
+          return;
+        }
+
+        const x = (projVec.x * 0.5 + 0.5) * w;
+        const y = (-(projVec.y * 0.5) + 0.5) * h;
+
+        // Keep pins cleanly within viewport bounds
+        const inBounds = x > 30 && x < w - 30 && y > 30 && y < h - 70;
+        pinEl.style.opacity = inBounds ? '1' : '0';
+        pinEl.style.pointerEvents = inBounds ? 'auto' : 'none';
+        pinEl.style.left = `${x}px`;
+        pinEl.style.top = `${y}px`;
+      });
+    }
+
+    /* =========================================================================
+       11. MASTER ANIMATION LOOP
+       ========================================================================= */
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+      const speedMult = (state.solarWindSpeed / 420);
+
+      // 1. Rotate Earth and Core Geodynamo
+      earthMesh.rotation.y += dt * 0.22;
+      if (coreGroup.visible) {
+        coreGroup.rotation.y -= dt * 0.65;
+      }
+
+      // 2. Make Sun Corona Halo billboard toward camera
+      sunHaloPlane.lookAt(camera.position);
+
+      // 3. Update Shader Uniforms
+      auroraShaderMat.uniforms.uTime.value = elapsed;
+      bowShockShaderMat.uniforms.uTime.value = elapsed;
+      magnetopauseMat.uniforms.uTime.value = elapsed;
+      plasmaRibbonMat.uniforms.uTime.value = elapsed;
+      sunHaloMat.uniforms.uTime.value = elapsed;
+
+      // 4. Update Vertical Draping IMF Lines & Undulating Cyan Plasma Sheet Lines
+      if (state.showFieldLines) {
+        updateIMFLines(elapsed, speedMult);
+        updatePlasmaSheetLines(elapsed, state.stormFactor);
+      }
+
+      // 5. Update Charged Solar Wind Particles & Lorentz Deflection
+      if (state.showParticles) {
+        updateParticles(dt, elapsed, speedMult);
+      }
+
+      // 6. Smooth Camera Fly-To Transition
+      if (camAnim.active) {
+        camAnim.progress += dt * 1.85;
+        if (camAnim.progress >= 1.0) {
+          camAnim.progress = 1.0;
+          camAnim.active = false;
+        }
+        // Smooth cubic ease-out
+        const ease = 1.0 - Math.pow(1.0 - camAnim.progress, 3);
+        camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, ease);
+        controls.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, ease);
+      }
+
+      controls.update();
+      updateHUDPinPositions();
+      renderer.render(scene, camera);
+    }
+
+    // Initialize Application on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      initHUDPinsAndUI();
+      updateSolarWindTelemetryUI();
+      handleResize();
+      animate();
+    });
+  </script>
+  <script>
+    // Toggle bilah navigasi samping (sidebar) — sembunyikan / tampilkan
+    (function () {
+      var btn = document.getElementById('navHandleBtn');
+      if (!btn) return;
+      var root = document.documentElement;
+      function apply(closed) {
+        root.classList.toggle('nav-closed', closed);
+        btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+        btn.setAttribute('aria-label', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        btn.setAttribute('title', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+      }
+      var stored = null;
+      try { stored = localStorage.getItem('tpNavClosed'); } catch (e) { }
+      // Mobile (≤900px): drawer selalu mulai tertutup agar 3D terlihat penuh
+      var isMobileNav = window.matchMedia('(max-width:900px)').matches;
+      if (isMobileNav || stored === '1') apply(true);
+      btn.addEventListener('click', function () {
+        var closed = !root.classList.contains('nav-closed');
+        apply(closed);
+        try { localStorage.setItem('tpNavClosed', closed ? '1' : '0'); } catch (e) { }
+      });
+    })();
+  </script>
+  <script>
+    // (c) Roda scroll mouse menggeser bilah navbar horizontal (bukan hanya trackpad)
+    (function () {
+      document.addEventListener('wheel', function (e) {
+        var el = e.target instanceof Element ? e.target : null;
+        while (el && el !== document.documentElement) {
+          var cs = getComputedStyle(el);
+          if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              e.preventDefault();
+              el.scrollLeft += e.deltaY;
+            }
+            return;
+          }
+          el = el.parentElement;
+        }
+      }, { passive: false, capture: true });
+    })();
+  </script>
+</body>
+</html>

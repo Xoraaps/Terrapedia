@@ -1,0 +1,3739 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>TerraPedia — BAB 03: Biosfer & Ekosistem (3D Cutaway Biome Diorama)</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Three.js v0.143.0 Official Importmap (TerraPedia Standard) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.143.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.143.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    /* TerraPedia BAB 03 — arah: observatorium malam + atlas ilmiah (sama dengan BAB 01/02).
+       Chrome tenang: permukaan gelap bersih, hairline, satu aksen aurora.
+       Kekayaan warna hanya hidup di diorama 3D. Signature: kelompeng skala. */
+    :root{
+      --tp-bg-deep:#060911;
+      --surface:rgba(12,18,30,.92);
+      --surface-2:rgba(17,24,40,.94);
+      --tp-accent:#5df0a8;
+      --tp-border:rgba(255,255,255,.08);
+      --tp-border-strong:rgba(255,255,255,.16);
+      --tp-text-main:#f1f5f9;
+      --tp-text-body:#cbd5e1;
+      --tp-text-muted:#94a3b8;
+      --amber:#fbbf24;
+      --shadow-float:0 12px 32px rgba(0,0,0,.38);
+      --radius-lg:16px;
+      --radius-md:12px;
+      --radius-sm:8px;
+      --font:'Inter',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;scrollbar-width:none;-ms-overflow-style:none;-webkit-tap-highlight-color:transparent}
+    *::-webkit-scrollbar{display:none;width:0;height:0}
+    button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+    html,body{height:100%}
+    html{overflow:hidden}
+    body{background:var(--tp-bg-deep);color:var(--tp-text-main);font-family:var(--font);overflow:hidden;user-select:none}
+
+    .font-mono-tech{font-family:var(--font-mono)}
+
+    /* Panggung diorama full-screen (pola BAB 01): kanvas dirender oleh JS ke dalam kontainer ini */
+    #dioramaCanvasContainer{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:0;cursor:grab;touch-action:none}
+    #dioramaCanvasContainer:active{cursor:grabbing}
+    #dioramaCanvasContainer canvas{width:100% !important;height:100% !important;display:block}
+
+    /* Overlay pin bioma 3D terproyeksi: fixed di atas kanvas, di bawah HUD */
+    #floatingPinsContainer{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+
+    /* Floating HUD shell (struktur kontainer sama persis dengan BAB 01/02) */
+    .ui-shell{position:fixed;inset:0;pointer-events:none;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
+    .top-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+    .brand-pill{pointer-events:auto;display:inline-flex;align-items:center;gap:12px;padding:8px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .brand-mark{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--tp-accent);font-size:12px;background:rgba(93,240,168,.1);border:1px solid rgba(93,240,168,.35);flex:none}
+    .brand-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .brand-title{font-weight:600;font-size:13px;letter-spacing:-.01em;color:#fff;white-space:nowrap}
+    .brand-sub{font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .brand-chapter{font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .top-controls{pointer-events:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .cam-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:var(--surface-2);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .cam-btn:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+    .cam-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .pill-group{display:inline-flex;gap:2px;padding:4px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .pill-group button{padding:4px 10px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--tp-text-muted);border:1px solid transparent;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .pill-group button:hover{color:#fff}
+    .pill-group button.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .exit-btn{width:32px;height:32px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--surface-2);border:1px solid var(--tp-border);color:var(--tp-text-muted);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .exit-btn:hover{color:#fda4af;background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35)}
+    .exit-btn svg{width:15px;height:15px;display:block}
+    /* Tombol ✕ berputar 90° saat hover (nicety dari versi modal) */
+    #closeArticleModalBtn svg{transition:transform .2s ease}
+    #closeArticleModalBtn:hover svg,#closeArticleModalBtn:focus-visible svg{transform:rotate(90deg)}
+
+    .touch-prompt{align-self:center;margin-top:26px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--tp-text-body);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .prompt-dot{width:8px;height:8px;border-radius:9999px;background:var(--tp-accent);flex:none}
+
+    /* Dock melayang terpusat tengah bawah (pola bottom-dock BAB 01) */
+    .bottom-dock{pointer-events:auto;align-self:center;width:fit-content;max-width:90vw;background:var(--surface);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:12px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-float);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .layer-pills{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 3px;cursor:grab}
+    .layer-pills::-webkit-scrollbar{display:none;width:0;height:0}
+
+    .biome-pill{flex:0 0 auto;touch-action:pan-x;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);white-space:nowrap;font-size:12px;font-weight:500;color:var(--tp-text-body);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .biome-pill:hover{color:#fff;background:rgba(255,255,255,.08);border-color:var(--tp-border-strong)}
+    .biome-pill.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .controls-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .toggle-row{display:flex;gap:6px;flex-wrap:wrap}
+    .scene-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .scene-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .scene-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .scene-btn-neutral{color:var(--tp-text-body);background:rgba(255,255,255,.05);border-color:var(--tp-border)}
+    .scene-btn-neutral:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+
+    .chapter-nav-row{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .chapter-next-card{display:inline-flex;align-items:center;gap:10px;max-width:100%;padding:6px 8px 6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.04);border:1px solid var(--tp-border);text-decoration:none;transition:border-color .18s ease,background-color .18s ease}
+    .chapter-next-card:hover{border-color:rgba(93,240,168,.4);background:rgba(93,240,168,.06)}
+    .chapter-next-text{display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+    .chapter-next-card.is-prev .chapter-next-text{align-items:flex-start}
+    .chapter-next-label{font-family:var(--font-mono);font-size:9px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .chapter-next-title{font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .18s ease}
+    .chapter-next-card:hover .chapter-next-title{color:var(--tp-accent)}
+    .chapter-next-arrow{width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .chapter-next-card:hover .chapter-next-arrow{color:var(--tp-accent);background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.4)}
+
+    /* Permukaan panel (dipakai konten inspeksi & artikel) */
+    .tp-glass{background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float)}
+    .tp-glass-subtle{background:var(--surface-2);border:1px solid rgba(148,163,184,.14)}
+    .tp-glass-interactive{transition:border-color .18s ease,background-color .18s ease}
+    .tp-glass-interactive:hover{border-color:var(--tp-border-strong)}
+    /* Kartu artikel (pola BAB 02) */
+    .tp-glass-card{background:var(--surface-2);border:1px solid var(--tp-border);transition:border-color .18s ease,background-color .18s ease}
+    .tp-glass-card:hover{border-color:var(--tp-border-strong)}
+    .bio-progress-fill{transition:width .65s cubic-bezier(.22,1,.36,1),background-color .4s ease}
+    .article-prose p{line-height:1.78;color:#cbd5e1;user-select:text}
+
+    /* Pin bioma 3D terproyeksi dari world space */
+    .biome-3d-pin{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;transition:opacity .2s ease;z-index:15}
+    .biome-3d-pin.active .pin-badge{border-color:rgba(93,240,168,.5);background:rgba(9,22,34,.95)}
+    .pin-stem{width:2px;height:18px;margin:0 auto;background:rgba(93,240,168,.35)}
+    .pin-dot{width:8px;height:8px;border-radius:9999px;margin:-2px auto 0;background:#5df0a8}
+
+    /* --- Inspector bioma: popup samping kanan (pola info-popup BAB 01/02) --- */
+    #biomeInfoCard{position:fixed;right:16px;top:96px;width:min(340px,calc(100vw - 32px));max-height:calc(100dvh - 230px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;z-index:45;background:var(--surface-2);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:14px;box-shadow:var(--shadow-float);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);user-select:text;visibility:hidden;opacity:0;transform:translateY(12px);pointer-events:none;transition:opacity .26s ease,transform .26s ease,visibility .26s}
+    #biomeInfoCard.open{visibility:visible;opacity:1;transform:translateY(0);pointer-events:auto}
+    #inspectorCloseBtn{width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    #inspectorCloseBtn:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+
+    /* --- Overlay artikel: drawer kanan desktop, sheet layar penuh pada mobile --- */
+    #articleOverlay{position:fixed;inset:0;z-index:60;pointer-events:none}
+    #articleOverlay.open{pointer-events:auto}
+    .cap-backdrop{position:absolute;inset:0;background:rgba(3,6,12,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .3s ease}
+    #articleOverlay.open .cap-backdrop{opacity:1}
+    .cap-panel{position:absolute;top:0;right:0;bottom:0;width:min(760px,52vw);display:flex;flex-direction:column;background:var(--surface-2);border-left:1px solid var(--tp-border);box-shadow:-25px 0 60px -18px rgba(0,0,0,.8);transform:translateX(103%);visibility:hidden;transition:transform .34s cubic-bezier(.16,1,.3,1),visibility .34s}
+    /* Signature: kelompeng skala di tepi kiri drawer artikel (sama dengan BAB 01/02) */
+    .cap-panel::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border-strong) 0 1px,transparent 1px 8px);pointer-events:none;z-index:5}
+    #articleOverlay.open .cap-panel{transform:translateX(0);visibility:visible}
+    #articleOverlay #scientificArticleSection{max-width:none !important;margin:0 !important;padding:0 !important}
+    .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--tp-border);background:rgba(10,17,32,.95)}
+    .cap-eyebrow{display:block;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-muted);white-space:nowrap}
+    .cap-title{font-size:13px;font-weight:600;color:#fff;margin-top:6px;line-height:1.35}
+    .cap-close{width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cap-close:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+    .cap-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+
+    @media (max-width:720px){
+      .brand-sub{display:none}
+      #biomeInfoCard{left:12px;right:12px;top:58px;width:auto;max-height:46dvh}
+      .ui-shell{padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      .brand-pill{padding:6px 10px;gap:8px}
+      .brand-mark{width:26px;height:26px;border-radius:8px}
+      .brand-title{font-size:12px}
+      .brand-chapter{font-size:9px}
+      .cam-btn{padding:5px 9px;font-size:11px}
+      .pill-group button{padding:4px 8px;font-size:10px}
+      .exit-btn{width:30px;height:30px}
+      .touch-prompt{font-size:10px;padding:5px 11px}
+      .bottom-dock{max-width:calc(100vw - 24px);padding:8px 12px;gap:6px}
+      .biome-pill{padding:4px 9px;font-size:11px}
+      .scene-btn{padding:4px 8px;font-size:11px}
+      .controls-row{gap:8px;padding-top:6px}
+      .chapter-next-card{padding:5px 6px 5px 10px}
+      .chapter-next-title{max-width:190px;font-size:11.5px}
+      .chapter-next-arrow{width:22px;height:22px}
+    }
+    @media (max-width:380px){
+      .top-controls{gap:4px}
+      .cam-btn{padding:4px 7px;font-size:10.5px}
+      .pill-group button{padding:4px 6px}
+      .brand-chapter{max-width:150px}
+      .chapter-next-title{max-width:140px;font-size:11px}
+      .scene-btn{padding:4px 6px;font-size:10.5px}
+      .biome-pill{padding:4px 7px;font-size:10.5px}
+      #biomeInfoCard{max-height:52dvh;padding:12px}
+    }
+    @media (max-width:640px){
+      .cap-panel{width:100%;left:0;right:0;top:auto;height:92dvh;border-left:none;border-top:1px solid var(--tp-border);border-radius:18px 18px 0 0;transform:translateY(104%);box-shadow:0 -25px 60px -18px rgba(0,0,0,.8)}
+      #articleOverlay.open .cap-panel{transform:translateY(0)}
+      .cap-body{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+    }
+    @media (prefers-reduced-motion:reduce){
+      #biomeInfoCard,.cap-panel,.cap-backdrop,.touch-prompt,.bio-progress-fill{transition:none}
+    }
+  </style>
+<style id="tpNavStyle">
+    /* ====== TerraPedia NAV: bilah navigasi menjadi sidebar kiri penuh + tombol navbar ====== */
+    :root{--tp-nav-w:min(280px,86vw)}
+    .ui-shell .bottom-dock{
+      position:fixed;top:0;bottom:0;left:0;z-index:30;
+      width:var(--tp-nav-w);max-width:86vw;height:auto;max-height:none;
+      border-width:0 1px 0 0;border-radius:0 18px 18px 0;
+      overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+      padding:20px 14px calc(16px + env(safe-area-inset-bottom,0px));
+      transition:left .34s cubic-bezier(.22,.7,.2,1),visibility .34s;
+    }
+    html.nav-closed .ui-shell .bottom-dock{left:calc(-1 * var(--tp-nav-w));visibility:hidden}
+
+    /* Tombol navbar (handle) menempel di tepi kanan sidebar */
+    .nav-handle{position:fixed;top:50%;left:var(--tp-nav-w);transform:translateY(-50%);margin-left:-1px;z-index:41;width:26px;height:52px;display:inline-flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;color:var(--tp-text-muted);background:var(--surface);border:1px solid var(--tp-border);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 18px -10px rgba(0,0,0,.65);transition:left .34s cubic-bezier(.22,.7,.2,1),color .18s ease,background-color .18s ease}
+    .nav-handle:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .nav-handle svg{width:14px;height:14px;pointer-events:none}
+    .nav-handle .ic-open{display:none}
+    html.nav-closed .nav-handle{left:0}
+    html.nav-closed .nav-handle .ic-close{display:none}
+    html.nav-closed .nav-handle .ic-open{display:block}
+    .nav-handle:focus-visible{outline:2px solid rgba(93,240,168,.7);outline-offset:1px}
+
+    /* Kartu navigasi bab: fixed di ujung kiri & kanan viewport (di luar dock) */
+    .tp-nav-card{position:fixed;bottom:16px;z-index:40;pointer-events:auto;width:auto;max-width:min(330px,38vw)}
+    .tp-nav-card.tp-card-next{right:16px;transition:opacity .25s ease,visibility .25s}
+    .tp-nav-card.tp-card-prev{left:16px}
+
+    /* HUD atas (brand & bar petunjuk) mengambang di atas sidebar — tidak pernah bergeser */
+    .ui-shell .top-bar .brand-pill{position:relative;z-index:45}
+    .ui-shell .touch-prompt{position:relative;z-index:45}
+    /* (b) Ketinggian dock di desktop: isi naik, ruang kosong atas berkurang */
+    @media (min-width:901px){
+      .ui-shell .bottom-dock{padding-top:24px}
+    }
+
+    /* (e) Struktur item navbar seragam: lingkaran warna + nomor + nama */
+    .tp-pill-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-pill-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-text-muted,#94a3b8);flex:none}
+    button.active .tp-pill-num{color:inherit}
+
+    /* (d) Struktur floating text seragam: lingkaran warna + nomor + nama */
+    .tp-f-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-f-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-accent,#5df0a8);flex:none}
+
+    /* Tagline di area atas dock navigasi */
+    .tp-dock-tagline{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--tp-text-body,#cbd5e1);padding:0 2px 2px;white-space:nowrap}
+    .tp-dock-tagline::before{content:'';width:6px;height:6px;border-radius:9999px;background:var(--tp-accent,#5df0a8);box-shadow:0 0 0 3px rgba(93,240,168,.14);flex:none}
+    .tp-dock-tagline::after{content:'';height:1px;flex:1;min-width:12px;background:linear-gradient(90deg,rgba(93,240,168,.28),transparent)}
+
+    /* Mobile: sidebar menjadi drawer overlay */
+    @media (max-width:900px){
+      html:not(.nav-closed) .ui-shell .bottom-dock{box-shadow:18px 0 50px -18px rgba(0,0,0,.78)}
+      html:not(.nav-closed) .tp-card-prev{opacity:0;visibility:hidden;pointer-events:none}
+    }
+    @media (max-width:640px){
+      .tp-nav-card{max-width:calc(50vw - 24px)}
+      /* Judul kartu navigasi harus menyusut mengikuti kartu (anti tabrakan) */
+      .tp-nav-card .chapter-next-text{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden}
+      .tp-nav-card .chapter-next-title{max-width:100%}
+      .tp-nav-card .chapter-next-label{overflow:hidden;text-overflow:ellipsis}
+      .nav-handle{width:24px;height:44px}
+    }
+    @media (max-width:720px){
+      /* Pill brand compact (brand-sub disembunyikan) -> padding atas lebih pendek */
+      .ui-shell .bottom-dock{padding-top:16px}
+    }
+    /* ====== Mobile UX: target sentuh, scrim drawer, keterbacaan ====== */
+    @media (max-width:720px){
+      /* Tap target min 40px (pedoman iOS HIG / Material Design) */
+      #openArticleOverlayBtn{min-height:42px;padding-top:9px;padding-bottom:9px}
+      .cap-close{width:42px !important;height:42px !important;font-size:16px !important}
+      button[id*="lose" i],#closeArticleModal,#exitModuleBtn{min-width:40px;min-height:40px}
+      button[id*="ang" i],button[data-lang]{min-width:42px;min-height:36px}
+      /* Area sentuh handle navigasi diperluas tanpa mengubah tampilan */
+      .nav-handle{overflow:visible}
+      .nav-handle::before{content:'';position:absolute;inset:-12px -14px}
+      /* Item di dalam drawer lebih nyaman disentuh */
+      .ui-shell .bottom-dock button{min-height:38px}
+      /* Judul & padding overlay artikel di layar sempit */
+      .cap-title{font-size:16px}
+      .cap-body{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+      /* Perluas area sentuh pin/label 3D (posisi visual tidak berubah) */
+      #tp3dLabels .tp-layer-label::before,
+      #labelsOverlayContainer .tp-3d-label::before,
+      #floatingPinsContainer .biome-3d-pin::before,
+      #hudPinsContainer .hud-pin::before,
+      #hotspotLayer .hotspot-pin::before{content:'';position:absolute;inset:-9px}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .ui-shell .bottom-dock,.nav-handle,.tp-nav-card{transition:none}
+    }
+  </style>
+</head>
+<body>
+  <!-- Panggung diorama full-screen (pola BAB 01): kanvas Three.js dirender JS ke kontainer ini -->
+  <div id="dioramaCanvasContainer"></div>
+
+  <!-- 3D Floating Biome Pins Container (Projected from 3D world coords) -->
+  <div id="floatingPinsContainer"></div>
+
+  <!-- INSPECTOR BIOMA (popup samping kanan, pola info-popup BAB 01/02):
+       tersembunyi sampai bioma diklik -->
+  <aside id="biomeInfoCard">
+        <!-- Inspector Header -->
+        <div class="flex items-start justify-between gap-2.5 pb-2.5 border-b border-slate-800/90">
+          <div class="flex items-center gap-2.5">
+            <div id="inspectorIconBox" class="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-mono-tech font-medium flex-shrink-0 border border-[#5df0a8]/50 bg-[#5df0a8]/10 text-[#5df0a8]">
+              01
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span id="inspectorCodeBadge" class="font-mono-tech text-[9px] px-1.5 py-0.5 rounded bg-[#5df0a8]/10 text-[#5df0a8] border border-[#5df0a8]/40">
+                  BIOMA 01 // TROPIKA
+                </span>
+                <span id="inspectorCoordBadge" class="font-mono-tech text-[9px] text-slate-400">
+                  10°LU – 10°LS
+                </span>
+              </div>
+              <h2 id="inspectorTitle" class="text-sm sm:text-base font-semibold text-white mt-0.5 leading-snug">
+                Hutan Hujan Tropis
+              </h2>
+            </div>
+          </div>
+
+          <!-- Collapse Inspector on Mobile Button -->
+          <div class="flex items-center gap-1.5">
+            <button id="inspectorCloseBtn" type="button" title="Tutup panel inspeksi" aria-label="Tutup panel inspeksi">✕</button>
+            <button id="toggleInspectorCollapseBtn" type="button" class="sm:hidden p-1.5 rounded-lg bg-slate-800/80 text-slate-300" title="Minimize/Expand">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Inspector Body -->
+        <div id="inspectorBodyContent" class="space-y-2.5 pt-2.5 text-xs">
+          <!-- Short Overview -->
+          <p id="inspectorSummary" class="text-[11px] sm:text-xs text-slate-300 leading-relaxed">
+            Ekosistem daratan dengan insolasi matahari sepanjang tahun dan curah hujan ekstrem, membentuk stratifikasi tajuk berlapis yang menopang lebih dari separuh spesies terestrial Bumi.
+          </p>
+
+          <!-- Quick Climate Telemetry Grid -->
+          <div class="grid grid-cols-3 gap-1.5">
+            <div class="tp-glass-subtle rounded-xl p-2">
+              <span class="font-mono-tech text-[9px] text-slate-400 block" data-i18n="inspector.tempLabel">SUHU RATA-RATA</span>
+              <span id="inspectorTempVal" class="font-mono-tech text-[11px] font-medium text-white mt-0.5 block">25°C – 28°C</span>
+            </div>
+            <div class="tp-glass-subtle rounded-xl p-2">
+              <span class="font-mono-tech text-[9px] text-slate-400 block" data-i18n="inspector.rainLabel">CURAH HUJAN</span>
+              <span id="inspectorRainVal" class="font-mono-tech text-[11px] font-medium text-[#5df0a8] mt-0.5 block">2000–4500 mm</span>
+            </div>
+            <div class="tp-glass-subtle rounded-xl p-2">
+              <span class="font-mono-tech text-[9px] text-slate-400 block" data-i18n="inspector.nppLabel">PRODUKTIVITAS</span>
+              <span id="inspectorNppVal" class="font-mono-tech text-[11px] font-medium text-cyan-300 mt-0.5 block">2200 g/m²/thn</span>
+            </div>
+          </div>
+
+          <!-- 4 Required Scientific Pillars -->
+          <div class="space-y-2">
+            <!-- 1. Karakteristik Iklim -->
+            <div class="tp-glass-subtle rounded-xl p-2.5 border-l-2 border-l-sky-400">
+              <div class="flex items-center gap-1.5 font-mono-tech text-[10px] font-medium text-sky-300 mb-0.5">
+                <span data-i18n="inspector.climateHeading">Karakteristik Iklim & Abiotik</span>
+              </div>
+              <p id="inspectorClimateText" class="text-[11px] text-slate-300 leading-relaxed"></p>
+            </div>
+
+            <!-- 2. Vegetasi -->
+            <div class="tp-glass-subtle rounded-xl p-2.5 border-l-2 border-l-[#5df0a8]">
+              <div class="flex items-center gap-1.5 font-mono-tech text-[10px] font-medium text-[#5df0a8] mb-0.5">
+                <span data-i18n="inspector.vegetationHeading">Vegetasi & Adaptasi Flora</span>
+              </div>
+              <p id="inspectorVegetationText" class="text-[11px] text-slate-300 leading-relaxed"></p>
+            </div>
+
+            <!-- 3. Fauna -->
+            <div class="tp-glass-subtle rounded-xl p-2.5 border-l-2 border-l-amber-400">
+              <div class="flex items-center gap-1.5 font-mono-tech text-[10px] font-medium text-amber-300 mb-0.5">
+                <span data-i18n="inspector.faunaHeading">Organisme & Fauna Kunci</span>
+              </div>
+              <p id="inspectorFaunaText" class="text-[11px] text-slate-300 leading-relaxed"></p>
+            </div>
+
+            <!-- 4. Keanekaragaman Hayati -->
+            <div class="tp-glass-subtle rounded-xl p-2.5 border-l-2 border-l-slate-400">
+              <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-1 font-mono-tech text-[10px] font-medium text-slate-300">
+                  <span data-i18n="inspector.biodiversityHeading">Indeks Biodiversitas</span>
+                </div>
+                <span id="inspectorBioScore" class="font-mono-tech text-[10px] font-medium text-[#5df0a8]">98 / 100</span>
+              </div>
+              <!-- Progress Bar -->
+              <div class="w-full h-1.5 rounded-full bg-slate-900/90 overflow-hidden my-1 border border-slate-800">
+                <div id="inspectorBioBar" class="h-full rounded-full bg-[#5df0a8] bio-progress-fill" style="width: 98%;"></div>
+              </div>
+              <p id="inspectorBiodiversityText" class="text-[11px] text-slate-300 leading-relaxed mt-1"></p>
+            </div>
+          </div>
+        </div>
+  </aside>
+
+  <!-- FLOATING HUD OVERLAY (struktur kontainer sama persis dengan BAB 01/02):
+       pointer-events:none di shell, pointer-events:auto hanya pada kartu/tombol interaktif -->
+  <div class="ui-shell">
+    <div>
+      <header class="top-bar">
+        <div class="brand-pill">
+          <span class="brand-mark">▲</span>
+          <div class="brand-col">
+            <span class="brand-title">TerraPedia 3D</span>
+            <span class="brand-chapter" data-i18n="header.chapterBadge">BAB 03 — BIOSFER &amp; EKOSISTEM</span>
+            <span class="brand-sub" data-i18n="header.title">Struktur Biosfer dan Dinamika Ekosistem Bumi</span>
+          </div>
+        </div>
+
+        <!-- Pojok kanan atas: tombol artikel, sakelar bahasa (ID/EN), dan ✕ melayang tanpa bar memanjang -->
+        <div class="top-controls">
+          <button id="openArticleOverlayBtn" type="button" class="cam-btn" data-i18n="header.readArticleBtn">Artikel Ilmiah</button>
+          <div class="pill-group" role="group" aria-label="Language Switcher">
+            <button id="langBtnID" type="button" class="active">ID</button>
+            <button id="langBtnEN" type="button">EN</button>
+          </div>
+          <button id="closeArticleModalBtn" type="button" title="Keluar ke TerraPedia / Exit to TerraPedia" class="exit-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Pil petunjuk tepat di bawah kartu judul kiri atas -->
+      <div style="display:flex;justify-content:center">
+        <div class="touch-prompt">
+          <span class="prompt-dot"></span>
+          <span data-i18n="hud.defaultPrompt">Klik bioma atau pin 3D untuk inspeksi</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCK MELAYANG TERPUSAT TENGAH BAWAH: pemilih bioma + kontrol scene + navigasi bab -->
+    <div class="bottom-dock" id="bottomDock">
+      <div class="tp-dock-tagline">Kenali Bumi Lebih Dalam</div>
+      <!-- Baris 1: Pemilih bioma (klik lagi = sembunyikan info) -->
+      <div class="layer-pills" id="biomeSelectorBar">
+        <button type="button" data-biome="rainforest" class="biome-pill active">
+          <span class="tp-pill-dot" style="background:#5df0a8"></span>
+          <span class="tp-pill-num">01</span>
+          <span data-i18n="biomes.rainforest.short">Hutan Hujan Tropis</span>
+        </button>
+        <button type="button" data-biome="desert" class="biome-pill">
+          <span class="tp-pill-dot" style="background:#f59e0b"></span>
+          <span class="tp-pill-num">02</span>
+          <span data-i18n="biomes.desert.short">Gurun</span>
+        </button>
+        <button type="button" data-biome="savanna" class="biome-pill">
+          <span class="tp-pill-dot" style="background:#eab308"></span>
+          <span class="tp-pill-num">03</span>
+          <span data-i18n="biomes.savanna.short">Savana</span>
+        </button>
+        <button type="button" data-biome="tundra" class="biome-pill">
+          <span class="tp-pill-dot" style="background:#38bdf8"></span>
+          <span class="tp-pill-num">04</span>
+          <span data-i18n="biomes.tundra.short">Tundra</span>
+        </button>
+        <button type="button" data-biome="ocean" class="biome-pill">
+          <span class="tp-pill-dot" style="background:#06b6d4"></span>
+          <span class="tp-pill-num">05</span>
+          <span data-i18n="biomes.ocean.short">Lautan</span>
+        </button>
+      </div>
+
+      <!-- Baris 2: Kontrol scene 3D -->
+      <div class="controls-row">
+        <div class="toggle-row">
+          <button id="toggleAutoRotateBtn" type="button" class="scene-btn active">
+            <span data-i18n="hud.autoRotate">Putar Otomatis</span>
+          </button>
+          <button id="togglePinsBtn" type="button" class="scene-btn active">
+            <span data-i18n="hud.togglePins">Pin Label: ON</span>
+          </button>
+          <button id="resetCameraBtn" type="button" class="scene-btn scene-btn-neutral">
+            <span data-i18n="hud.resetView">Reset Sudut</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tombol navbar: sembunyikan / tampilkan bilah navigasi samping -->
+    <button id="navHandleBtn" type="button" class="nav-handle" aria-expanded="true" aria-controls="bottomDock" aria-label="Sembunyikan navigasi bab" title="Sembunyikan navigasi bab">
+      <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+      <svg class="ic-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button>
+
+    <!-- Kartu navigasi bab: fixed di ujung kiri & kanan viewport -->
+    <a class="chapter-next-card is-prev tp-nav-card tp-card-prev" href="terrapedia_bab_02_visualisasi_3d_atmosfer_iklim.html" title="Buka BAB 02 — Atmosfer &amp; Iklim" aria-label="Kembali ke BAB 02 — Atmosfer dan Iklim">
+      <span class="chapter-next-arrow">←</span>
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="footerNav.prevLabel">BAB SEBELUMNYA</span>
+        <span class="chapter-next-title" data-i18n="footerNav.prevTitle">BAB 02 — Atmosfer &amp; Iklim</span>
+      </span>
+    </a>
+    <a class="chapter-next-card tp-nav-card tp-card-next" href="terrapedia_bab_04_vulkanologi_seismik.html" title="Buka BAB 04 — Vulkanologi &amp; Seismik" aria-label="Lanjut ke BAB 04 — Vulkanologi dan Seismik">
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="footerNav.nextLabel">BAB SELANJUTNYA</span>
+        <span class="chapter-next-title" data-i18n="footerNav.nextTitle">BAB 04 — Vulkanologi &amp; Seismik</span>
+      </span>
+      <span class="chapter-next-arrow">→</span>
+    </a>
+  </div>
+
+  <!-- =========================================================================
+       OVERLAY ARTIKEL (pola info-popup BAB 01):
+       artikel ilmiah hanya tampil setelah tombol "Artikel Ilmiah" diklik.
+       Desktop: drawer kanan. Mobile (≤640px): sheet layar penuh.
+       ========================================================================= -->
+  <div id="articleOverlay" aria-hidden="true">
+    <div class="cap-backdrop" data-overlay-close></div>
+    <section class="cap-panel" role="dialog" aria-modal="true" aria-label="Artikel BAB 03 — Biosfer &amp; Ekosistem">
+      <header class="cap-head">
+        <div class="min-w-0">
+          <span class="cap-eyebrow" data-i18n="header.readArticleBtn">Artikel Ilmiah</span>
+          <h2 class="cap-title" data-i18n="header.title">Struktur Biosfer dan Dinamika Ekosistem Bumi</h2>
+        </div>
+        <button id="closeArticleOverlayBtn" type="button" class="cap-close" aria-label="Tutup artikel" title="Tutup artikel (Esc)">✕</button>
+      </header>
+      <div class="cap-body">
+    <!-- =======================================================================
+         SCIENTIFIC ARTICLE & DATA COMPONENTS (TERRAPEDIA BAB 03)
+         ======================================================================= -->
+    <main id="scientificArticleSection" class="w-full space-y-8 article-prose">
+
+      <!-- ARTICLE HERO: pengantar ringkas (pola BAB 02) -->
+      <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+        <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+          <span data-i18n="article.s0Tag">01 // PENGANTAR</span>
+          <span class="h-px flex-1 bg-white/10"></span>
+        </div>
+        <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="article.heroTitle">
+          BAB 03 — Dinamika Biosfer, Struktur Trofik, dan Karakteristik Bioma Global
+        </h2>
+        <p class="text-sm text-slate-300 leading-relaxed" data-i18n="article.heroLead">
+          Biosfer merupakan selubung tipis kehidupan di permukaan Bumi tempat litosfer (kerak batuan), hidrosfer (perairan), dan atmosfer (udara) berinteraksi secara sinergis. Melalui pemodelan diorama tiga dimensi di atas, kita dapat mengamati bagaimana gradien lintang, ketinggian, suhu, dan presipitasi membagi permukaan planet menjadi unit-unit ekosistem besar yang disebut bioma.
+        </p>
+      </section>
+
+      <!-- SECTION 01: ARSITEKTUR BIOSFER & HIRARKI EKOLOGI -->
+      <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+        <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+          <span data-i18n="article.s1Tag">02 // ARSITEKTUR BIOSFER</span>
+          <span class="h-px flex-1 bg-white/10"></span>
+        </div>
+        <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="article.sec1Title">
+          Arsitektur Biosfer & Enam Tingkat Organisasi Ekologi
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div class="lg:col-span-7 space-y-4 text-sm sm:text-base">
+            <p data-i18n="article.sec1P1">
+              Istilah <strong>Biosfer</strong> pertama kali dipopulerkan oleh ahli geologi Eduard Suess (1875) dan dikembangkan secara kuantitatif oleh geokimiawan Vladimir Vernadsky (1926). Secara vertikal, zona kehidupan aktif membentang dari dasar Palung Mariana pada kedalaman hampir 11.000 meter di bawah permukaan laut hingga ketinggian sekitar 10.000 meter di troposfer atas tempat spora mikroorganisme dan burung migran melintas.
+            </p>
+            <p data-i18n="article.sec1P2">
+              Untuk memahami kompleksitas interaksi di dalam biosfer, ekologi modern menyusun sistem kehidupan ke dalam enam tingkat hierarki organisasi yang saling bertingkat—mulai dari organisme tunggal hingga keseluruhan sistem planetari.
+            </p>
+          </div>
+
+          <!-- Whittaker / Holdridge Climate Gradient Summary Card -->
+          <div class="lg:col-span-5 tp-glass rounded-2xl p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="font-mono-tech text-xs font-medium text-[#5df0a8]" data-i18n="article.whittakerTitle">Hukum Klasifikasi Bioma Whittaker</span>
+              <span class="font-mono-tech text-[11px] text-slate-400">R.H. Whittaker (1975)</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed" data-i18n="article.whittakerDesc">
+              Distribusi bioma terestrial di Bumi dikendalikan terutama oleh dua variabel abiotik utama: <strong>Suhu Udara Rata-Rata Tahunan (Mean Annual Temperature)</strong> dan <strong>Presipitasi/Curah Hujan Tahunan (Mean Annual Precipitation)</strong>.
+            </p>
+            <div class="space-y-2 pt-1 font-mono-tech text-xs">
+              <div class="flex items-center justify-between p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+                <span class="text-emerald-300" data-i18n="article.wRow1L">Panas + Hujan Ekstrem</span>
+                <span class="text-white font-semibold" data-i18n="article.wRow1R">→ Hutan Hujan Tropis</span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-lg bg-amber-500/10 border border-amber-500/25">
+                <span class="text-amber-300" data-i18n="article.wRow2L">Panas + Musim Kering Panjang</span>
+                <span class="text-white font-semibold" data-i18n="article.wRow2R">→ Savana Tropis</span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-lg bg-orange-500/10 border border-orange-500/25">
+                <span class="text-orange-300" data-i18n="article.wRow3L">Evaporasi > Presipitasi (&lt;250mm)</span>
+                <span class="text-white font-semibold" data-i18n="article.wRow3R">→ Gurun Arid</span>
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/25">
+                <span class="text-cyan-300" data-i18n="article.wRow4L">Suhu Kriogenik + Permafrost</span>
+                <span class="text-white font-semibold" data-i18n="article.wRow4R">→ Tundra Kutub/Alpin</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6 Hierarchy Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5 pt-2">
+          <div class="tp-glass-subtle tp-glass-interactive rounded-2xl p-4">
+            <span class="font-mono-tech text-[10px] text-slate-400">Level 01</span>
+            <h4 class="font-semibold text-white text-sm mt-1" data-i18n="article.h1Title">Individu</h4>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed" data-i18n="article.h1Desc">Organisme tunggal yang mampu menjalankan fungsi fisiologis mandiri (misal: seekor jerapah <em>Giraffa camelopardalis</em>).</p>
+          </div>
+          <div class="tp-glass-subtle tp-glass-interactive rounded-2xl p-4">
+            <span class="font-mono-tech text-[10px] text-slate-400">Level 02</span>
+            <h4 class="font-semibold text-white text-sm mt-1" data-i18n="article.h2Title">Populasi</h4>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed" data-i18n="article.h2Desc">Kumpulan individu sejenis yang menempati ruang geografis tertentu pada waktu yang sama dan dapat berkembang biak.</p>
+          </div>
+          <div class="tp-glass-subtle tp-glass-interactive rounded-2xl p-4">
+            <span class="font-mono-tech text-[10px] text-slate-400">Level 03</span>
+            <h4 class="font-semibold text-white text-sm mt-1" data-i18n="article.h3Title">Komunitas</h4>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed" data-i18n="article.h3Desc">Seluruh populasi berbagai spesies (flora, fauna, mikroba) yang saling berinteraksi di suatu habitat spesifik.</p>
+          </div>
+          <div class="tp-glass-subtle tp-glass-interactive rounded-2xl p-4">
+            <span class="font-mono-tech text-[10px] text-slate-400">Level 04</span>
+            <h4 class="font-semibold text-white text-sm mt-1" data-i18n="article.h4Title">Ekosistem</h4>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed" data-i18n="article.h4Desc">Tatanan kesatuan utuh antara komunitas biotik dengan komponen fisik-kimia abiotik (cahaya, tanah, air, mineral).</p>
+          </div>
+          <div class="tp-glass-subtle tp-glass-interactive rounded-2xl p-4">
+            <span class="font-mono-tech text-[10px] text-slate-400">Level 05</span>
+            <h4 class="font-semibold text-white text-sm mt-1" data-i18n="article.h5Title">Bioma</h4>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed" data-i18n="article.h5Desc">Kumpulan ekosistem skala regional/kontinental dengan corak vegetasi klimaks dan iklim makro yang serupa.</p>
+          </div>
+          <div class="tp-glass-subtle tp-glass-interactive rounded-2xl p-4 border-[#5df0a8]/40">
+            <span class="font-mono-tech text-[10px] text-slate-400">Level 06</span>
+            <h4 class="font-semibold text-white text-sm mt-1" data-i18n="article.h6Title">Biosfer</h4>
+            <p class="text-xs text-slate-400 mt-1.5 leading-relaxed" data-i18n="article.h6Desc">Integrasi global seluruh bioma daratan dan lautan yang membentuk sistem penyangga kehidupan planet Bumi.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 02: ALIRAN ENERGI, PIRAMIDA TROFIK & SIKLUS BIOGEOKIMIA -->
+      <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+        <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+          <span data-i18n="article.s2Tag">03 // ALIRAN ENERGI &amp; SIKLUS MATERI</span>
+          <span class="h-px flex-1 bg-white/10"></span>
+        </div>
+        <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="article.sec2Title">
+          Aliran Energi Termodinamika, Hukum 10% Lindeman & Siklus Biogeokimia
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Energy Flow & Trophic Pyramid Card -->
+          <div class="tp-glass rounded-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <h4 class="text-base sm:text-lg font-semibold text-white" data-i18n="article.trophicTitle">Piramida Trofik & Efisiensi Ekologi 10%</h4>
+              <span class="font-mono-tech text-xs text-[#5df0a8]">Lindeman (1942)</span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed" data-i18n="article.trophicDesc">
+              Energi mengalir secara searah (unidirectional) dari radiasi foton Matahari menuju produsen fotosintetik, lalu diteruskan ke konsumen. Sesuai Hukum Termodinamika II, sekitar <strong>90% energi terdisipasi sebagai panas respirasi metabolik</strong> pada setiap perpindahan tingkat trofik, menyisakan rata-rata hanya <strong>10% energi</strong> yang tersimpan sebagai biomassa baru.
+            </p>
+
+            <!-- Visual Trophic Bars -->
+            <div class="space-y-2.5 pt-2 font-mono-tech text-xs">
+              <div class="p-2.5 rounded-xl bg-rose-500/15 border border-rose-400/30 flex items-center justify-between w-2/5">
+                <span class="text-rose-200 font-semibold" data-i18n="article.tLevel4">IV. Predator Puncak</span>
+                <span class="text-white">10 kcal</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-between w-3/5">
+                <span class="text-amber-200 font-semibold" data-i18n="article.tLevel3">III. Karnivora Sekunder</span>
+                <span class="text-white">100 kcal</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-between w-4/5">
+                <span class="text-sky-200 font-semibold" data-i18n="article.tLevel2">II. Herbivora Primer</span>
+                <span class="text-white">1.000 kcal</span>
+              </div>
+              <div class="p-2.5 rounded-xl bg-emerald-500/20 border border-[#5df0a8]/50 flex items-center justify-between w-full">
+                <span class="text-[#5df0a8] font-semibold" data-i18n="article.tLevel1">I. Produsen Autotrof (Flora & Fitoplankton)</span>
+                <span class="text-white">10.000 kcal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Biogeochemical Cycles Card -->
+          <div class="tp-glass rounded-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <h4 class="text-base sm:text-lg font-semibold text-white" data-i18n="article.cycleTitle">Konektivitas Antar-Bioma dalam Siklus Materi</h4>
+              <span class="font-mono-tech text-xs text-cyan-300">C · H₂O · N · P</span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-300 leading-relaxed" data-i18n="article.cycleDesc">
+              Berbeda dengan energi yang mengalir terbuka, materi kimia berputar dalam daur tertutup (siklus biogeokimia) yang menghubungkan kelima bioma pada diorama di atas menjadi satu kesatuan sistem Bumi:
+            </p>
+            <div class="space-y-3 text-xs">
+              <div class="p-3 rounded-xl tp-glass-subtle">
+                <div class="font-semibold text-[#5df0a8] mb-0.5" data-i18n="article.cycle1Title">1. Daur Hidrologi & Transpirasi Kanopi</div>
+                <p class="text-slate-300 leading-relaxed" data-i18n="article.cycle1Desc">Evaporasi permukaan Lautan membentuk awan konvektif yang menjatuhkan presipitasi di atas Hutan Hujan Tropis dan pegunungan Tundra, lalu kembali melalui aliran sungai ke samudra.</p>
+              </div>
+              <div class="p-3 rounded-xl tp-glass-subtle">
+                <div class="font-semibold text-amber-300 mb-0.5" data-i18n="article.cycle2Title">2. Transportasi Aerosol Mineral Lintas Benua</div>
+                <p class="text-slate-300 leading-relaxed" data-i18n="article.cycle2Desc">Debu kaya fosfor dari bioma Gurun (seperti Sahara) terbawa angin pasat melintasi samudra untuk menyuburkan tanah Hutan Hujan Tropis yang miskin hara akibat pencucian hujan (leaching).</p>
+              </div>
+              <div class="p-3 rounded-xl tp-glass-subtle">
+                <div class="font-semibold text-cyan-300 mb-0.5" data-i18n="article.cycle3Title">3. Rosot Karbon Biru & Terestrial (Carbon Sink)</div>
+                <p class="text-slate-300 leading-relaxed" data-i18n="article.cycle3Desc">Fitoplankton serta terumbu karang di Lautan bekerja bersama biomassa pohon Hutan Tropis dan lapisan permafrost Tundra dalam menyerap serta mengunci karbon dioksida atmosfer.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 03: EKSPLORASI MENDALAM 5 BIOMA UTAMA (INTERACTIVE CARDS) -->
+      <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+            <span data-i18n="article.s3Tag">04 // PROFIL BIOMA</span>
+            <span class="h-px w-10 bg-white/10"></span>
+          </div>
+          <span class="font-mono-tech text-xs text-slate-400" data-i18n="article.sec3Hint">
+            Klik tombol "Fokus di 3D" untuk mengarahkan kamera langsung ke bioma terkait
+          </span>
+        </div>
+        <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="article.sec3Title">
+          Profil Ilmiah Lima Ekosistem Utama pada Diorama
+        </h2>
+
+        <div id="articleBiomeCardsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Populated dynamically by JS for seamless ID/EN translation & 3D camera synchronization -->
+        </div>
+      </section>
+
+      <!-- SECTION 04: MATRIKS KOMPARATIF BIOMA GLOBAL -->
+      <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+        <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+          <span data-i18n="article.s4Tag">05 // MATRIKS KOMPARATIF</span>
+          <span class="h-px flex-1 bg-white/10"></span>
+        </div>
+        <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="article.sec4Title">
+          Matriks Komparatif Parameter Ekologi Bioma Global
+        </h2>
+
+        <div class="tp-glass rounded-2xl overflow-hidden border border-slate-800">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr class="bg-slate-900/90 border-b border-slate-800 font-mono-tech text-[11px] text-slate-400">
+                  <th class="py-3.5 px-4" data-i18n="table.colBiome">Bioma / Ekosistem</th>
+                  <th class="py-3.5 px-4" data-i18n="table.colTemp">Rentang Suhu (°C)</th>
+                  <th class="py-3.5 px-4" data-i18n="table.colPrecip">Presipitasi Tahunan</th>
+                  <th class="py-3.5 px-4" data-i18n="table.colNpp">NPP Rata-Rata (g/m²/thn)</th>
+                  <th class="py-3.5 px-4" data-i18n="table.colSoil">Karakteristik Substrat / Tanah</th>
+                  <th class="py-3.5 px-4" data-i18n="table.colBio">Indeks Biodiversitas</th>
+                </tr>
+              </thead>
+              <tbody id="comparisonTableBody" class="divide-y divide-slate-800/70 text-slate-300">
+                <!-- Populated dynamically by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- NAVIGASI BAB: BILAH BAWAH (Model BAB 04) -->
+      <footer class="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <a href="terrapedia_bab_02_visualisasi_3d_atmosfer_iklim.html" title="Buka BAB 02 — Atmosfer &amp; Iklim" aria-label="Kembali ke BAB 02 — Atmosfer dan Iklim"
+           class="group w-full sm:w-auto inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-slate-900/70 hover:bg-slate-900 border border-white/10 hover:border-[#5df0a8]/50 transition text-left">
+          <span class="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-[#5df0a8]/20 flex items-center justify-center text-slate-300 group-hover:text-[#5df0a8] transition shrink-0">←</span>
+          <span class="min-w-0">
+            <span data-i18n="footerNav.prevLabel" class="block text-[10px] font-mono text-slate-400 group-hover:text-[#5df0a8] transition">BAB SEBELUMNYA</span>
+            <span data-i18n="footerNav.prevTitle" class="block text-xs sm:text-sm font-semibold text-white group-hover:text-[#5df0a8] transition truncate">BAB 02 — Atmosfer &amp; Iklim</span>
+          </span>
+        </a>
+
+        <a href="terrapedia_bab_04_vulkanologi_seismik.html" title="Buka BAB 04 — Vulkanologi &amp; Seismik" aria-label="Lanjut ke BAB 04 — Vulkanologi dan Seismik"
+           class="group w-full sm:w-auto inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-slate-900/70 hover:bg-slate-900 border border-white/10 hover:border-[#5df0a8]/50 transition">
+          <span class="min-w-0">
+            <span data-i18n="footerNav.nextLabel" class="block text-[10px] font-mono text-slate-400 group-hover:text-[#5df0a8] transition">BAB SELANJUTNYA</span>
+            <span data-i18n="footerNav.nextTitle" class="block text-xs sm:text-sm font-semibold text-white group-hover:text-[#5df0a8] transition truncate">BAB 04 — Vulkanologi &amp; Seismik</span>
+          </span>
+          <span class="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-[#5df0a8]/20 flex items-center justify-center text-slate-300 group-hover:text-[#5df0a8] transition shrink-0">→</span>
+        </a>
+      </footer>
+
+    </main>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================================
+       THREE.JS v0.143.0 DIORAMA & BILINGUAL APPLICATION LOGIC
+       ========================================================================= -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* =========================================================================
+       1. BILINGUAL DICTIONARY & BIOME SCIENTIFIC DATABASE (ID & EN)
+       ========================================================================= */
+    const I18N = {
+      id: {
+        header: {
+          chapterBadge: 'Bab 03 — Biosfer & Ekosistem',
+          title: 'Struktur Biosfer dan Dinamika Ekosistem Bumi',
+          readArticleBtn: 'Artikel Ilmiah'
+        },
+        footerNav: { prevLabel: 'Sebelumnya', prevTitle: 'BAB 02 — Atmosfer & Iklim', nextLabel: 'Berikutnya', nextTitle: 'BAB 04 — Vulkanologi & Seismik' },
+        hud: {
+          dioramaLabel: 'Diorama potongan Bumi 3D',
+          instructions: 'Putar (<strong class="text-white">Drag</strong>), perbesar (<strong class="text-white">Scroll</strong>), dan <strong class="text-[#5df0a8]">Klik langsung pada bioma</strong> atau label 3D untuk membedah struktur iklim, vegetasi, serta fauna endemiknya.',
+          autoRotate: 'Putar Otomatis',
+          togglePinsOn: 'Pin Label: ON',
+          togglePinsOff: 'Pin Label: OFF',
+          resetView: 'Reset Sudut',
+          focus3DBtn: 'Fokus di 3D',
+          defaultPrompt: 'Klik bioma atau pin 3D untuk inspeksi'
+        },
+        inspector: {
+          tempLabel: 'Suhu rata-rata',
+          rainLabel: 'Curah hujan',
+          nppLabel: 'Produktivitas',
+          climateHeading: 'Karakteristik Iklim & Abiotik',
+          vegetationHeading: 'Vegetasi & Adaptasi Flora',
+          faunaHeading: 'Organisme & Fauna Kunci',
+          biodiversityHeading: 'Indeks Keanekaragaman Hayati'
+        },
+        article: {
+          heroTag1: 'Modul ensiklopedia sains Bumi',
+          heroTag2: 'Estimasi baca: 12 menit',
+          heroTag3: 'Skala spasial: global (−11.000 m s/d +10.000 m)',
+          s0Tag: '01 // PENGANTAR',
+          s1Tag: '02 // ARSITEKTUR BIOSFER',
+          s2Tag: '03 // ALIRAN ENERGI & SIKLUS MATERI',
+          s3Tag: '04 // PROFIL BIOMA',
+          s4Tag: '05 // MATRIKS KOMPARATIF',
+          heroTitle: 'BAB 03 — Dinamika Biosfer, Struktur Trofik, dan Karakteristik Bioma Global',
+          heroLead: 'Biosfer merupakan selubung tipis kehidupan di permukaan Bumi tempat litosfer (kerak batuan), hidrosfer (perairan), dan atmosfer (udara) berinteraksi secara sinergis. Melalui pemodelan diorama tiga dimensi di atas, kita dapat mengamati bagaimana gradien lintang, ketinggian, suhu, dan presipitasi membagi permukaan planet menjadi unit-unit ekosistem besar yang disebut bioma.',
+          sec1Title: 'Arsitektur Biosfer & Enam Tingkat Organisasi Ekologi',
+          sec1P1: 'Istilah <strong>Biosfer</strong> pertama kali dipopulerkan oleh ahli geologi Eduard Suess (1875) dan dikembangkan secara kuantitatif oleh geokimiawan Vladimir Vernadsky (1926). Secara vertikal, zona kehidupan aktif membentang dari dasar Palung Mariana pada kedalaman hampir 11.000 meter di bawah permukaan laut hingga ketinggian sekitar 10.000 meter di troposfer atas tempat spora mikroorganisme dan burung migran melintas.',
+          sec1P2: 'Untuk memahami kompleksitas interaksi di dalam biosfer, ekologi modern menyusun sistem kehidupan ke dalam enam tingkat hierarki organisasi yang saling bertingkat—mulai dari organisme tunggal hingga keseluruhan sistem planetari.',
+          whittakerTitle: 'Hukum Klasifikasi Bioma Whittaker',
+          whittakerDesc: 'Distribusi bioma terestrial di Bumi dikendalikan terutama oleh dua variabel abiotik utama: <strong>Suhu Udara Rata-Rata Tahunan (Mean Annual Temperature)</strong> dan <strong>Presipitasi/Curah Hujan Tahunan (Mean Annual Precipitation)</strong>.',
+          wRow1L: 'Panas + Hujan Ekstrem',
+          wRow1R: '→ Hutan Hujan Tropis',
+          wRow2L: 'Panas + Musim Kering Panjang',
+          wRow2R: '→ Savana Tropis',
+          wRow3L: 'Evaporasi > Presipitasi (<250mm)',
+          wRow3R: '→ Gurun Arid',
+          wRow4L: 'Suhu Kriogenik + Permafrost',
+          wRow4R: '→ Tundra Kutub/Alpin',
+          h1Title: 'Individu',
+          h1Desc: 'Organisme tunggal yang mampu menjalankan fungsi fisiologis mandiri (misal: seekor jerapah Giraffa camelopardalis).',
+          h2Title: 'Populasi',
+          h2Desc: 'Kumpulan individu sejenis yang menempati ruang geografis tertentu pada waktu yang sama dan dapat berkembang biak.',
+          h3Title: 'Komunitas',
+          h3Desc: 'Seluruh populasi berbagai spesies (flora, fauna, mikroba) yang saling berinteraksi di suatu habitat spesifik.',
+          h4Title: 'Ekosistem',
+          h4Desc: 'Tatanan kesatuan utuh antara komunitas biotik dengan komponen fisik-kimia abiotik (cahaya, tanah, air, mineral).',
+          h5Title: 'Bioma',
+          h5Desc: 'Kumpulan ekosistem skala regional/kontinental dengan corak vegetasi klimaks dan iklim makro yang serupa.',
+          h6Title: 'Biosfer',
+          h6Desc: 'Integrasi global seluruh bioma daratan dan lautan yang membentuk sistem penyangga kehidupan planet Bumi.',
+          sec2Title: 'Aliran Energi Termodinamika, Hukum 10% Lindeman & Siklus Biogeokimia',
+          trophicTitle: 'Piramida Trofik & Efisiensi Ekologi 10%',
+          trophicDesc: 'Energi mengalir secara searah (unidirectional) dari radiasi foton Matahari menuju produsen fotosintetik, lalu diteruskan ke konsumen. Sesuai Hukum Termodinamika II, sekitar <strong>90% energi terdisipasi sebagai panas respirasi metabolik</strong> pada setiap perpindahan tingkat trofik, menyisakan rata-rata hanya <strong>10% energi</strong> yang tersimpan sebagai biomassa baru.',
+          tLevel4: 'IV. Predator Puncak',
+          tLevel3: 'III. Karnivora Sekunder',
+          tLevel2: 'II. Herbivora Primer',
+          tLevel1: 'I. Produsen Autotrof (Flora & Fitoplankton)',
+          cycleTitle: 'Konektivitas Antar-Bioma dalam Siklus Materi',
+          cycleDesc: 'Berbeda dengan energi yang mengalir terbuka, materi kimia berputar dalam daur tertutup (siklus biogeokimia) yang menghubungkan kelima bioma pada diorama di atas menjadi satu kesatuan sistem Bumi:',
+          cycle1Title: '1. Daur Hidrologi & Transpirasi Kanopi',
+          cycle1Desc: 'Evaporasi permukaan Lautan membentuk awan konvektif yang menjatuhkan presipitasi di atas Hutan Hujan Tropis dan pegunungan Tundra, lalu kembali melalui aliran sungai ke samudra.',
+          cycle2Title: '2. Transportasi Aerosol Mineral Lintas Benua',
+          cycle2Desc: 'Debu kaya fosfor dari bioma Gurun (seperti Sahara) terbawa angin pasat melintasi samudra untuk menyuburkan tanah Hutan Hujan Tropis yang miskin hara akibat pencucian hujan (leaching).',
+          cycle3Title: '3. Rosot Karbon Biru & Terestrial (Carbon Sink)',
+          cycle3Desc: 'Fitoplankton serta terumbu karang di Lautan bekerja bersama biomassa pohon Hutan Tropis dan lapisan permafrost Tundra dalam menyerap serta mengunci karbon dioksida atmosfer.',
+          sec3Title: 'Profil Ilmiah Lima Ekosistem Utama pada Diorama',
+          sec3Hint: 'Klik tombol "Fokus di 3D" untuk mengarahkan kamera langsung ke bioma terkait',
+          sec4Title: 'Matriks Komparatif Parameter Ekologi Bioma Global'
+        },
+        table: {
+          colBiome: 'Bioma / Ekosistem',
+          colTemp: 'Rentang Suhu (°C)',
+          colPrecip: 'Presipitasi Tahunan',
+          colNpp: 'NPP Rata-Rata (g/m²/thn)',
+          colSoil: 'Karakteristik Substrat / Tanah',
+          colBio: 'Indeks Biodiversitas'
+        }
+      },
+      en: {
+        header: {
+          chapterBadge: 'CH 03 — Biosphere & Ecosystem',
+          title: "Earth's Biosphere Structure & Ecosystem Dynamics",
+          readArticleBtn: 'Scientific Article'
+        },
+        footerNav: { prevLabel: 'Previous', prevTitle: 'CH 02 — Atmosphere & Climate', nextLabel: 'Next', nextTitle: 'CH 04 — Volcanology & Seismology' },
+        hud: {
+          dioramaLabel: '3D Earth cutaway diorama',
+          instructions: 'Orbit (<strong class="text-white">Drag</strong>), zoom (<strong class="text-white">Scroll</strong>), and <strong class="text-[#5df0a8]">Click directly on any biome</strong> or 3D pin to inspect its climate regime, vegetation, and keystone fauna.',
+          autoRotate: 'Auto-Rotate',
+          togglePinsOn: 'Pin Labels: ON',
+          togglePinsOff: 'Pin Labels: OFF',
+          resetView: 'Reset View',
+          focus3DBtn: 'Focus in 3D',
+          defaultPrompt: 'Click a biome or 3D pin to inspect'
+        },
+        inspector: {
+          tempLabel: 'Mean temp',
+          rainLabel: 'Precipitation',
+          nppLabel: 'Productivity',
+          climateHeading: 'Climate & Abiotic Regime',
+          vegetationHeading: 'Vegetation & Flora Adaptations',
+          faunaHeading: 'Keystone Organisms & Fauna',
+          biodiversityHeading: 'Biodiversity Richness Index'
+        },
+        article: {
+          heroTag1: 'Earth system science encyclopedia',
+          heroTag2: 'Reading time: 12 min',
+          heroTag3: 'Spatial scale: global (−11,000 m to +10,000 m)',
+          s0Tag: '01 // INTRODUCTION',
+          s1Tag: '02 // BIOSPHERE ARCHITECTURE',
+          s2Tag: '03 // ENERGY FLOW & MATTER CYCLES',
+          s3Tag: '04 // BIOME PROFILES',
+          s4Tag: '05 // COMPARATIVE MATRIX',
+          heroTitle: 'CHAPTER 03 — Biosphere Dynamics, Trophic Architecture & Global Biomes',
+          heroLead: 'The biosphere is the life-supporting envelope of Earth where the lithosphere (rock crust), hydrosphere (waters), and atmosphere (air) dynamically converge. Through the interactive 3D cutaway diorama above, we observe how latitudinal insolation gradients, elevation, temperature, and precipitation partition our planet into distinct ecological complexes known as biomes.',
+          sec1Title: 'Biosphere Architecture & The Six Levels of Ecological Organization',
+          sec1P1: 'First coined by geologist Eduard Suess (1875) and formalized by geochemist Vladimir Vernadsky (1926), the <strong>Biosphere</strong> spans vertically from the hadal depths of the Mariana Trench (~11,000 meters below sea level) to the upper troposphere (~10,000 meters altitude) where microbial spores and high-altitude migratory birds travel.',
+          sec1P2: 'To analyze complex biological interactions across scales, modern ecology structures living systems into six nested hierarchical levels—ranging from an individual organism to the planetary biosphere.',
+          whittakerTitle: 'Whittaker Biome Classification Law',
+          whittakerDesc: 'Global terrestrial biome distribution is governed primarily by two macroscopic abiotic parameters: <strong>Mean Annual Temperature (MAT)</strong> and <strong>Mean Annual Precipitation (MAP)</strong>.',
+          wRow1L: 'High Thermal + Extreme Rainfall',
+          wRow1R: '→ Tropical Rainforest',
+          wRow2L: 'Warm + Pronounced Dry Season',
+          wRow2R: '→ Tropical Savanna',
+          wRow3L: 'Evaporation > Rainfall (<250mm)',
+          wRow3R: '→ Arid Desert',
+          wRow4L: 'Cryogenic Temp + Permafrost',
+          wRow4R: '→ Polar / Alpine Tundra',
+          h1Title: 'Individual',
+          h1Desc: 'A single living organism capable of independent physiological function (e.g., a reticulated giraffe Giraffa camelopardalis).',
+          h2Title: 'Population',
+          h2Desc: 'A group of interbreeding individuals of the same species occupying a defined geographic area simultaneously.',
+          h3Title: 'Community',
+          h3Desc: 'All interacting populations of multiple species (flora, fauna, fungi, microbes) coexisting within a specific habitat.',
+          h4Title: 'Ecosystem',
+          h4Desc: 'The functional integration of a biotic community with its physical-chemical abiotic environment (solar energy, soil, water).',
+          h5Title: 'Biome',
+          h5Desc: 'Large-scale regional or continental ecosystem complexes defined by climax vegetation structure and macro-climate.',
+          h6Title: 'Biosphere',
+          h6Desc: 'The global sum of all terrestrial and marine biomes forming Earth’s self-regulating life-support system.',
+          sec2Title: 'Thermodynamic Energy Flow, Lindeman’s 10% Law & Biogeochemical Cycles',
+          trophicTitle: 'Trophic Pyramid & The 10% Ecological Efficiency Law',
+          trophicDesc: 'Energy flows unidirectionally from solar photons into photosynthetic primary producers and upward through consumer tiers. Governed by the Second Law of Thermodynamics, roughly <strong>90% of energy is lost as metabolic respiratory heat</strong> at each trophic transfer, leaving only ~<strong>10% stored as net new biomass</strong>.',
+          tLevel4: 'IV. Apex Predators',
+          tLevel3: 'III. Secondary Carnivores',
+          tLevel2: 'II. Primary Herbivores',
+          tLevel1: 'I. Autotrophic Producers (Flora & Phytoplankton)',
+          cycleTitle: 'Cross-Biome Connectivity in Biogeochemical Cycles',
+          cycleDesc: 'Unlike open energy flow, chemical nutrients circulate in closed planetary loops (biogeochemical cycles) that bind all five biomes in our 3D diorama into a single unified Earth system:',
+          cycle1Title: '1. Hydrological Cycle & Canopy Evapotranspiration',
+          cycle1Desc: 'Solar evaporation over the Ocean generates convective cloud systems that deliver rainfall to the Tropical Rainforest and snow to Tundra peaks, returning via river basins to the sea.',
+          cycle2Title: '2. Trans-Continental Mineral Aerosol Transport',
+          cycle2Desc: 'Phosphorus-rich mineral dust lifted from Desert dunes (such as the Sahara) travels on trade winds to fertilize nutrient-leached Tropical Rainforest soils.',
+          cycle3Title: '3. Terrestrial & Blue Carbon Sequestration',
+          cycle3Desc: 'Marine phytoplankton and coral reefs work alongside Tropical Rainforest canopy biomass and Tundra permafrost soils to sequester atmospheric carbon dioxide.',
+          sec3Title: 'Deep-Dive Scientific Profiles of the Five Diorama Biomes',
+          sec3Hint: 'Click "Focus in 3D" on any card to smoothly fly the 3D camera to that ecosystem',
+          sec4Title: 'Quantitative Global Biome Comparison Matrix'
+        },
+        table: {
+          colBiome: 'Biome / Ecosystem',
+          colTemp: 'Temp Range (°C)',
+          colPrecip: 'Annual Precipitation',
+          colNpp: 'Mean NPP (g/m²/yr)',
+          colSoil: 'Substrate / Soil Profile',
+          colBio: 'Biodiversity Index'
+        }
+      }
+    };
+
+    const BIOME_DATA = {
+      rainforest: {
+        id: 'rainforest',
+        accentHex: '#5df0a8',
+        accentThree: 0x5df0a8,
+        pinPos: new THREE.Vector3(1.2, 6.8, -5.8),
+        camPos: new THREE.Vector3(16, 16, 19),
+        camTarget: new THREE.Vector3(0.5, 1.8, -2.5),
+        bioPercent: 98,
+        idData: {
+          short: 'Hutan Hujan Tropis',
+          codeBadge: 'Bioma 01 · Tropika basah',
+          coordBadge: '10°LU – 10°LS',
+          title: 'Hutan Hujan Tropis (Tropical Rainforest)',
+          summary: 'Ekosistem daratan dengan insolasi matahari sepanjang tahun dan curah hujan ekstrem, membentuk stratifikasi tajuk berlapis serta air terjun sungai tropis yang menopang lebih dari 50% spesies terestrial Bumi.',
+          tempVal: '25°C – 28°C',
+          rainVal: '2000–4500 mm',
+          nppVal: '2200 g/m²/thn',
+          climate: 'Iklim ekuatorial megatermal (Af) dengan kelembapan relatif tinggi (80–90%), amplitudo suhu harian lebih besar daripada tahunan, serta curah hujan konvektif hampir setiap hari.',
+          vegetation: 'Stratifikasi vertikal 4 lapis (emergent, kanopi utama 30–45m, understory, lantai hutan gelap). Didominasi Dipterocarpaceae berakar papan (buttress roots), pohon palem pesisir, liana berkayu, serta epifit anggrek dan bromeliad.',
+          fauna: 'Burung Makau (Ara macao), toucan, primata arboreal, jaguar, katak pohon beracun (Dendrobatidae), serta jutaan spesies serangga dekomposer dan kupu-kupu kanopi.',
+          bioScoreLabel: '98 / 100 (Ekstrem Tinggi)',
+          biodiversity: 'Menempati hanya ~6–7% daratan Bumi namun menjadi rumah bagi lebih dari separuh spesies flora dan fauna global dengan produktivitas primer bersih tertinggi di daratan.',
+          soil: 'Oxisol & Ultisol (merah-kuning, miskin hara akibat pencucian cepat namun kaya siklus serasah permukaan).'
+        },
+        enData: {
+          short: 'Tropical Rainforest',
+          codeBadge: 'Biome 01 · Humid tropics',
+          coordBadge: '10°N – 10°S',
+          title: 'Tropical Rainforest (Equatorial Selva)',
+          summary: 'Year-round solar insolation and torrential convective rainfall create multi-tiered forest canopies and cascading river basins that harbor over 50% of all terrestrial species on Earth.',
+          tempVal: '25°C – 28°C',
+          rainVal: '2000–4500 mm',
+          nppVal: '2200 g/m²/yr',
+          climate: 'Equatorial megathermal climate (Köppen Af) with persistent 80–90% relative humidity, minimal seasonal temperature variance, and intense daily zenithal rainfall.',
+          vegetation: 'Four-tier vertical stratification (emergent giants, closed 30–45m canopy, shade-tolerant understory, forest floor). Features buttress-rooted hardwoods, coastal palms, woody lianas, and vascular epiphytes.',
+          fauna: 'Scarlet Macaws (Ara macao), toucans, arboreal primates, jaguars, poison dart frogs (Dendrobatidae), and hyper-diverse canopy arthropods.',
+          bioScoreLabel: '98 / 100 (Hyper-Diverse)',
+          biodiversity: 'Covers only ~6–7% of Earth’s land surface yet sustains over half of all known terrestrial flora and fauna with maximal terrestrial Net Primary Productivity.',
+          soil: 'Oxisols & Ultisols (deeply weathered, nutrient-poor acidic clays reliant on rapid surface litter recycling).'
+        }
+      },
+
+      desert: {
+        id: 'desert',
+        accentHex: '#f59e0b',
+        accentThree: 0xf59e0b,
+        pinPos: new THREE.Vector3(-5.8, 6.2, -5.5),
+        camPos: new THREE.Vector3(-19, 15, 17),
+        camTarget: new THREE.Vector3(-3.8, 1.5, -2.8),
+        bioPercent: 34,
+        idData: {
+          short: 'Gurun',
+          codeBadge: 'Bioma 02 · Arid subtropis',
+          coordBadge: '15° – 35° LU/LS',
+          title: 'Gurun Pasir & Oasis (Arid Desert)',
+          summary: 'Bentang alam arid dengan bukit pasir (sand dunes) keemasan, sumur oasis air tanah, dan defisit neraca air ekstrem di mana laju evaporasi potensial jauh melampaui presipitasi tahunan.',
+          tempVal: '10°C – 45°C',
+          rainVal: '< 250 mm/thn',
+          nppVal: '90 g/m²/thn',
+          climate: 'Iklim kering subtropis (BWh) di bawah sabuk tekanan tinggi subtropis (sel Hadley turun). Langit cerah tanpa awan memicu fluktuasi suhu diurnal ekstrem antara siang yang membakar dan malam yang dingin.',
+          vegetation: 'Tumbuhan xerofit sukulen seperti Kaktus Saguaro (Carnegiea gigantea) dengan batang penyimpan air berfotosintesis CAM, daun tereduksi menjadi duri untuk menekan transpirasi, serta sistem perakaran dangkal-luas.',
+          fauna: 'Unta dromedaris, rubah fennec bertelinga lebar (radiator panas), elang gurun yang memanfaatkan arus termal udara, reptil bersisik kedap air, serta kalajengking nokturnal.',
+          bioScoreLabel: '34 / 100 (Spesialisasi Tinggi)',
+          biodiversity: 'Biomassa total rendah namun memiliki tingkat endemisme dan adaptasi fisiologis penghematan air (estivasi & perilaku nokturnal) yang sangat spesifik.',
+          soil: 'Aridisol & Entisol (pasir kuarsa kasar, kandungan humus sangat rendah, kaya akumulasi garam kalsium karbonat).'
+        },
+        enData: {
+          short: 'Desert',
+          codeBadge: 'Biome 02 · Subtropical arid',
+          coordBadge: '15° – 35° N/S',
+          title: 'Arid Desert Dunes & Oasis',
+          summary: 'Sculpted golden sand dunes and groundwater oasis wells defined by severe moisture deficit where potential evapotranspiration vastly exceeds annual rainfall.',
+          tempVal: '10°C – 45°C',
+          rainVal: '< 250 mm/yr',
+          nppVal: '90 g/m²/yr',
+          climate: 'Subtropical arid climate (Köppen BWh) under descending Hadley cell high-pressure belts. Cloudless skies drive extreme diurnal thermal swings between scorching days and chilly nights.',
+          vegetation: 'Succulent xerophytes such as giant Saguaro cacti (Carnegiea gigantea) utilizing CAM photosynthesis, pleated water-storage stems, spines instead of leaves, and thick waxy cuticles.',
+          fauna: 'Desert hawks riding thermal updrafts, dromedary camels, fennec foxes with heat-radiating ears, sidewinder reptiles, and nocturnal arachnids.',
+          bioScoreLabel: '34 / 100 (Highly Specialized)',
+          biodiversity: 'Low standing biomass but extraordinary evolutionary specialization in water conservation, burrowing behavior, and concentrated life around desert oases.',
+          soil: 'Aridisols & Entisols (coarse eolian quartz sands, minimal organic humus, calcic horizon accumulation).'
+        }
+      },
+
+      savanna: {
+        id: 'savanna',
+        accentHex: '#eab308',
+        accentThree: 0xeab308,
+        pinPos: new THREE.Vector3(7.6, 5.2, -2.5),
+        camPos: new THREE.Vector3(23, 14, 15),
+        camTarget: new THREE.Vector3(4.2, 1.2, -1.5),
+        bioPercent: 72,
+        idData: {
+          short: 'Savana',
+          codeBadge: 'Bioma 03 · Padang rumput tropis',
+          coordBadge: '5° – 20° LU/LS',
+          title: 'Savana Tropis (Tropical Savanna)',
+          summary: 'Ekosistem transisi antara hutan hujan dan gurun berupa hamparan padang rumput keemasan yang diselingi pepohonan akasia berkanopi datar serta kawanan megafauna herbivora.',
+          tempVal: '20°C – 32°C',
+          rainVal: '500–1500 mm',
+          nppVal: '900 g/m²/thn',
+          climate: 'Iklim tropis basah-kering (Aw) dengan suhu hangat sepanjang tahun namun memiliki kontras tajam antara musim hujan lebat (4–6 bulan) dan musim kemarau panjang yang rawan kebakaran alami.',
+          vegetation: 'Dominasi rumput C4 tahan kekeringan (Pennisetum, Imperata), pohon Akasia (Vachellia tortilis) berkanopi payung untuk menahan insolasi, pohon Baobab penyimpan air di batang, dan palem transisi pantai.',
+          fauna: 'Jerapah (Giraffa camelopardalis) pemakan pucuk kanopi akasia, zebra, gazelle, gajah afrika, singa, cheetah, serta kawanan burung pemakan biji.',
+          bioScoreLabel: '72 / 100 (Megafauna Kaya)',
+          biodiversity: 'Memiliki biomassa dan keragaman herbivora besar (ungulata) tertinggi di planet Bumi melalui pembagian relung pakan vertikal (grazers vs browsers).',
+          soil: 'Alfisol & Vertisol (cukup subur di lapisan atas, mengeras saat kemarau, diperkaya abu mineral kebakaran alami).'
+        },
+        enData: {
+          short: 'Savanna',
+          codeBadge: 'Biome 03 · Tropical grassland',
+          coordBadge: '5° – 20° N/S',
+          title: 'Tropical Savanna Grassland',
+          summary: 'Warm transitional ecotones between rainforest and desert characterized by continuous golden C4 grasslands dotted with flat-topped Acacia trees and iconic browsing megafauna.',
+          tempVal: '20°C – 32°C',
+          rainVal: '500–1500 mm',
+          nppVal: '900 g/m²/yr',
+          climate: 'Tropical wet-and-dry climate (Köppen Aw) featuring consistently warm temperatures partitioned into a brief monsoon wet season and a prolonged dry season shaped by natural fire regimes.',
+          vegetation: 'Continuous drought-tolerant C4 grasses interspersed with umbrella-canopied Acacia trees (Vachellia), water-storing Baobabs, and fire-resistant deep root systems.',
+          fauna: 'Reticulated Giraffes (Giraffa camelopardalis) browsing high Acacia foliage, plains zebras, gazelles, African elephants, lions, and migratory bird flocks.',
+          bioScoreLabel: '72 / 100 (Megafauna Rich)',
+          biodiversity: 'Supports the highest diversity and biomass of large mammalian herbivores and apex predators on Earth through vertical niche partitioning.',
+          soil: 'Alfisols & Vertisols (porous upper horizons with seasonal clay cracking and rapid nutrient pulse during rains).'
+        }
+      },
+
+      tundra: {
+        id: 'tundra',
+        accentHex: '#38bdf8',
+        accentThree: 0x38bdf8,
+        pinPos: new THREE.Vector3(-7.8, 5.8, 3.8),
+        camPos: new THREE.Vector3(-22, 14, 20),
+        camTarget: new THREE.Vector3(-4.8, 0.6, 2.8),
+        bioPercent: 28,
+        idData: {
+          short: 'Tundra',
+          codeBadge: 'Bioma 04 · Kutub & alpin',
+          coordBadge: '> 60° LU/LS & Puncak Alpin',
+          title: 'Tundra Kutub & Glasial (Arctic & Alpine Tundra)',
+          summary: 'Bentang alam tanpa pohon di lingkar kutub dan puncak pegunungan bersalju abadi yang dicirikan oleh tanah beku permanen (permafrost), bongkahan es apung, dan perairan dingin Arktik.',
+          tempVal: '−34°C – 10°C',
+          rainVal: '150–250 mm (Salju)',
+          nppVal: '140 g/m²/thn',
+          climate: 'Iklim kriogenik kutub (ET) dengan musim dingin gelap yang ekstrem panjang dan musim tumbuh sangat singkat (50–60 hari) dengan suhu bulan terhangat tidak melebihi 10°C.',
+          vegetation: 'Tanpa pohon tinggi (treeless) karena akar terhalang lapisan permafrost. Didominasi lumut kerak (lichen Cladonia), lumut daun (Sphagnum), rumput teki, dan semak kerdil arktik.',
+          fauna: 'Beruang Kutub (Ursus maritimus) yang berenang di sela bongkahan es laut untuk berburu anjing laut, rubah arktik berbulu putih tebal, karibu/rusa kutub, burung hantu salju, dan ikan char arktik.',
+          bioScoreLabel: '28 / 100 (Rentan Iklim)',
+          biodiversity: 'Rantai makanan pendek dan sederhana namun sangat krusial sebagai penyimpan karbon global di dalam lapisan permafrost serta indikator perubahan iklim.',
+          soil: 'Gelisol (memiliki lapisan Permafrost beku permanen sedalam ratusan meter di bawah lapisan aktif tipis).'
+        },
+        enData: {
+          short: 'Tundra',
+          codeBadge: 'Biome 04 · Cryogenic polar',
+          coordBadge: '> 60° N/S & Alpine Peaks',
+          title: 'Polar & Alpine Glacial Tundra',
+          summary: 'Treeless snow-capped mountain ridges and icy arctic coastlines defined by sub-surface permafrost, floating sea-ice floes, and cold-adapted marine-terrestrial predators.',
+          tempVal: '−34°C – 10°C',
+          rainVal: '150–250 mm (Snow)',
+          nppVal: '140 g/m²/yr',
+          climate: 'Polar tundra climate (Köppen ET) with severe, prolonged winters, low solar angles, and a brief 50–60 day summer thaw where mean temperatures remain below 10°C.',
+          vegetation: 'Devoid of tall trees due to impenetrable permafrost. Dominated by reindeer lichens (Cladonia), bryophyte mosses, sedges, and prostrate dwarf willow shrubs.',
+          fauna: 'Polar Bears (Ursus maritimus) swimming between sea-ice floes, thick-coated Arctic foxes, caribou, snowy owls, and cold-water Arctic char fish.',
+          bioScoreLabel: '28 / 100 (Climate Sensitive)',
+          biodiversity: 'Simple, fragile food webs with high seasonal migratory influx; stores immense ancient organic carbon locked within frozen permafrost.',
+          soil: 'Gelisols (underlain by continuous permafrost with a shallow seasonally thawed active layer).'
+        }
+      },
+
+      ocean: {
+        id: 'ocean',
+        accentHex: '#06b6d4',
+        accentThree: 0x06b6d4,
+        pinPos: new THREE.Vector3(3.8, 1.8, 7.5),
+        camPos: new THREE.Vector3(18, 9, 25),
+        camTarget: new THREE.Vector3(1.2, -1.5, 4.0),
+        bioPercent: 94,
+        idData: {
+          short: 'Lautan',
+          codeBadge: 'Bioma 05 · Hidrosfer marin',
+          coordBadge: '71% Permukaan Bumi',
+          title: 'Lautan & Ekosistem Terumbu Karang (Marine Biome)',
+          summary: 'Volume perairan asin bersambungan yang mendominasi permukaan Bumi, terbagi atas zona fotik terumbu karang yang kaya cahaya hingga palung pelagik dalam.',
+          tempVal: '−2°C – 30°C',
+          rainVal: 'Siklus Evaporasi Utama',
+          nppVal: '125–2500 g/m²/thn',
+          climate: 'Memiliki kapasitas kalor spesifik tinggi yang menstabilkan iklim planet Bumi. Terstratifikasi secara vertikal berdasarkan penetrasi cahaya (zona fotik 0–200m vs afotik) serta gradien suhu (termoklin).',
+          vegetation: 'Fitoplankton mikroskopis (diatom & dinoflagellata) yang menyumbang >50% oksigen atmosfer Bumi, hutan rumput laut (kelp Macrocystis), lamun (seagrass), dan alga simbiotik Zooxanthellae pada karang.',
+          fauna: 'Hiu pelagik (Carcharhinidae), kawanan ikan karang tropis (Amphiprioninae / Anthias), kura-kura laut, mamalia cetacea, cnidaria pembangun terumbu karang, serta eksplorasi penyelam ilmiah.',
+          bioScoreLabel: '94 / 100 (Keanekaragaman Filum Tertinggi)',
+          biodiversity: 'Terumbu karang tropis ("Hutan Hujan Lautan") hanya mencakup <1% dasar laut namun menghidupi 25% dari seluruh spesies biota laut dunia.',
+          soil: 'Sedimen biogenik karbonat (ooze gampingan/silika), pasir aragonit karang, dan lempung abisal.'
+        },
+        enData: {
+          short: 'Ocean',
+          codeBadge: 'Biome 05 · Marine hydrosphere',
+          coordBadge: '71% of Earth Surface',
+          title: 'Ocean Pelagic & Coral Reef Cross-Section',
+          summary: 'The continuous saline water volume encompassing 71% of the globe, stratified from sunlit turquoise coral reef shelves to cold polar and deep benthic trenches.',
+          tempVal: '−2°C – 30°C',
+          rainVal: 'Primary Evaporation Engine',
+          nppVal: '125–2500 g/m²/yr',
+          climate: 'High thermal inertia regulates global climate via thermohaline circulation. Vertically zoned by solar light attenuation (euphotic 0–200m vs aphotic) and thermocline gradients.',
+          vegetation: 'Microscopic phytoplankton (diatoms & dinoflagellates) generating >50% of Earth’s oxygen, swaying benthic kelp forests, seagrass meadows, and symbiotic coral zooxanthellae.',
+          fauna: 'Reef & pelagic Sharks, synchronized schools of orange tropical reef fish, stony & brain corals (Scleractinia), sea anemones, marine mammals, and scientific scuba explorers.',
+          bioScoreLabel: '94 / 100 (Highest Phyletic Diversity)',
+          biodiversity: 'Shallow coral reefs occupy <1% of the ocean floor yet shelter ~25% of all marine species, representing the highest phyletic diversity on Earth.',
+          soil: 'Calcareous aragonite reef sands, biogenic pelagic oozes, and deep-sea abyssal clays.'
+        }
+      }
+    };
+
+    /* =========================================================================
+       2. APPLICATION STATE
+       ========================================================================= */
+    let currentLang = 'id';
+    let selectedBiomeId = 'rainforest';
+    let autoRotateEnabled = true;
+    let pinsVisible = true;
+
+    /* =========================================================================
+       3. INITIALIZE THREE.JS SCENE, CAMERA, RENDERER & CONTROLS
+       ========================================================================= */
+    const container = document.getElementById('dioramaCanvasContainer');
+    const pinsContainer = document.getElementById('floatingPinsContainer');
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x070c17, 0.011);
+
+    const DEFAULT_CAM_POS = new THREE.Vector3(23, 17, 26);
+    const DEFAULT_CAM_TARGET = new THREE.Vector3(0, 0.6, 0);
+
+    const camera = new THREE.PerspectiveCamera(
+      38,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      250
+    );
+    camera.position.copy(DEFAULT_CAM_POS);
+
+    /**
+     * Shifts the 3D projection center to the LEFT on desktop/landscape screens (w > 860)
+     * so the diorama sits comfortably in the open left space (~32% from left edge)
+     * and is never obscured by the right-side #biomeInfoCard panel.
+     */
+    function applyCameraViewOffset() {
+      if (!container) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      if (w > 860) {
+        // Positive X sub-frustum offset shifts the rendered 3D model to the left of the viewport
+        camera.setViewOffset(w, h, Math.round(w * 0.18), 0, w, h);
+      } else {
+        camera.clearViewOffset();
+      }
+      camera.updateProjectionMatrix();
+    }
+    applyCameraViewOffset();
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    container.appendChild(renderer.domElement);
+
+    // DEEP-SPACE STARFIELD (pola BAB 01): bintang berkelip di latar belakang biosfer
+    const starCount = 1800, starGeo = new THREE.BufferGeometry(), starPos = new Float32Array(starCount * 3), starSeed = new Float32Array(starCount);
+    for (let i = 0; i < starCount; i++) {
+      const r = 50 + Math.random() * 80, th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1);
+      starPos[i * 3] = Math.sin(ph) * Math.cos(th) * r; starPos[i * 3 + 1] = Math.cos(ph) * r; starPos[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * r;
+      starSeed[i] = Math.random() * 100;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    starGeo.setAttribute('aSeed', new THREE.BufferAttribute(starSeed, 1));
+
+    const starMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uTime: { value: 0 }, uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) } },
+      vertexShader: `attribute float aSeed; uniform float uTime; uniform float uDpr; varying float vTw; varying float vTint; void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vTw=0.45+0.55*sin(uTime*(1.2+fract(aSeed)*1.8)+aSeed);vTint=fract(aSeed*3.17);gl_PointSize=(1.4+1.8*fract(aSeed*7.1))*(85.0/max(-mv.z,1.0))*uDpr;gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `varying float vTw; varying float vTint; void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;vec3 col=mix(vec3(0.80,0.88,1.0),vec3(0.45,0.96,0.72),step(0.82,vTint));gl_FragColor=vec4(col,pow(1.0-d,2.2)*vTw);}`
+    });
+    const starPoints = new THREE.Points(starGeo, starMat);
+    scene.add(starPoints);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.maxPolarAngle = Math.PI / 2 - 0.04; // keep camera above base bottom
+    controls.minPolarAngle = 0.25;
+    controls.minDistance = 14;
+    controls.maxDistance = 48;
+    controls.target.copy(DEFAULT_CAM_TARGET);
+
+    // Smooth camera lerp state
+    let cameraGoalPos = null;
+    let cameraGoalTarget = null;
+    controls.addEventListener('start', () => {
+      // Stop programmed transition when user manually drags/zooms
+      cameraGoalPos = null;
+      cameraGoalTarget = null;
+    });
+
+    /* =========================================================================
+       4. LIGHTING SETUP (SUNLIGHT, HEMISPHERE, UNDERWATER CAUSTIC GLOW)
+       ========================================================================= */
+    const ambientLight = new THREE.HemisphereLight(0xdff6ff, 0x1a283b, 0.72);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff5e0, 1.35);
+    sunLight.position.set(18, 28, 16);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 5;
+    sunLight.shadow.camera.far = 65;
+    const d = 16;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    // Rim light from back-left for desert & tundra peaks
+    const rimLight = new THREE.DirectionalLight(0x7dd3fc, 0.52);
+    rimLight.position.set(-20, 14, -16);
+    scene.add(rimLight);
+
+    // Underwater bioluminescent fill light
+    const oceanGlowLight = new THREE.PointLight(0x22d3ee, 0.9, 18);
+    oceanGlowLight.position.set(3.5, -1.8, 5.5);
+    scene.add(oceanGlowLight);
+
+    /* =========================================================================
+       5. PROCEDURAL GEOMETRY HELPERS, HEIGHTMAPS & REALISTIC BIOME BUILDERS
+       ========================================================================= */
+    const worldRoot = new THREE.Group();
+    scene.add(worldRoot);
+
+    // Store biome groups for raycasting & highlighting
+    const biomeGroups = {
+      rainforest: new THREE.Group(),
+      desert: new THREE.Group(),
+      savanna: new THREE.Group(),
+      tundra: new THREE.Group(),
+      ocean: new THREE.Group()
+    };
+    Object.entries(biomeGroups).forEach(([key, grp]) => {
+      grp.name = key;
+      worldRoot.add(grp);
+    });
+
+    // Helper to tag all child meshes with `userData.biomeId` for Raycasting
+    function tagBiomeMeshes(group, biomeId) {
+      group.traverse((obj) => {
+        if (obj.isMesh) {
+          obj.userData.biomeId = biomeId;
+        }
+      });
+    }
+
+    // Animated entities registry
+    const animatedEntities = {
+      trees: [],
+      birds: [],
+      waterfallDrops: [],
+      snowFlakes: [],
+      bubbles: [],
+      clouds: [],
+      camelLegs: [],
+      shark: null,
+      fishSchool: [],
+      polarBearSwim: null,
+      giraffeNeck: null,
+      diver: null,
+      waterSurfaceMesh: null,
+      selectionRing: null,
+      selectionBox: null
+    };
+
+    /* -------------------------------------------------------------------------
+       5.0 DETERMINISTIC 2D NOISE, RIDGED MULTIFRACTAL & PROCEDURAL TEXTURES
+       ------------------------------------------------------------------------- */
+    function hash2D(ix, iz) {
+      const n = Math.sin(ix * 127.1 + iz * 311.7) * 43758.5453123;
+      return n - Math.floor(n);
+    }
+
+    function noise2D(x, z) {
+      const ix = Math.floor(x);
+      const iz = Math.floor(z);
+      const fx = x - ix;
+      const fz = z - iz;
+      const ux = fx * fx * (3.0 - 2.0 * fx);
+      const uz = fz * fz * (3.0 - 2.0 * fz);
+      const a = hash2D(ix, iz);
+      const b = hash2D(ix + 1, iz);
+      const c = hash2D(ix, iz + 1);
+      const d = hash2D(ix + 1, iz + 1);
+      return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+    }
+
+    function fbm2D(x, z, octaves = 4) {
+      let val = 0;
+      let amp = 0.5;
+      let freq = 1.0;
+      for (let i = 0; i < octaves; i++) {
+        val += amp * noise2D(x * freq, z * freq);
+        freq *= 2.04;
+        amp *= 0.5;
+      }
+      return val;
+    }
+
+    function ridgedNoise2D(x, z, octaves = 4) {
+      let val = 0;
+      let amp = 0.55;
+      let freq = 1.0;
+      let weight = 1.0;
+      for (let i = 0; i < octaves; i++) {
+        let n = 1.0 - Math.abs(noise2D(x * freq, z * freq) * 2.0 - 1.0);
+        n = n * n * weight;
+        weight = Math.min(1.0, Math.max(0.0, n * 1.6));
+        val += n * amp;
+        freq *= 2.1;
+        amp *= 0.5;
+      }
+      return val;
+    }
+
+    // Procedural Eolian Wind-Ripple Bump Map for Realistic Desert Sand
+    function createSandRippleBumpMap() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(512, 512);
+      const data = imgData.data;
+
+      for (let y = 0; y < 512; y++) {
+        for (let x = 0; x < 512; x++) {
+          const u = x / 512;
+          const v = y / 512;
+          const warp = noise2D(u * 10, v * 10) * 0.35;
+          const ripple = Math.pow(0.5 + 0.5 * Math.sin((u * 42 + v * 28 + warp) * Math.PI * 2), 1.6);
+          const grain = (Math.random() - 0.5) * 0.18;
+          const val = Math.max(0, Math.min(255, Math.floor((ripple * 0.82 + grain + 0.1) * 255)));
+          const idx = (y * 512 + x) * 4;
+          data[idx] = val;
+          data[idx + 1] = val;
+          data[idx + 2] = val;
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3, 3);
+      return tex;
+    }
+
+    // Procedural Reticulated Giraffe Coat Texture
+    function createGiraffeCoatTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f3c677';
+      ctx.fillRect(0, 0, 256, 256);
+
+      const seeds = [];
+      for (let i = 0; i < 42; i++) {
+        seeds.push({ x: Math.random() * 256, y: Math.random() * 256 });
+      }
+
+      const img = ctx.getImageData(0, 0, 256, 256);
+      const d = img.data;
+      for (let y = 0; y < 256; y++) {
+        for (let x = 0; x < 256; x++) {
+          let d1 = 1e9;
+          let d2 = 1e9;
+          for (let i = 0; i < seeds.length; i++) {
+            const dx = x - seeds[i].x;
+            const dy = y - seeds[i].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < d1) {
+              d2 = d1;
+              d1 = dist;
+            } else if (dist < d2) {
+              d2 = dist;
+            }
+          }
+          const edge = d2 - d1;
+          const idx = (y * 256 + x) * 4;
+          if (edge > 4.2) {
+            // Chestnut brown polygon patch
+            d[idx] = 138;
+            d[idx + 1] = 66;
+            d[idx + 2] = 24;
+          } else {
+            // Golden cream channel
+            d[idx] = 242;
+            d[idx + 1] = 198;
+            d[idx + 2] = 118;
+          }
+          d[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    /**
+     * Builds a 100% seamless 3D Geological Cutaway Block where the top terrain surface
+     * and the 4 vertical stratigraphic cutaway cliff walls share exact boundary heights.
+     * Eliminates any "box + oval" artifacts!
+     */
+    function createGeologicalBlock({
+      xMin, xMax, zMin, zMax,
+      segX = 64, segZ = 64,
+      yBase = -3.8,
+      heightFn,
+      topColorFn,
+      wallColorFn,
+      bumpMap = null,
+      bumpScale = 0.04,
+      roughness = 0.82
+    }) {
+      const blockGroup = new THREE.Group();
+      const width = xMax - xMin;
+      const depth = zMax - zMin;
+
+      // 1. TOP CONTINUOUS TERRAIN SURFACE
+      const topGeo = new THREE.PlaneGeometry(width, depth, segX, segZ);
+      topGeo.rotateX(-Math.PI / 2);
+      const posAttr = topGeo.attributes.position;
+      const colors = new Float32Array(posAttr.count * 3);
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const worldX = posAttr.getX(i) + (xMin + xMax) * 0.5;
+        const worldZ = posAttr.getZ(i) + (zMin + zMax) * 0.5;
+        const h = heightFn(worldX, worldZ);
+        posAttr.setX(i, worldX);
+        posAttr.setY(i, h);
+        posAttr.setZ(i, worldZ);
+
+        const c = topColorFn(worldX, h, worldZ);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+      topGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      topGeo.computeVertexNormals();
+
+      const topMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness,
+        metalness: 0.04,
+        bumpMap,
+        bumpScale
+      });
+      const topMesh = new THREE.Mesh(topGeo, topMat);
+      topMesh.castShadow = true;
+      topMesh.receiveShadow = true;
+      blockGroup.add(topMesh);
+
+      // 2. FOUR SEAMLESS STRATIGRAPHIC CUTAWAY WALLS
+      const wallSegY = 20;
+      function buildCutawayWall(isXWall, fixedCoord, startCoord, endCoord, segments, flipNormal) {
+        const wallGeo = new THREE.BufferGeometry();
+        const verts = [];
+        const cols = [];
+        const indices = [];
+
+        for (let iy = 0; iy <= wallSegY; iy++) {
+          const vFrac = iy / wallSegY; // 0 = top surface edge, 1 = bottom base
+          for (let ix = 0; ix <= segments; ix++) {
+            const uFrac = ix / segments;
+            const along = startCoord + uFrac * (endCoord - startCoord);
+            const wx = isXWall ? along : fixedCoord;
+            const wz = isXWall ? fixedCoord : along;
+            const topY = heightFn(wx, wz);
+            const wy = topY * (1.0 - vFrac) + yBase * vFrac;
+
+            verts.push(wx, wy, wz);
+            const c = wallColorFn(wx, wy, wz, topY);
+            cols.push(c.r, c.g, c.b);
+          }
+        }
+
+        for (let iy = 0; iy < wallSegY; iy++) {
+          for (let ix = 0; ix < segments; ix++) {
+            const a = iy * (segments + 1) + ix;
+            const b = a + 1;
+            const c = a + (segments + 1);
+            const d = c + 1;
+            if (flipNormal) {
+              indices.push(a, b, c, b, d, c);
+            } else {
+              indices.push(a, c, b, b, c, d);
+            }
+          }
+        }
+
+        wallGeo.setIndex(indices);
+        wallGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        wallGeo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+        wallGeo.computeVertexNormals();
+
+        const wallMat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.88,
+          metalness: 0.04,
+          side: THREE.DoubleSide
+        });
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat);
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        return wallMesh;
+      }
+
+      // North wall (z = zMin), South wall (z = zMax), West wall (x = xMin), East wall (x = xMax)
+      blockGroup.add(buildCutawayWall(true, zMin, xMin, xMax, segX, true));
+      blockGroup.add(buildCutawayWall(true, zMax, xMin, xMax, segX, false));
+      blockGroup.add(buildCutawayWall(false, xMin, zMin, zMax, segZ, false));
+      blockGroup.add(buildCutawayWall(false, xMax, zMin, zMax, segZ, true));
+
+      return blockGroup;
+    }
+
+    /* -------------------------------------------------------------------------
+       5.1 BASE GEOLOGICAL LITHOSPHERE / CRUST PEDESTAL & TECH FRAME
+       ------------------------------------------------------------------------- */
+    function buildGeologicalBase() {
+      const baseGroup = new THREE.Group();
+
+      // Deep dark lithosphere base slab
+      const baseGeo = new THREE.BoxGeometry(20.2, 1.2, 20.2);
+      const baseMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      const baseSlab = new THREE.Mesh(baseGeo, baseMat);
+      baseSlab.position.set(0, -4.4, 0);
+      baseSlab.receiveShadow = true;
+      baseGroup.add(baseSlab);
+
+      // Glowing emerald TerraPedia wireframe trim around the pedestal bottom
+      const frameGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(20.4, 0.15, 20.4));
+      const frameMat = new THREE.LineBasicMaterial({
+        color: 0x5df0a8,
+        transparent: true,
+        opacity: 0.45
+      });
+      const frameLines = new THREE.LineSegments(frameGeo, frameMat);
+      frameLines.position.set(0, -4.98, 0);
+      baseGroup.add(frameLines);
+
+      worldRoot.add(baseGroup);
+    }
+
+    /* -------------------------------------------------------------------------
+       5.2 BIOME 02: GURUN (DESERT) — Back-Left Quadrant (X: -10.0..-0.2, Z: -10.0..0.8)
+       True 80x80 continuous sculpted sand-dune heightmap with sharp wind-carved
+       barchan/transverse ridges, concave oasis basin for the stone well, and
+       seamless stratified sandstone cutaway cliff walls!
+       ------------------------------------------------------------------------- */
+    function getDesertHeight(x, z) {
+      // Normalized coordinates within desert quadrant
+      const dx = x - (-5.4);
+      const dz = z - (-5.2);
+
+      // Broad natural erg sand sea rise toward the center-back of the desert quadrant
+      const distFromCenter = Math.sqrt(dx * dx * 0.75 + dz * dz * 0.75);
+      const broadErg = Math.max(0, 2.35 - distFromCenter * 0.26);
+
+      // Wind-sculpted diagonal Barchan & transverse dune ridges with sharp crests
+      const warp = fbm2D(x * 0.28 + 3.1, z * 0.28 + 1.7, 3) * 1.45;
+      const dunePhase1 = (x * 0.62 + z * 0.44) + warp;
+      const sharpCrest1 = Math.pow(1.0 - Math.abs(Math.sin(dunePhase1)), 1.75) * 1.25;
+
+      // Secondary intersecting star-dune ridge
+      const dunePhase2 = (x * 0.35 - z * 0.58) + warp * 0.6;
+      const sharpCrest2 = Math.pow(1.0 - Math.abs(Math.sin(dunePhase2)), 1.9) * 0.62;
+
+      // Fine wind ripple modulation
+      const microUndulation = fbm2D(x * 1.2, z * 1.2, 2) * 0.18;
+
+      let h = 1.15 + broadErg + sharpCrest1 + sharpCrest2 + microUndulation;
+
+      // Natural concave depression around the stone well at (-2.3, -2.1)
+      const wellDist = Math.hypot(x - (-2.3), z - (-2.1));
+      if (wellDist < 2.2) {
+        const basinFactor = Math.cos((wellDist / 2.2) * (Math.PI * 0.5));
+        h -= basinFactor * basinFactor * 0.72;
+      }
+
+      // Smooth tapering near the southern oasis cliff edge (z -> 0.8) and eastern canyon wall (x -> -0.2)
+      const southBlend = Math.max(0, Math.min(1, (0.8 - z) / 2.2));
+      h = 0.85 + (h - 0.85) * (0.42 + 0.58 * southBlend);
+
+      return h;
+    }
+
+    function buildDesertBiome() {
+      const grp = biomeGroups.desert;
+      const sandBump = createSandRippleBumpMap();
+
+      // 1. Unified 80x80 Sculpted Sand Dune & Sedimentary Sandstone Cutaway Block
+      const desertTerrain = createGeologicalBlock({
+        xMin: -10.0,
+        xMax: -0.2,
+        zMin: -10.0,
+        zMax: 0.8,
+        segX: 80,
+        segZ: 80,
+        yBase: -3.8,
+        bumpMap: sandBump,
+        bumpScale: 0.055,
+        roughness: 0.78,
+        heightFn: getDesertHeight,
+        topColorFn: (x, y, z) => {
+          // Sunlit golden-apricot crests vs warm terracotta-ochre leeward slip faces
+          const slopeShade = noise2D(x * 0.8, z * 0.8);
+          const heightFactor = Math.max(0, Math.min(1, (y - 1.1) / 3.2));
+          const cLow = new THREE.Color(0xd97b38);  // Warm terracotta sand in troughs
+          const cMid = new THREE.Color(0xf29d4b);  // Rich golden Sahara sand
+          const cHigh = new THREE.Color(0xffbe73); // Sunlit pale amber dune crest
+          const col = cLow.clone().lerp(cMid, Math.min(1, heightFactor * 1.35));
+          col.lerp(cHigh, Math.pow(heightFactor, 1.8) * (0.65 + 0.35 * slopeShade));
+          return col;
+        },
+        wallColorFn: (x, y, z, topY) => {
+          // Realistic Horizontal Sedimentary Sandstone Strata Bands on cutaway cliff walls
+          const strataWave = Math.sin(y * 5.2 + noise2D(x * 0.6, z * 0.6) * 2.2);
+          const depthFromTop = topY - y;
+          if (depthFromTop < 0.28) {
+            return new THREE.Color(0xf09b48); // Upper loose sand crust
+          }
+          if (strataWave > 0.45) {
+            return new THREE.Color(0xc86428); // Iron-rich red sandstone band
+          } else if (strataWave > -0.2) {
+            return new THREE.Color(0xe0843c); // Warm ochre sandstone layer
+          } else {
+            return new THREE.Color(0x9e471e); // Deep sienna mudstone bedding plane
+          }
+        }
+      });
+      grp.add(desertTerrain);
+
+      // 2. Detailed Ribbed Saguaro Cacti & Prickly Pear Paddles placed seamlessly on the heightmap
+      function createRealisticSaguaro(x, z, scale = 1.0, rotY = 0) {
+        const y = getDesertHeight(x, z) - 0.08;
+        const cactus = new THREE.Group();
+        const cMat = new THREE.MeshStandardMaterial({
+          color: 0x3f7033,
+          roughness: 0.68
+        });
+        const ribMat = new THREE.MeshStandardMaterial({
+          color: 0x2d5423,
+          roughness: 0.78
+        });
+
+        // Main ribbed trunk
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.21, 2.25, 12), cMat);
+        trunk.position.y = 1.12;
+        trunk.castShadow = true;
+        cactus.add(trunk);
+
+        // Vertical pleats/ribs around trunk
+        for (let r = 0; r < 6; r++) {
+          const angle = (r / 6) * Math.PI * 2;
+          const rib = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 2.18, 6), ribMat);
+          rib.position.set(Math.cos(angle) * 0.17, 1.1, Math.sin(angle) * 0.17);
+          cactus.add(rib);
+        }
+
+        const topCap = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), cMat);
+        topCap.position.y = 2.25;
+        cactus.add(topCap);
+
+        // Desert cactus flower crown
+        const flower = new THREE.Mesh(
+          new THREE.SphereGeometry(0.055, 8, 6),
+          new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.4 })
+        );
+        flower.position.y = 2.4;
+        cactus.add(flower);
+
+        // Curved Left Arm
+        const armLCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-0.14, 1.15, 0),
+          new THREE.Vector3(-0.46, 1.2, 0),
+          new THREE.Vector3(-0.52, 1.55, 0),
+          new THREE.Vector3(-0.52, 1.98, 0)
+        ]);
+        const armL = new THREE.Mesh(new THREE.TubeGeometry(armLCurve, 12, 0.115, 10, false), cMat);
+        armL.castShadow = true;
+        cactus.add(armL);
+        const capL = new THREE.Mesh(new THREE.SphereGeometry(0.115, 10, 8), cMat);
+        capL.position.set(-0.52, 1.98, 0);
+        cactus.add(capL);
+
+        // Curved Right Arm
+        const armRCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0.14, 0.9, 0),
+          new THREE.Vector3(0.42, 0.95, 0),
+          new THREE.Vector3(0.48, 1.28, 0),
+          new THREE.Vector3(0.48, 1.68, 0)
+        ]);
+        const armR = new THREE.Mesh(new THREE.TubeGeometry(armRCurve, 12, 0.105, 10, false), cMat);
+        armR.castShadow = true;
+        cactus.add(armR);
+        const capR = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 8), cMat);
+        capR.position.set(0.48, 1.68, 0);
+        cactus.add(capR);
+
+        cactus.position.set(x, y, z);
+        cactus.scale.setScalar(scale);
+        cactus.rotation.y = rotY;
+        animatedEntities.trees.push({ mesh: cactus, baseRotZ: 0, speed: 1.3, amp: 0.015, phase: x });
+        return cactus;
+      }
+
+      grp.add(createRealisticSaguaro(-4.7, -2.5, 1.12, 0.25));
+      grp.add(createRealisticSaguaro(-3.7, -2.0, 0.74, -0.45));
+      grp.add(createRealisticSaguaro(-7.1, -4.9, 0.95, 0.85));
+      grp.add(createRealisticSaguaro(-8.2, -2.2, 0.68, 1.4));
+
+      // Prickly Pear (Opuntia) Paddle Cactus & Desert Sandstone Boulders
+      const rockMat = new THREE.MeshStandardMaterial({ color: 0x9c522b, roughness: 0.92 });
+      [
+        [-4.3, -2.3, 0.28],
+        [-5.1, -2.7, 0.22],
+        [-2.9, -1.6, 0.32],
+        [-6.8, -5.2, 0.38]
+      ].forEach(([rx, rz, rScale]) => {
+        const ry = getDesertHeight(rx, rz) - 0.05;
+        const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(rScale, 1), rockMat);
+        boulder.scale.set(1.3, 0.68, 1.1);
+        boulder.position.set(rx, ry, rz);
+        boulder.rotation.y = rx;
+        boulder.castShadow = true;
+        grp.add(boulder);
+      });
+
+      // 3. Weathered Masonry Desert Well in the Oasis Basin + Rope to Canyon Oasis Pool
+      const wellX = -2.3;
+      const wellZ = -2.1;
+      const wellY = getDesertHeight(wellX, wellZ);
+      const wellGroup = new THREE.Group();
+      wellGroup.position.set(wellX, wellY, wellZ);
+
+      const stoneMat1 = new THREE.MeshStandardMaterial({ color: 0x5c5346, roughness: 0.92 });
+      const stoneMat2 = new THREE.MeshStandardMaterial({ color: 0x473f35, roughness: 0.95 });
+
+      // Individual masonry blocks forming a realistic circular stone well wall
+      for (let tier = 0; tier < 3; tier++) {
+        const numBlocks = 14;
+        for (let b = 0; b < numBlocks; b++) {
+          const ang = (b / numBlocks) * Math.PI * 2 + tier * 0.22;
+          const block = new THREE.Mesh(
+            new THREE.BoxGeometry(0.34, 0.22, 0.28),
+            (b + tier) % 2 === 0 ? stoneMat1 : stoneMat2
+          );
+          block.position.set(Math.cos(ang) * 0.68, tier * 0.2 - 0.04, Math.sin(ang) * 0.68);
+          block.rotation.y = -ang + Math.PI / 2;
+          block.castShadow = true;
+          wellGroup.add(block);
+        }
+      }
+
+      // Dark water shaft inside the well
+      const wellHole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.56, 0.56, 0.45, 20),
+        new THREE.MeshBasicMaterial({ color: 0x0f172a })
+      );
+      wellHole.position.y = 0.08;
+      wellGroup.add(wellHole);
+
+      // Wooden Winch Frame & Coiled Rope Axle over the well
+      const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c3a21, roughness: 0.88 });
+      [-0.66, 0.66].forEach((px) => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.95, 0.11), woodMat);
+        post.position.set(px, 0.72, 0);
+        post.castShadow = true;
+        wellGroup.add(post);
+      });
+      const winchAxle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 10), woodMat);
+      winchAxle.rotation.z = Math.PI / 2;
+      winchAxle.position.set(0, 1.1, 0);
+      wellGroup.add(winchAxle);
+      grp.add(wellGroup);
+
+      // Glowing Turquoise Oasis Pool at the base of the Desert Sandstone Cliff + Bucket & Rope
+      const oasisPoolGroup = new THREE.Group();
+      oasisPoolGroup.position.set(-1.35, -0.78, 0.05);
+
+      const oasisSandRim = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.55, 1.75, 0.22, 28),
+        new THREE.MeshStandardMaterial({ color: 0xdab88b, roughness: 0.85 })
+      );
+      oasisPoolGroup.add(oasisSandRim);
+
+      const oasisWater = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.32, 1.4, 0.26, 28),
+        new THREE.MeshStandardMaterial({
+          color: 0x2dd4bf,
+          roughness: 0.12,
+          metalness: 0.1,
+          transparent: true,
+          opacity: 0.9
+        })
+      );
+      oasisWater.position.y = 0.03;
+      oasisPoolGroup.add(oasisWater);
+
+      // Wooden water bucket floating in the oasis pool
+      const bucket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.18, 0.34, 14),
+        new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.55 })
+      );
+      bucket.position.set(0.05, 0.18, 0.1);
+      bucket.rotation.z = 0.18;
+      oasisPoolGroup.add(bucket);
+      grp.add(oasisPoolGroup);
+
+      // Continuous Rope draping from the well rim down the sandstone cliff into the oasis bucket
+      const midZ = -0.9;
+      const midY = getDesertHeight(-1.8, midZ);
+      const ropeCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(wellX, wellY + 0.42, wellZ + 0.68),
+        new THREE.Vector3(-2.0, getDesertHeight(-2.0, -1.4) + 0.08, -1.4),
+        new THREE.Vector3(-1.7, midY + 0.06, midZ),
+        new THREE.Vector3(-1.5, 0.45, 0.82),
+        new THREE.Vector3(-1.3, -0.58, 0.15)
+      ]);
+      const ropeGeo = new THREE.TubeGeometry(ropeCurve, 32, 0.038, 8, false);
+      const ropeMat = new THREE.MeshStandardMaterial({ color: 0x6b4c2b, roughness: 0.9 });
+      grp.add(new THREE.Mesh(ropeGeo, ropeMat));
+
+      // 4. Articulated Dromedary Camel walking along the high desert dune ridge
+      const camelX = -6.4;
+      const camelZ = -4.2;
+      const camelY = getDesertHeight(camelX, camelZ);
+      const camelGroup = new THREE.Group();
+      const camelMat = new THREE.MeshStandardMaterial({ color: 0xc87d3b, roughness: 0.78 });
+      const camelDarkMat = new THREE.MeshStandardMaterial({ color: 0x7c471e, roughness: 0.85 });
+
+      const cTorso = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 12), camelMat);
+      cTorso.scale.set(1.55, 0.92, 0.78);
+      cTorso.position.y = 0.72;
+      cTorso.castShadow = true;
+      camelGroup.add(cTorso);
+
+      const cHump = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 10), camelDarkMat);
+      cHump.scale.set(1.1, 1.15, 0.85);
+      cHump.position.set(-0.05, 1.08, 0);
+      camelGroup.add(cHump);
+
+      // Curved S-shaped camel neck
+      const neckCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.42, 0.68, 0),
+        new THREE.Vector3(0.68, 0.58, 0),
+        new THREE.Vector3(0.84, 0.95, 0),
+        new THREE.Vector3(0.92, 1.24, 0)
+      ]);
+      const cNeck = new THREE.Mesh(new THREE.TubeGeometry(neckCurve, 12, 0.11, 8, false), camelMat);
+      cNeck.castShadow = true;
+      camelGroup.add(cNeck);
+
+      const cHead = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.16, 0.16), camelMat);
+      cHead.position.set(1.04, 1.28, 0);
+      camelGroup.add(cHead);
+
+      // 4 Articulated Camel Legs
+      [
+        [-0.36, -0.15, 0],
+        [-0.36, 0.15, Math.PI],
+        [0.34, -0.15, Math.PI],
+        [0.34, 0.15, 0]
+      ].forEach(([lx, lz, phase]) => {
+        const legPivot = new THREE.Group();
+        legPivot.position.set(lx, 0.58, lz);
+        const legMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.58, 8), camelMat);
+        legMesh.position.y = -0.29;
+        legMesh.castShadow = true;
+        legPivot.add(legMesh);
+        camelGroup.add(legPivot);
+        animatedEntities.camelLegs.push({ pivot: legPivot, phase });
+      });
+
+      camelGroup.position.set(camelX, camelY - 0.04, camelZ);
+      camelGroup.rotation.y = 0.48;
+      camelGroup.scale.setScalar(1.08);
+      grp.add(camelGroup);
+
+      // 5. Flock of Desert Birds soaring high above the golden sand dunes
+      createBirdFlock(grp, -5.6, 6.3, -5.2, 11, 2.3, 0x292524);
+
+      tagBiomeMeshes(grp, 'desert');
+    }
+
+    /* -------------------------------------------------------------------------
+       5.3 BIOME 01: HUTAN HUJAN TROPIS (TROPICAL RAINFOREST) — Back-Center/Right
+       Sculpted multi-level highland plateau with carved river gorge, columnar
+       terracotta canyon rocks, cascading waterfall, tropical beach spit, and
+       curved coconut palms with a woven hammock!
+       ------------------------------------------------------------------------- */
+    function getRainforestHeight(x, z) {
+      // Base elevated rainforest plateau
+      const noiseVal = fbm2D(x * 0.42 + 7.2, z * 0.42 + 4.1, 3);
+      let h = 1.85 + noiseVal * 0.95;
+
+      // Carved tropical river channel flowing around x = 0.45 from z = -8.5 to z = -1.2
+      const riverDist = Math.abs(x - (0.45 + Math.sin(z * 0.45) * 0.35));
+      if (riverDist < 1.35 && z > -8.8) {
+        const channelDepth = Math.cos((riverDist / 1.35) * (Math.PI * 0.5));
+        h -= channelDepth * channelDepth * 0.78;
+      }
+
+      // Taper smoothly toward the southern beach lagoon at z = -0.6
+      if (z > -2.4) {
+        const t = Math.max(0, Math.min(1, (z - (-2.4)) / 1.8));
+        h = h * (1 - t * 0.35);
+      }
+      return h;
+    }
+
+    function buildRainforestBiome() {
+      const grp = biomeGroups.rainforest;
+
+      // 1. Sculpted Rainforest Highland Block (X: -0.2..5.4, Z: -10.0..-0.8)
+      const forestBlock = createGeologicalBlock({
+        xMin: -0.2,
+        xMax: 5.4,
+        zMin: -10.0,
+        zMax: -0.8,
+        segX: 52,
+        segZ: 56,
+        yBase: -3.8,
+        roughness: 0.84,
+        heightFn: getRainforestHeight,
+        topColorFn: (x, y, z) => {
+          const riverDist = Math.abs(x - (0.45 + Math.sin(z * 0.45) * 0.35));
+          if (riverDist < 0.75) {
+            return new THREE.Color(0x1f5f4b); // Moist mossy riverbed
+          }
+          const n = noise2D(x * 0.9, z * 0.9);
+          return new THREE.Color(0x285e34).lerp(new THREE.Color(0x4b7f3a), n);
+        },
+        wallColorFn: (x, y, z, topY) => {
+          const depth = topY - y;
+          if (depth < 0.35) return new THREE.Color(0x366938); // Hanging moss rim
+          const strata = Math.sin(y * 4.5 + x * 0.8);
+          return strata > 0 ? new THREE.Color(0x524838) : new THREE.Color(0x3d3529);
+        }
+      });
+      grp.add(forestBlock);
+
+      // 2. Columnar Red-Brown Terraced Rock Pillars (matching reference canyon edge)
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x9e513a, roughness: 0.74 });
+      const pillarCapMat = new THREE.MeshStandardMaterial({ color: 0xb86b4d, roughness: 0.68 });
+      const pillarSpecs = [
+        [1.75, -2.2, 0.75, 0.26],
+        [2.25, -1.9, 0.58, 0.24],
+        [2.72, -2.3, 0.82, 0.28],
+        [3.18, -2.0, 0.62, 0.25],
+        [2.05, -1.45, 0.48, 0.22],
+        [2.55, -1.52, 0.52, 0.24],
+        [3.02, -1.58, 0.44, 0.21]
+      ];
+      pillarSpecs.forEach(([px, pz, h, rad]) => {
+        const baseY = getRainforestHeight(px, pz);
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * 1.06, h, 7), pillarMat);
+        p.position.set(px, baseY + h * 0.4, pz);
+        p.castShadow = true;
+        grp.add(p);
+
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(rad * 0.96, rad, 0.08, 7), pillarCapMat);
+        cap.position.set(px, baseY + h * 0.8 + 0.04, pz);
+        grp.add(cap);
+      });
+
+      // 3. Winding Tropical River & Multi-Stage Waterfall Cascading down the Cliff
+      const riverCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.45, getRainforestHeight(0.45, -7.8) + 0.06, -7.8),
+        new THREE.Vector3(0.22, getRainforestHeight(0.22, -5.2) + 0.06, -5.2),
+        new THREE.Vector3(0.52, getRainforestHeight(0.52, -2.8) + 0.06, -2.8),
+        new THREE.Vector3(0.42, getRainforestHeight(0.42, -0.85) + 0.04, -0.85),
+        new THREE.Vector3(0.42, 0.35, -0.52),
+        new THREE.Vector3(0.42, -0.85, -0.18)
+      ]);
+      const riverGeo = new THREE.TubeGeometry(riverCurve, 44, 0.48, 10, false);
+      riverGeo.scale(1.45, 0.24, 1.0);
+      const riverMat = new THREE.MeshStandardMaterial({
+        color: 0x34d399,
+        roughness: 0.16,
+        metalness: 0.12,
+        transparent: true,
+        opacity: 0.86
+      });
+      const riverMesh = new THREE.Mesh(riverGeo, riverMat);
+      grp.add(riverMesh);
+
+      // Waterfall animated droplets & plunge-pool mist
+      const dropGeo = new THREE.SphereGeometry(0.085, 6, 6);
+      const dropMat = new THREE.MeshBasicMaterial({
+        color: 0xd1fae5,
+        transparent: true,
+        opacity: 0.82
+      });
+      for (let i = 0; i < 34; i++) {
+        const drop = new THREE.Mesh(dropGeo, dropMat);
+        drop.position.set(
+          -0.15 + Math.random() * 1.15,
+          -0.95 + Math.random() * 2.8,
+          -0.75 + (Math.random() - 0.5) * 0.35
+        );
+        grp.add(drop);
+        animatedEntities.waterfallDrops.push({
+          mesh: drop,
+          speed: 0.048 + Math.random() * 0.035,
+          minY: -0.95,
+          maxY: 1.85
+        });
+      }
+
+      // 4. Multi-Species Rainforest Canopy Trees with Gnarled Roots & Layered Foliage
+      function createOrganicRainforestTree(x, z, scale, palette, style = 'canopy') {
+        const y = getRainforestHeight(x, z) - 0.08;
+        const tree = new THREE.Group();
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3321, roughness: 0.9 });
+
+        // Curved organic trunk
+        const trunkCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0.08, 0.85, -0.05),
+          new THREE.Vector3(-0.05, 1.75, 0.06),
+          new THREE.Vector3(0, 2.35, 0)
+        ]);
+        const trunk = new THREE.Mesh(new THREE.TubeGeometry(trunkCurve, 10, 0.21, 8, false), trunkMat);
+        trunk.castShadow = true;
+        tree.add(trunk);
+
+        // Buttress roots at base
+        for (let r = 0; r < 4; r++) {
+          const ang = (r / 4) * Math.PI * 2 + 0.3;
+          const root = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.75, 5), trunkMat);
+          root.position.set(Math.cos(ang) * 0.18, 0.32, Math.sin(ang) * 0.18);
+          root.rotation.z = -Math.cos(ang) * 0.42;
+          root.rotation.x = Math.sin(ang) * 0.42;
+          tree.add(root);
+        }
+
+        if (style === 'canopy') {
+          const puffs = [
+            [0, 2.55, 0, 1.28, palette[0]],
+            [-0.72, 2.25, 0.42, 0.95, palette[1]],
+            [0.74, 2.3, -0.35, 0.98, palette[0]],
+            [0.25, 2.92, 0.38, 0.88, palette[2]],
+            [-0.48, 2.72, -0.48, 0.86, palette[1]],
+            [0.52, 2.1, 0.55, 0.78, palette[2]]
+          ];
+          puffs.forEach(([cx, cy, cz, rad, colHex]) => {
+            const leafMat = new THREE.MeshStandardMaterial({ color: colHex, roughness: 0.76 });
+            const puff = new THREE.Mesh(new THREE.IcosahedronGeometry(rad, 2), leafMat);
+            puff.scale.set(1.12, 0.68, 1.08);
+            puff.position.set(cx, cy, cz);
+            puff.castShadow = true;
+            puff.receiveShadow = true;
+            tree.add(puff);
+          });
+        } else {
+          // Tall cypress / emergent spire tree (back-right of rainforest in reference image)
+          for (let l = 0; l < 5; l++) {
+            const leafMat = new THREE.MeshStandardMaterial({
+              color: palette[l % palette.length],
+              roughness: 0.78
+            });
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(1.15 - l * 0.18, 1.45, 10), leafMat);
+            cone.position.y = 1.65 + l * 0.65;
+            cone.castShadow = true;
+            tree.add(cone);
+          }
+        }
+
+        tree.position.set(x, y, z);
+        tree.scale.setScalar(scale);
+        animatedEntities.trees.push({
+          mesh: tree,
+          baseRotZ: 0,
+          speed: 1.4 + Math.random() * 0.5,
+          amp: 0.02,
+          phase: x + z
+        });
+        return tree;
+      }
+
+      grp.add(createOrganicRainforestTree(-0.1, -4.6, 1.15, [0x2d5a27, 0x3f7433, 0x528c3e], 'canopy'));
+      grp.add(createOrganicRainforestTree(1.9, -4.9, 1.28, [0x7a4e2d, 0x946238, 0x5c3c22], 'canopy')); // Bronze-russet canopy tree matching reference
+      grp.add(createOrganicRainforestTree(3.75, -6.4, 1.32, [0x365928, 0x497336, 0x2b471f], 'spire'));
+      grp.add(createOrganicRainforestTree(1.1, -7.5, 1.38, [0x3d6e34, 0x568a47, 0x73a35d], 'canopy'));
+      grp.add(createOrganicRainforestTree(4.3, -4.1, 0.96, [0x296338, 0x3b7d4b, 0x4f965e], 'canopy'));
+
+      // 5. Sculpted Sandy Beach Spit, Curved Coconut Palms & Woven Hammock
+      const beachGeo = new THREE.BoxGeometry(9.6, 0.48, 2.1);
+      const beachMat = new THREE.MeshStandardMaterial({ color: 0xf5d7b8, roughness: 0.82 });
+      const beachStrip = new THREE.Mesh(beachGeo, beachMat);
+      beachStrip.position.set(2.9, -0.92, 0.45);
+      beachStrip.receiveShadow = true;
+      grp.add(beachStrip);
+
+      function createDetailedPalmTree(x, y, z, scale = 1.0, leanX = 0.18, frondHex = 0x2e7d32) {
+        const palm = new THREE.Group();
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6e4e3a, roughness: 0.88 });
+
+        // Segmented curved coconut trunk
+        const pts = [
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(leanX * 0.45, 0.95, 0.06),
+          new THREE.Vector3(leanX * 0.85, 1.85, 0.14),
+          new THREE.Vector3(leanX, 2.72, 0.2)
+        ];
+        const curve = new THREE.CatmullRomCurve3(pts);
+        const trunk = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.105, 8, false), trunkMat);
+        trunk.castShadow = true;
+        palm.add(trunk);
+
+        // Coconuts cluster under crown
+        const cocoMat = new THREE.MeshStandardMaterial({ color: 0x422814, roughness: 0.7 });
+        [[-0.08, 0.06], [0.09, 0.05], [0, -0.08]].forEach(([cx, cz]) => {
+          const coco = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), cocoMat);
+          coco.position.set(leanX + cx, 2.62, 0.2 + cz);
+          palm.add(coco);
+        });
+
+        // Graceful Arched Pinnate Fronds
+        const crownGroup = new THREE.Group();
+        crownGroup.position.set(leanX, 2.74, 0.2);
+        const frondMat = new THREE.MeshStandardMaterial({
+          color: frondHex,
+          roughness: 0.62,
+          side: THREE.DoubleSide
+        });
+
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const frondPivot = new THREE.Group();
+          frondPivot.rotation.y = angle;
+
+          const fCurve = new THREE.CatmullRomCurve3([
+            new THREE.Vector3(0, 0, 0),
+            new THREE.Vector3(0, 0.18, 0.48),
+            new THREE.Vector3(0, -0.05, 0.98),
+            new THREE.Vector3(0, -0.38, 1.35)
+          ]);
+          const frondRib = new THREE.Mesh(new THREE.TubeGeometry(fCurve, 10, 0.09, 4, false), frondMat);
+          frondRib.scale.set(2.4, 0.25, 1.0);
+          frondRib.castShadow = true;
+          frondPivot.add(frondRib);
+          crownGroup.add(frondPivot);
+        }
+
+        palm.add(crownGroup);
+        palm.position.set(x, y, z);
+        palm.scale.setScalar(scale);
+        animatedEntities.trees.push({
+          mesh: palm,
+          baseRotZ: 0,
+          speed: 1.9,
+          amp: 0.03,
+          phase: x * 1.5
+        });
+        return palm;
+      }
+
+      grp.add(createDetailedPalmTree(0.25, -0.75, 0.68, 1.06, -0.22, 0x8a9e27));
+      grp.add(createDetailedPalmTree(2.35, -0.75, 0.64, 1.12, 0.22, 0x2e7d32));
+      grp.add(createDetailedPalmTree(4.45, -0.75, 0.56, 1.08, 0.14, 0x1e6f8c));
+
+      // Woven Hammock slung between the first two beach palms
+      const hammockCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0.18, 0.58, 0.76),
+        new THREE.Vector3(1.3, 0.04, 0.82),
+        new THREE.Vector3(2.42, 0.62, 0.72)
+      ]);
+      const hammockGeo = new THREE.TubeGeometry(hammockCurve, 20, 0.13, 10, false);
+      hammockGeo.scale(1, 0.38, 1.65);
+      const hammockMat = new THREE.MeshStandardMaterial({ color: 0x855f3c, roughness: 0.82 });
+      grp.add(new THREE.Mesh(hammockGeo, hammockMat));
+
+      // Scarlet Macaws flying above the rainforest canopy
+      createBirdFlock(grp, 2.2, 6.5, -5.2, 9, 2.1, 0xef4444);
+
+      tagBiomeMeshes(grp, 'rainforest');
+    }
+
+    /* -------------------------------------------------------------------------
+       5.4 BIOME 03: SAVANA (SAVANNA) — East / Mid-Right Grassland Terrace
+       Sculpted golden savanna terrain, umbrella Acacia trees, termite mounds,
+       dense swaying grass, and a textured 3D Reticulated Giraffe!
+       ------------------------------------------------------------------------- */
+    function getSavannaHeight(x, z) {
+      const n = fbm2D(x * 0.45 + 1.2, z * 0.45 + 8.4, 3);
+      // Gently slopes down from north (-10) toward the southern beach edge (0.8)
+      const southSlope = Math.max(0, (0.8 - z) / 10.8);
+      return -0.25 + southSlope * 1.15 + n * 0.42;
+    }
+
+    function buildSavannaBiome() {
+      const grp = biomeGroups.savanna;
+
+      // 1. Sculpted Savanna Grassland Block (X: 5.4..10.0, Z: -10.0..0.8)
+      const savannaBlock = createGeologicalBlock({
+        xMin: 5.4,
+        xMax: 10.0,
+        zMin: -10.0,
+        zMax: 0.8,
+        segX: 44,
+        segZ: 56,
+        yBase: -3.8,
+        roughness: 0.84,
+        heightFn: getSavannaHeight,
+        topColorFn: (x, y, z) => {
+          const n = noise2D(x * 1.1, z * 1.1);
+          return new THREE.Color(0xcfa663).lerp(new THREE.Color(0xe5c583), n);
+        },
+        wallColorFn: (x, y, z, topY) => {
+          const d = topY - y;
+          if (d < 0.28) return new THREE.Color(0xd6b06d);
+          return Math.sin(y * 4.2) > 0 ? new THREE.Color(0x9e7446) : new THREE.Color(0x7d5832);
+        }
+      });
+      grp.add(savannaBlock);
+
+      // 2. Realistic 3D Reticulated Giraffe with Procedural Spotted Coat Texture
+      const giraffeX = 7.35;
+      const giraffeZ = -2.35;
+      const giraffeY = getSavannaHeight(giraffeX, giraffeZ);
+      const giraffe = new THREE.Group();
+
+      const coatTex = createGiraffeCoatTexture();
+      const gCoatMat = new THREE.MeshStandardMaterial({
+        map: coatTex,
+        roughness: 0.68
+      });
+      const gDarkMat = new THREE.MeshStandardMaterial({ color: 0x3b2313, roughness: 0.7 });
+
+      // Sloped anatomical giraffe torso (higher at shoulders, lower at rump)
+      const chest = new THREE.Mesh(new THREE.SphereGeometry(0.46, 14, 12), gCoatMat);
+      chest.scale.set(0.88, 1.05, 1.35);
+      chest.position.set(0, 1.38, 0.18);
+      chest.rotation.x = 0.22;
+      chest.castShadow = true;
+      giraffe.add(chest);
+
+      const rump = new THREE.Mesh(new THREE.SphereGeometry(0.39, 12, 10), gCoatMat);
+      rump.scale.set(0.85, 0.92, 1.15);
+      rump.position.set(0, 1.22, -0.35);
+      rump.castShadow = true;
+      giraffe.add(rump);
+
+      // 4 Slender Long Legs with hooves
+      [
+        [-0.22, 0.38, 1.35],
+        [0.22, 0.38, 1.35],
+        [-0.21, -0.42, 1.22],
+        [0.21, -0.42, 1.22]
+      ].forEach(([lx, lz, lHeight]) => {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.048, lHeight, 10), gCoatMat);
+        leg.position.set(lx, lHeight * 0.5, lz);
+        leg.castShadow = true;
+        giraffe.add(leg);
+
+        const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.06, 0.08, 8), gDarkMat);
+        hoof.position.set(lx, 0.04, lz);
+        giraffe.add(hoof);
+      });
+
+      // Tail with dark brush tip
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.018, 0.68, 6), gCoatMat);
+      tail.position.set(0, 0.92, -0.82);
+      tail.rotation.x = 0.12;
+      giraffe.add(tail);
+
+      // Articulated Long Neck Pivot for natural browsing animation
+      const neckPivot = new THREE.Group();
+      neckPivot.position.set(0, 1.56, 0.38);
+
+      const neckCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.72, 0.18),
+        new THREE.Vector3(0, 1.45, 0.36),
+        new THREE.Vector3(0, 2.08, 0.52)
+      ]);
+      const neckMesh = new THREE.Mesh(new THREE.TubeGeometry(neckCurve, 16, 0.15, 10, false), gCoatMat);
+      neckMesh.castShadow = true;
+      neckPivot.add(neckMesh);
+
+      // Mane ridge along back of neck
+      const mane = new THREE.Mesh(new THREE.BoxGeometry(0.04, 1.95, 0.08), gDarkMat);
+      mane.position.set(0, 1.05, 0.18);
+      mane.rotation.x = 0.24;
+      neckPivot.add(mane);
+
+      // Sculpted Head, Snout, Ears & Two Ossicones
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 2.12, 0.56);
+
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), gCoatMat);
+      skull.scale.set(0.85, 0.85, 1.45);
+      headGroup.add(skull);
+
+      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.12, 0.34, 10), gCoatMat);
+      snout.rotation.x = Math.PI / 2 + 0.25;
+      snout.position.set(0, -0.05, 0.22);
+      headGroup.add(snout);
+
+      // Eyes, Ears & Ossicones
+      [-0.08, 0.08].forEach((ox) => {
+        const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.19, 8), gDarkMat);
+        horn.position.set(ox, 0.19, -0.02);
+        horn.rotation.x = -0.15;
+        headGroup.add(horn);
+
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 6), gCoatMat);
+        ear.rotation.z = ox > 0 ? -1.1 : 1.1;
+        ear.position.set(ox * 2.1, 0.06, -0.05);
+        headGroup.add(ear);
+
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), gDarkMat);
+        eye.position.set(ox * 1.65, 0.03, 0.08);
+        headGroup.add(eye);
+      });
+
+      neckPivot.add(headGroup);
+      giraffe.add(neckPivot);
+      giraffe.position.set(giraffeX, giraffeY - 0.04, giraffeZ);
+      giraffe.rotation.y = -0.58;
+      giraffe.scale.setScalar(1.16);
+      grp.add(giraffe);
+      animatedEntities.giraffeNeck = neckPivot;
+
+      // 3. Flat-Topped Umbrella Acacia Tree & Red-Clay Termite Mound
+      const acaciaX = 8.25;
+      const acaciaZ = -6.4;
+      const acaciaY = getSavannaHeight(acaciaX, acaciaZ);
+      const acacia = new THREE.Group();
+      const aTrunkMat = new THREE.MeshStandardMaterial({ color: 0x593d2b, roughness: 0.9 });
+      const aLeafMat = new THREE.MeshStandardMaterial({ color: 0x5c7d2d, roughness: 0.76 });
+
+      // Multi-forked Acacia branches
+      [
+        [0, 0, 0.35, 1.85, 0.15],
+        [-0.55, 0.25, -0.2, 1.65, -0.25],
+        [0.48, -0.22, 0.15, 1.72, 0.22]
+      ].forEach(([tx, tz, leanX, h, leanZ]) => {
+        const branchCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(tx * 0.4, h * 0.55, tz * 0.4),
+          new THREE.Vector3(tx + leanX, h, tz + leanZ)
+        ]);
+        const br = new THREE.Mesh(new THREE.TubeGeometry(branchCurve, 10, 0.09, 7, false), aTrunkMat);
+        br.castShadow = true;
+        acacia.add(br);
+
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.85, 0.26, 12), aLeafMat);
+        pad.position.set(tx + leanX, h + 0.08, tz + leanZ);
+        pad.castShadow = true;
+        acacia.add(pad);
+      });
+
+      acacia.position.set(acaciaX, acaciaY - 0.05, acaciaZ);
+      grp.add(acacia);
+
+      // African Red-Clay Termite Mound
+      const moundX = 6.35;
+      const moundZ = -5.1;
+      const mound = new THREE.Mesh(
+        new THREE.ConeGeometry(0.38, 1.15, 9),
+        new THREE.MeshStandardMaterial({ color: 0x9c4a27, roughness: 0.92 })
+      );
+      mound.position.set(moundX, getSavannaHeight(moundX, moundZ) + 0.45, moundZ);
+      mound.castShadow = true;
+      grp.add(mound);
+
+      // 4. Dense Golden Dry Savanna Grass Clumps surrounding the Giraffe
+      const grassMat = new THREE.MeshStandardMaterial({
+        color: 0xdec087,
+        roughness: 0.84,
+        side: THREE.DoubleSide
+      });
+      const grassCoords = [
+        [6.1, -1.6], [6.7, -1.1], [7.5, -1.3], [8.3, -1.9],
+        [6.5, -2.9], [7.9, -3.3], [8.7, -0.9], [6.0, -0.3],
+        [7.2, -0.2], [8.5, 0.1], [6.3, -4.2], [7.8, -4.6],
+        [9.1, -2.7], [8.9, -4.1], [6.9, -2.1], [7.6, -2.8]
+      ];
+      grassCoords.forEach(([gx, gz], idx) => {
+        const gy = getSavannaHeight(gx, gz);
+        const tuft = new THREE.Group();
+        for (let b = 0; b < 9; b++) {
+          const blade = new THREE.Mesh(new THREE.ConeGeometry(0.065, 1.05 + (b % 3) * 0.28, 4), grassMat);
+          blade.position.y = 0.48;
+          blade.rotation.z = (b - 4) * 0.13;
+          blade.rotation.x = ((b % 2) - 0.5) * 0.22;
+          tuft.add(blade);
+        }
+        tuft.position.set(gx, gy - 0.05, gz);
+        grp.add(tuft);
+        animatedEntities.trees.push({
+          mesh: tuft,
+          baseRotZ: 0,
+          speed: 2.2,
+          amp: 0.042,
+          phase: idx
+        });
+      });
+
+      // Flocking Savanna Birds overhead (right side of reference image)
+      createBirdFlock(grp, 6.8, 6.2, -3.0, 12, 2.5, 0x1e293b);
+
+      tagBiomeMeshes(grp, 'savanna');
+    }
+
+    /* -------------------------------------------------------------------------
+       5.5 BIOME 04: TUNDRA (POLAR & ALPINE TUNDRA) — Front-Left Rim & Arctic Sea
+       Continuous 3D Ridged Multifractal Alpine/Arctic Mountain Range along the
+       left rim, polygonal sea-ice floes, swimming Polar Bear with paws/ears,
+       Arctic Fox, and gentle snowfall!
+       ------------------------------------------------------------------------- */
+    function getTundraMountainHeight(x, z) {
+      // Ridge runs along x from -10.0 to -5.4, z from 0.8 to 10.0
+      // Across-ridge normalized profile (0 at outer edge -10, 1 at crest -7.9, 0 at inner coastline -5.4)
+      let across = 0;
+      if (x < -7.9) {
+        across = (x - (-10.0)) / 2.1; // 0.35 .. 1.0
+        across = 0.38 + 0.62 * Math.sin(across * Math.PI * 0.5);
+      } else {
+        const t = Math.max(0, Math.min(1, (-5.4 - x) / 2.5));
+        across = Math.pow(t, 1.35);
+      }
+
+      // Along-ridge 3 main jagged peaks matching reference image
+      const peakWave = Math.abs(Math.sin((z - 0.6) * 0.68)) * 2.45 +
+                       Math.abs(Math.cos((z + 1.1) * 1.15)) * 1.15;
+      const crag = ridgedNoise2D(x * 0.72, z * 0.72, 3) * 1.85;
+
+      // Taper slightly at very front corner z -> 10.0
+      const zFade = z > 8.2 ? Math.max(0.25, (10.2 - z) / 2.0) : 1.0;
+
+      return -0.75 + across * zFade * (1.25 + peakWave + crag);
+    }
+
+    function buildTundraBiome() {
+      const grp = biomeGroups.tundra;
+
+      // 1. Continuous 64x64 Sculpted Alpine/Arctic Mountain Range Block
+      const tundraMountains = createGeologicalBlock({
+        xMin: -10.0,
+        xMax: -5.4,
+        zMin: 0.8,
+        zMax: 10.0,
+        segX: 48,
+        segZ: 64,
+        yBase: -3.8,
+        roughness: 0.55,
+        heightFn: getTundraMountainHeight,
+        topColorFn: (x, y, z) => {
+          const n = noise2D(x * 1.6, z * 1.6) * 0.35;
+          if (y + n > 1.35) {
+            return new THREE.Color(0xf8fafc); // Gleaming snow-white alpine peak
+          } else if (y + n > 0.35) {
+            return new THREE.Color(0xcbd5e1); // Frosted glacial scree
+          } else {
+            return new THREE.Color(0x64748b); // Dark slate bedrock near waterline
+          }
+        },
+        wallColorFn: (x, y, z, topY) => {
+          if (y > 0.6) return new THREE.Color(0xe2e8f0); // Glacial snow & ice cap wall
+          if (y > -0.8) return new THREE.Color(0x94a3b8); // Permafrost active layer
+          return new THREE.Color(0x334155); // Deep submerged Arctic granite cliff
+        }
+      });
+      grp.add(tundraMountains);
+
+      // 2. Polygonal Floating Sea-Ice Floes on the Arctic Water Surface
+      const iceMat = new THREE.MeshStandardMaterial({
+        color: 0xf1f5f9,
+        roughness: 0.32,
+        metalness: 0.08
+      });
+      [
+        [-4.5, -0.82, 2.8, 1.05],
+        [-3.4, -0.82, 5.1, 0.82],
+        [-4.8, -0.82, 6.8, 0.92],
+        [-2.6, -0.82, 3.6, 0.65]
+      ].forEach(([ix, iy, iz, ir]) => {
+        const floe = new THREE.Mesh(new THREE.CylinderGeometry(ir, ir * 0.86, 0.24, 7), iceMat);
+        floe.position.set(ix, iy, iz);
+        floe.rotation.y = ix;
+        floe.receiveShadow = true;
+        grp.add(floe);
+      });
+
+      // 3. Detailed 3D Polar Bear Swimming in the Front-Left Arctic Cross-Section
+      const bearGroup = new THREE.Group();
+      const furMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.62 });
+      const wetFurMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.45 });
+      const darkNoseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.35 });
+
+      // Submerged buoyant barrel torso
+      const bearTorso = new THREE.Mesh(new THREE.SphereGeometry(0.76, 18, 16), wetFurMat);
+      bearTorso.scale.set(0.96, 0.88, 1.28);
+      bearGroup.add(bearTorso);
+
+      // Muscular shoulder hump & neck emerging toward the viewer
+      const bearNeck = new THREE.Mesh(new THREE.SphereGeometry(0.56, 14, 12), furMat);
+      bearNeck.position.set(0, 0.16, 0.55);
+      bearGroup.add(bearNeck);
+
+      const bearHead = new THREE.Mesh(new THREE.SphereGeometry(0.45, 16, 14), furMat);
+      bearHead.position.set(0, 0.24, 0.92);
+      bearGroup.add(bearHead);
+
+      // Sculpted muzzle & black nose
+      const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.24, 0.34, 12), furMat);
+      snout.rotation.x = Math.PI / 2;
+      snout.position.set(0, 0.17, 1.3);
+      bearGroup.add(snout);
+
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 10), darkNoseMat);
+      nose.position.set(0, 0.21, 1.46);
+      bearGroup.add(nose);
+
+      // Expressive Eyes & Rounded Polar Bear Ears
+      [-0.16, 0.16].forEach((ex) => {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), darkNoseMat);
+        eye.position.set(ex, 0.33, 1.28);
+        bearGroup.add(eye);
+
+        const ear = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 8), furMat);
+        ear.position.set(ex * 1.85, 0.58, 0.82);
+        bearGroup.add(ear);
+      });
+
+      // Front Paws paddling in the arctic water
+      [-0.46, 0.46].forEach((px) => {
+        const paw = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), wetFurMat);
+        paw.scale.set(0.82, 1.25, 0.85);
+        paw.position.set(px, -0.36, 0.62);
+        bearGroup.add(paw);
+      });
+
+      bearGroup.position.set(-4.3, -1.95, 8.85);
+      bearGroup.rotation.y = -0.12;
+      grp.add(bearGroup);
+      animatedEntities.polarBearSwim = bearGroup;
+
+      // 4. Arctic Fox perched on a snowy mountain ledge
+      const foxX = -6.8;
+      const foxZ = 2.4;
+      const foxY = getTundraMountainHeight(foxX, foxZ);
+      const foxGroup = new THREE.Group();
+      const fBody = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), furMat);
+      fBody.scale.set(1.5, 0.85, 0.75);
+      fBody.position.y = 0.22;
+      const fHead = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.28, 8), furMat);
+      fHead.rotation.z = -Math.PI / 2;
+      fHead.position.set(0.28, 0.3, 0);
+      const fTail = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), furMat);
+      fTail.scale.set(1.7, 0.72, 0.72);
+      fTail.position.set(-0.34, 0.22, 0);
+      foxGroup.add(fBody, fHead, fTail);
+      foxGroup.position.set(foxX, foxY, foxZ);
+      foxGroup.rotation.y = -0.35;
+      grp.add(foxGroup);
+
+      // 5. Continuously Falling Snowflakes over the Tundra peaks
+      const snowFlakeGeo = new THREE.SphereGeometry(0.06, 6, 6);
+      const snowFlakeMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.85
+      });
+      for (let i = 0; i < 38; i++) {
+        const flake = new THREE.Mesh(snowFlakeGeo, snowFlakeMat);
+        flake.position.set(
+          -9.6 + Math.random() * 5.2,
+          1.2 + Math.random() * 5.5,
+          0.8 + Math.random() * 8.8
+        );
+        grp.add(flake);
+        animatedEntities.snowFlakes.push({
+          mesh: flake,
+          speedY: 0.02 + Math.random() * 0.025,
+          driftPhase: Math.random() * Math.PI * 2,
+          minY: 1.0,
+          maxY: 6.7
+        });
+      }
+
+      tagBiomeMeshes(grp, 'tundra');
+    }
+
+    /* -------------------------------------------------------------------------
+       5.6 BIOME 05: LAUTAN (OCEAN CROSS-SECTION) — Front & Right Underwater Volume
+       Sculpted bathymetric seabed, dual-tone translucent ocean cutaway block,
+       animated wave surface, coral reef structures, anatomical Shark, school of
+       orange reef fish, and Scuba Diver explorer!
+       ------------------------------------------------------------------------- */
+    function buildOceanBiome() {
+      const grp = biomeGroups.ocean;
+
+      // 1. Sculpted Bathymetric Seabed (`BufferGeometry` sloping from shallow reef to deep arctic trench)
+      const seabedGeo = new THREE.PlaneGeometry(20.0, 9.2, 48, 28);
+      seabedGeo.rotateX(-Math.PI / 2);
+      const sbPos = seabedGeo.attributes.position;
+      const sbCols = new Float32Array(sbPos.count * 3);
+
+      for (let i = 0; i < sbPos.count; i++) {
+        const wx = sbPos.getX(i);
+        const wz = sbPos.getZ(i) + 5.4;
+        // Shallow warm reef shelf on the right (wx > 0), deeper cold trench on the left (wx < 0)
+        const shelfSlope = Math.max(0, Math.min(1, (wx + 8.0) / 16.0));
+        const ripple = fbm2D(wx * 0.6, wz * 0.6, 2) * 0.28;
+        const wy = -3.65 + shelfSlope * 0.48 + ripple;
+        sbPos.setY(i, wy);
+        sbPos.setZ(i, wz);
+
+        const cDeep = new THREE.Color(0x1e293b);
+        const cReefSand = new THREE.Color(0x88a8a8);
+        const col = cDeep.lerp(cReefSand, shelfSlope);
+        sbCols[i * 3] = col.r;
+        sbCols[i * 3 + 1] = col.g;
+        sbCols[i * 3 + 2] = col.b;
+      }
+      seabedGeo.setAttribute('color', new THREE.BufferAttribute(sbCols, 3));
+      seabedGeo.computeVertexNormals();
+
+      const seabedMesh = new THREE.Mesh(
+        seabedGeo,
+        new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 })
+      );
+      seabedMesh.receiveShadow = true;
+      grp.add(seabedMesh);
+
+      // Seabed base skirt down to -3.8
+      const skirtGeo = new THREE.BoxGeometry(20.0, 0.55, 9.2);
+      const skirtMesh = new THREE.Mesh(
+        skirtGeo,
+        new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 })
+      );
+      skirtMesh.position.set(0, -3.55, 5.4);
+      grp.add(skirtMesh);
+
+      // 2. Translucent Ocean Water Cutaway Volume
+      const waterBoxGeo = new THREE.BoxGeometry(19.96, 2.55, 9.16);
+      const waterBoxMat = new THREE.MeshPhysicalMaterial({
+        color: 0x22d3ee,
+        transmission: 0.72,
+        opacity: 0.74,
+        transparent: true,
+        roughness: 0.14,
+        metalness: 0.04,
+        ior: 1.33,
+        depthWrite: false
+      });
+      const waterVolume = new THREE.Mesh(waterBoxGeo, waterBoxMat);
+      waterVolume.position.set(0, -2.12, 5.4);
+      grp.add(waterVolume);
+
+      // Animated Top Water Surface Plane with gentle vertex waves
+      const surfaceGeo = new THREE.PlaneGeometry(19.96, 9.16, 36, 20);
+      surfaceGeo.rotateX(-Math.PI / 2);
+      const surfaceMat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        roughness: 0.15,
+        metalness: 0.18,
+        transparent: true,
+        opacity: 0.64
+      });
+      const waterSurface = new THREE.Mesh(surfaceGeo, surfaceMat);
+      waterSurface.position.set(0, -0.82, 5.4);
+      grp.add(waterSurface);
+      animatedEntities.waterSurfaceMesh = waterSurface;
+
+      // 3. Sleek Anatomical 3D Reef Shark cruising in the Front-Right Cross-Section
+      const sharkGroup = new THREE.Group();
+      const sharkTopMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 });
+      const sharkBellyMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.45 });
+
+      // Streamlined fusiform body via Lathe/scaled spheres
+      const sBody = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12), sharkTopMat);
+      sBody.scale.set(3.2, 0.88, 0.75);
+      sharkGroup.add(sBody);
+
+      const sBelly = new THREE.Mesh(new THREE.SphereGeometry(0.33, 14, 10), sharkBellyMat);
+      sBelly.scale.set(2.9, 0.65, 0.72);
+      sBelly.position.set(-0.08, -0.09, 0);
+      sharkGroup.add(sBelly);
+
+      // Iconic curved Dorsal Fin
+      const dorsalGeo = new THREE.ConeGeometry(0.24, 0.68, 5);
+      dorsalGeo.scale(1.45, 1, 0.22);
+      const dorsalFin = new THREE.Mesh(dorsalGeo, sharkTopMat);
+      dorsalFin.position.set(-0.05, 0.48, 0);
+      dorsalFin.rotation.z = -0.35;
+      sharkGroup.add(dorsalFin);
+
+      // Swept Pectoral Fins
+      [-0.42, 0.42].forEach((pz) => {
+        const pec = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.68, 4), sharkTopMat);
+        pec.scale.set(1.25, 1, 0.2);
+        pec.rotation.x = pz > 0 ? 1.28 : -1.28;
+        pec.rotation.z = -0.25;
+        pec.position.set(-0.32, -0.14, pz);
+        sharkGroup.add(pec);
+      });
+
+      // Articulated Caudal Tail Fin Pivot
+      const tailPivot = new THREE.Group();
+      tailPivot.position.set(1.02, 0, 0);
+      const tailUpper = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.78, 4), sharkTopMat);
+      tailUpper.scale.set(1.25, 1, 0.2);
+      tailUpper.position.set(0.24, 0.26, 0);
+      tailUpper.rotation.z = -0.68;
+      const tailLower = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 4), sharkTopMat);
+      tailLower.scale.set(1.2, 1, 0.2);
+      tailLower.position.set(0.18, -0.18, 0);
+      tailLower.rotation.z = -2.42;
+      tailPivot.add(tailUpper, tailLower);
+      sharkGroup.add(tailPivot);
+
+      sharkGroup.position.set(2.2, -2.15, 8.85);
+      sharkGroup.rotation.y = 0.18;
+      grp.add(sharkGroup);
+      animatedEntities.shark = {
+        group: sharkGroup,
+        tail: tailPivot,
+        baseX: 2.2,
+        baseY: -2.15,
+        baseZ: 8.85
+      };
+
+      // 4. School of Vibrant Orange Tropical Reef Fish
+      const fishMat = new THREE.MeshStandardMaterial({
+        color: 0xff5722,
+        emissive: 0x7c2d12,
+        emissiveIntensity: 0.28,
+        roughness: 0.38
+      });
+      const fishPositions = [
+        [5.2, -2.0, 9.1], [5.55, -1.88, 9.2], [5.85, -2.05, 9.0],
+        [5.4, -2.22, 9.15], [6.1, -1.92, 9.1], [6.35, -2.12, 8.95],
+        [5.75, -2.3, 9.05], [6.0, -1.78, 8.9], [6.5, -1.98, 9.15]
+      ];
+      fishPositions.forEach(([fx, fy, fz], idx) => {
+        const fish = new THREE.Group();
+        const fBody = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), fishMat);
+        fBody.scale.set(1.65, 0.9, 0.5);
+        const fTail = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.15, 3), fishMat);
+        fTail.rotation.z = -Math.PI / 2;
+        fTail.scale.set(1, 1, 0.3);
+        fTail.position.x = 0.16;
+        fish.add(fBody, fTail);
+        fish.position.set(fx, fy, fz);
+        grp.add(fish);
+        animatedEntities.fishSchool.push({
+          mesh: fish,
+          originX: fx,
+          originY: fy,
+          originZ: fz,
+          phase: idx * 0.65
+        });
+      });
+
+      // Cold-water Arctic Char trio on the left side under Tundra
+      const coldFishMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.48 });
+      [
+        [-8.2, -1.65, 9.1],
+        [-7.65, -1.92, 9.15],
+        [-8.35, -2.05, 9.05]
+      ].forEach(([cfx, cfy, cfz], idx) => {
+        const cf = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), coldFishMat);
+        cf.scale.set(1.85, 0.85, 0.5);
+        cf.position.set(cfx, cfy, cfz);
+        grp.add(cf);
+        animatedEntities.fishSchool.push({
+          mesh: cf,
+          originX: cfx,
+          originY: cfy,
+          originZ: cfz,
+          phase: idx * 1.1
+        });
+      });
+
+      // 5. Detailed 3D Scuba Diver with Underwater Scooter
+      const diverGroup = new THREE.Group();
+      const suitMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.48 });
+      const tankMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.65, roughness: 0.28 });
+      const visorMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+
+      const dTorso = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.24, 0.28), suitMat);
+      dTorso.rotation.z = -0.25;
+      diverGroup.add(dTorso);
+
+      const dHead = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), suitMat);
+      dHead.position.set(-0.34, 0.12, 0);
+      diverGroup.add(dHead);
+
+      const dVisor = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.18), visorMat);
+      dVisor.position.set(-0.44, 0.12, 0);
+      diverGroup.add(dVisor);
+
+      // Oxygen Tank on back
+      const dTank = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.44, 10), tankMat);
+      dTank.rotation.z = Math.PI / 2 - 0.25;
+      dTank.position.set(-0.02, 0.19, 0);
+      diverGroup.add(dTank);
+
+      // Flippers
+      [-0.1, 0.1].forEach((fz) => {
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.09, 0.11), suitMat);
+        leg.position.set(0.42, -0.12, fz);
+        leg.rotation.z = 0.2;
+        diverGroup.add(leg);
+      });
+
+      diverGroup.position.set(7.6, -1.55, 8.75);
+      grp.add(diverGroup);
+      animatedEntities.diver = diverGroup;
+
+      // 6. Diverse Coral Reefs (Brain Corals, Branching Staghorn Corals & Anemones)
+      const coralSpecs = [
+        [0.4, -3.22, 9.2, 0xec4899, 0.55, 'brain'],
+        [1.15, -3.2, 9.1, 0x8b5cf6, 0.62, 'staghorn'],
+        [-0.5, -3.25, 9.15, 0x10b981, 0.5, 'brain'],
+        [4.25, -3.18, 9.1, 0xef4444, 0.68, 'staghorn'],
+        [9.1, -3.12, 8.9, 0xa855f7, 0.6, 'brain'],
+        [-1.8, -3.28, 9.1, 0x3b82f6, 0.52, 'brain']
+      ];
+      coralSpecs.forEach(([cx, cy, cz, cHex, cRadius, type]) => {
+        const coralMat = new THREE.MeshStandardMaterial({ color: cHex, roughness: 0.65 });
+        if (type === 'brain') {
+          const coral = new THREE.Mesh(new THREE.DodecahedronGeometry(cRadius, 1), coralMat);
+          coral.scale.y = 0.78;
+          coral.position.set(cx, cy, cz);
+          grp.add(coral);
+        } else {
+          // Branching staghorn coral cluster
+          const cluster = new THREE.Group();
+          for (let b = 0; b < 6; b++) {
+            const ang = (b / 6) * Math.PI * 2;
+            const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, cRadius * 1.4, 7), coralMat);
+            branch.position.set(Math.cos(ang) * 0.18, cRadius * 0.5, Math.sin(ang) * 0.18);
+            branch.rotation.z = Math.cos(ang) * 0.45;
+            branch.rotation.x = Math.sin(ang) * 0.45;
+            cluster.add(branch);
+          }
+          cluster.position.set(cx, cy - 0.15, cz);
+          grp.add(cluster);
+        }
+      });
+
+      // 7. Rising Underwater Bubbles
+      const bubbleGeo = new THREE.SphereGeometry(0.06, 8, 8);
+      const bubbleMat = new THREE.MeshBasicMaterial({
+        color: 0xe0f2fe,
+        transparent: true,
+        opacity: 0.68
+      });
+      for (let i = 0; i < 28; i++) {
+        const b = new THREE.Mesh(bubbleGeo, bubbleMat);
+        b.position.set(
+          -7.0 + Math.random() * 15.5,
+          -3.2 + Math.random() * 2.2,
+          2.5 + Math.random() * 6.8
+        );
+        grp.add(b);
+        animatedEntities.bubbles.push({
+          mesh: b,
+          speedY: 0.014 + Math.random() * 0.018,
+          minY: -3.2,
+          maxY: -0.9
+        });
+      }
+
+      tagBiomeMeshes(grp, 'ocean');
+    }
+
+    /* -------------------------------------------------------------------------
+       5.7 VOLUMETRIC CLOUDS & SOARING BIRD FLOCK HELPER
+       ------------------------------------------------------------------------- */
+    function createBirdFlock(parentGroup, centerX, centerY, centerZ, count, radius, colorHex) {
+      const flockPivot = new THREE.Group();
+      flockPivot.position.set(centerX, centerY, centerZ);
+      const birdMat = new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide });
+
+      for (let i = 0; i < count; i++) {
+        const bird = new THREE.Group();
+        const wingGeo = new THREE.BufferGeometry();
+        const vertices = new Float32Array([
+          0, 0, 0,
+          -0.22, 0.08, 0.06,
+          0, 0.02, 0.14,
+          0, 0, 0,
+          0.22, 0.08, 0.06,
+          0, 0.02, 0.14
+        ]);
+        wingGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+        const wingMesh = new THREE.Mesh(wingGeo, birdMat);
+        bird.add(wingMesh);
+
+        const angle = (i / count) * Math.PI * 2;
+        const r = radius * (0.45 + Math.random() * 0.65);
+        bird.position.set(
+          Math.cos(angle) * r,
+          (Math.random() - 0.5) * 1.1,
+          Math.sin(angle) * r
+        );
+        bird.rotation.y = -angle;
+        flockPivot.add(bird);
+      }
+
+      parentGroup.add(flockPivot);
+      animatedEntities.birds.push({
+        pivot: flockPivot,
+        speed: 0.25 + Math.random() * 0.15
+      });
+    }
+
+    function buildAtmosphericClouds() {
+      const cloudPositions = [
+        [-6.5, 5.2, -6.5, 1.1],
+        [0.5, 6.2, -7.2, 1.3],
+        [7.2, 4.9, -4.5, 1.0]
+      ];
+      const cloudMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.9,
+        transparent: true,
+        opacity: 0.82
+      });
+
+      cloudPositions.forEach(([cx, cy, cz, scale], idx) => {
+        const cloud = new THREE.Group();
+        [
+          [0, 0, 0, 0.95],
+          [-0.85, -0.15, 0.2, 0.72],
+          [0.85, -0.1, -0.15, 0.76],
+          [0.3, 0.35, 0.25, 0.65]
+        ].forEach(([px, py, pz, r]) => {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), cloudMat);
+          puff.scale.y = 0.65;
+          puff.position.set(px, py, pz);
+          cloud.add(puff);
+        });
+        cloud.position.set(cx, cy, cz);
+        cloud.scale.setScalar(scale);
+        worldRoot.add(cloud);
+        animatedEntities.clouds.push({
+          mesh: cloud,
+          baseX: cx,
+          phase: idx * 2.1
+        });
+      });
+    }
+
+    /* -------------------------------------------------------------------------
+       5.8 3D BIOME SELECTION HIGHLIGHT RING & HOLOGRAPHIC BOUNDARY
+       ------------------------------------------------------------------------- */
+    const BIOME_BOUNDS = {
+      rainforest: { center: new THREE.Vector3(1.8, 0.6, -4.2), size: new THREE.Vector3(7.6, 6.8, 9.2) },
+      desert:     { center: new THREE.Vector3(-5.0, 0.5, -4.4), size: new THREE.Vector3(10.2, 6.6, 11.2) },
+      savanna:    { center: new THREE.Vector3(7.6, 0.2, -3.2), size: new THREE.Vector3(5.0, 5.8, 9.8) },
+      tundra:     { center: new THREE.Vector3(-7.4, 0.8, 4.4), size: new THREE.Vector3(5.6, 6.2, 9.4) },
+      ocean:      { center: new THREE.Vector3(0.0, -2.1, 4.4), size: new THREE.Vector3(20.2, 3.4, 11.4) }
+    };
+
+    function buildSelectionHighlighter() {
+      const highlightGroup = new THREE.Group();
+
+      // Wireframe Bounding Box for Active Biome
+      const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+      const edgesGeo = new THREE.EdgesGeometry(boxGeo);
+      const edgesMat = new THREE.LineBasicMaterial({
+        color: 0x5df0a8,
+        transparent: true,
+        opacity: 0.85
+      });
+      const selectionBox = new THREE.LineSegments(edgesGeo, edgesMat);
+      highlightGroup.add(selectionBox);
+
+      // Pulsing Holographic Beacon Ring above the selected biome
+      const ringGeo = new THREE.RingGeometry(1.1, 1.38, 36);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x5df0a8,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.75
+      });
+      const selectionRing = new THREE.Mesh(ringGeo, ringMat);
+      highlightGroup.add(selectionRing);
+
+      worldRoot.add(highlightGroup);
+      animatedEntities.selectionBox = selectionBox;
+      animatedEntities.selectionRing = selectionRing;
+    }
+
+    // Build all 5 biomes & environment
+    buildGeologicalBase();
+    buildDesertBiome();
+    buildRainforestBiome();
+    buildSavannaBiome();
+    buildTundraBiome();
+    buildOceanBiome();
+    buildAtmosphericClouds();
+    buildSelectionHighlighter();
+
+    /* =========================================================================
+       6. FLOATING 3D HTML PINS & RAYCASTING SELECTION LOGIC
+       ========================================================================= */
+    const pinElements = {};
+
+    function createFloatingPins() {
+      pinsContainer.innerHTML = '';
+      Object.values(BIOME_DATA).forEach((biome, bIdx) => {
+        const pin = document.createElement('div');
+        pin.className = `biome-3d-pin ${biome.id === selectedBiomeId ? 'active' : ''}`;
+        pin.dataset.biome = biome.id;
+
+        const langObj = currentLang === 'id' ? biome.idData : biome.enData;
+        pin.innerHTML = `
+          <div class="pin-badge tp-glass px-2.5 py-1 rounded-xl flex items-center gap-1.5 border border-slate-700/80">
+            <span class="tp-f-dot" style="background:${biome.accentHex}"></span>
+            <span class="tp-f-num">${String(bIdx + 1).padStart(2, '0')}</span>
+            <span class="pin-label font-mono-tech text-[11px] font-medium text-white whitespace-nowrap">${langObj.short}</span>
+          </div>
+          <div class="pin-stem"></div>
+          <div class="pin-dot"></div>
+        `;
+
+        pin.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Toggle: klik pin bioma yang sama lagi → sembunyikan info
+          if (biome.id === selectedBiomeId) {
+            deselectBiome(true);
+          } else {
+            selectBiome(biome.id, true);
+          }
+        });
+
+        pinsContainer.appendChild(pin);
+        pinElements[biome.id] = pin;
+      });
+    }
+
+    function updateFloatingPinsProjection() {
+      if (!pinsVisible) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      const tempVec = new THREE.Vector3();
+
+      Object.values(BIOME_DATA).forEach((biome) => {
+        const pinEl = pinElements[biome.id];
+        if (!pinEl) return;
+
+        tempVec.copy(biome.pinPos);
+        tempVec.applyMatrix4(worldRoot.matrixWorld);
+        tempVec.project(camera);
+
+        const x = (tempVec.x * 0.5 + 0.5) * width;
+        const y = (-(tempVec.y * 0.5) + 0.5) * height;
+
+        if (tempVec.z > 1.0) {
+          pinEl.style.opacity = '0';
+          pinEl.style.pointerEvents = 'none';
+        } else {
+          pinEl.style.opacity = '1';
+          pinEl.style.pointerEvents = 'auto';
+          pinEl.style.left = `${x}px`;
+          pinEl.style.top = `${y}px`;
+        }
+      });
+    }
+
+    // Raycasting on 3D Canvas Click
+    const raycaster = new THREE.Raycaster();
+    const pointerDownPos = new THREE.Vector2();
+    const mouseNormalized = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos.set(e.clientX, e.clientY);
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moveDist > 6) return; // Ignore orbit drags
+
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouseNormalized.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseNormalized.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouseNormalized, camera);
+      const intersects = raycaster.intersectObjects(worldRoot.children, true);
+
+      for (const hit of intersects) {
+        const biomeId = hit.object.userData?.biomeId;
+        if (biomeId && BIOME_DATA[biomeId]) {
+          // Toggle: klik bioma yang sama lagi → sembunyikan info & kembali ke sudut default
+          if (biomeId === selectedBiomeId) {
+            deselectBiome(true);
+          } else {
+            selectBiome(biomeId, true);
+          }
+          break;
+        }
+      }
+    });
+
+    /* =========================================================================
+       7. BIOME SELECTION, HIGHLIGHTING & UI SYNCHRONIZATION
+       ========================================================================= */
+    function selectBiome(biomeId, focusCamera = true) {
+      if (!BIOME_DATA[biomeId]) return;
+      selectedBiomeId = biomeId;
+      const biome = BIOME_DATA[biomeId];
+      const bounds = BIOME_BOUNDS[biomeId];
+
+      // 1. Update 3D Bounding Highlight & Ring
+      if (animatedEntities.selectionBox && bounds) {
+        animatedEntities.selectionBox.visible = true;
+        animatedEntities.selectionBox.position.copy(bounds.center);
+        animatedEntities.selectionBox.scale.copy(bounds.size);
+        animatedEntities.selectionBox.material.color.setHex(biome.accentThree);
+      }
+      if (animatedEntities.selectionRing) {
+        animatedEntities.selectionRing.visible = true;
+        animatedEntities.selectionRing.position.set(
+          biome.pinPos.x,
+          biome.pinPos.y - 2.6,
+          biome.pinPos.z
+        );
+        animatedEntities.selectionRing.material.color.setHex(biome.accentThree);
+      }
+
+      // 2. Subtle Emissive Highlight on Selected Biome Meshes
+      Object.entries(biomeGroups).forEach(([key, grp]) => {
+        const isSelected = key === biomeId;
+        grp.traverse((child) => {
+          if (child.isMesh && child.material && 'emissive' in child.material) {
+            if (isSelected) {
+              child.material.emissive.setHex(biome.accentThree);
+              child.material.emissiveIntensity = 0.09;
+            } else {
+              child.material.emissiveIntensity = 0.0;
+            }
+          }
+        });
+      });
+
+      // 3. Smooth Camera Focus Shift
+      if (focusCamera) {
+        cameraGoalPos = biome.camPos.clone();
+        cameraGoalTarget = biome.camTarget.clone();
+      }
+
+      // 4. Update Bottom Biome Pills & Floating 3D Pins
+      document.querySelectorAll('.biome-pill').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.biome === biomeId);
+      });
+      Object.entries(pinElements).forEach(([id, el]) => {
+        el.classList.toggle('active', id === biomeId);
+      });
+
+      // 5. Update Right HUD Inspector Panel
+      renderInspectorPanel();
+
+      // 6. Pola BAB 01: inspector hanya tampil ketika bioma dipilih via interaksi pengguna
+      if (focusCamera) showInspector();
+    }
+
+    function renderInspectorPanel() {
+      const biome = BIOME_DATA[selectedBiomeId];
+      if (!biome) return; // tidak ada bioma dipilih (setelah deselect)
+      const data = currentLang === 'id' ? biome.idData : biome.enData;
+
+      document.getElementById('inspectorIconBox').textContent = (data.codeBadge.match(/\d+/) || [''])[0].padStart(2, '0');
+      const iconBox = document.getElementById('inspectorIconBox');
+      iconBox.style.color = biome.accentHex;
+      iconBox.style.backgroundColor = biome.accentHex + '1f';
+      iconBox.style.borderColor = biome.accentHex + '66';
+      document.getElementById('inspectorCodeBadge').textContent = data.codeBadge;
+      document.getElementById('inspectorCoordBadge').textContent = data.coordBadge;
+      document.getElementById('inspectorTitle').textContent = data.title;
+      document.getElementById('inspectorSummary').textContent = data.summary;
+
+      document.getElementById('inspectorTempVal').textContent = data.tempVal;
+      document.getElementById('inspectorRainVal').textContent = data.rainVal;
+      document.getElementById('inspectorNppVal').textContent = data.nppVal;
+
+      document.getElementById('inspectorClimateText').textContent = data.climate;
+      document.getElementById('inspectorVegetationText').textContent = data.vegetation;
+      document.getElementById('inspectorFaunaText').textContent = data.fauna;
+      document.getElementById('inspectorBioScore').textContent = data.bioScoreLabel;
+      document.getElementById('inspectorBiodiversityText').textContent = data.biodiversity;
+
+      const bioBar = document.getElementById('inspectorBioBar');
+      bioBar.style.width = `${biome.bioPercent}%`;
+    }
+
+    /* =========================================================================
+       8. RENDER SCIENTIFIC ARTICLE CARDS & COMPARISON MATRIX (BILINGUAL)
+       ========================================================================= */
+    function renderArticleDynamicSections() {
+      const dict = I18N[currentLang];
+      const cardsGrid = document.getElementById('articleBiomeCardsGrid');
+      const tableBody = document.getElementById('comparisonTableBody');
+
+      cardsGrid.innerHTML = '';
+      tableBody.innerHTML = '';
+
+      Object.values(BIOME_DATA).forEach((biome) => {
+        const d = currentLang === 'id' ? biome.idData : biome.enData;
+
+        // 1. Deep-Dive Biome Card
+        const card = document.createElement('article');
+        card.className = 'tp-glass tp-glass-interactive rounded-2xl p-5 flex flex-col justify-between gap-4';
+        card.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono-tech text-[10px] px-2.5 py-0.5 rounded bg-[#5df0a8]/10 text-[#5df0a8] border border-[#5df0a8]/40">
+                ${d.codeBadge}
+              </span>
+              <span class="font-mono-tech text-xs text-slate-400">${d.coordBadge}</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="biome-card-badge w-10 h-10 rounded-xl border flex items-center justify-center text-xs font-mono-tech font-medium" style="color:${biome.accentHex};background-color:${biome.accentHex}1f;border-color:${biome.accentHex}66">
+                ${(d.codeBadge.match(/\d+/) || [''])[0].padStart(2, '0')}
+              </div>
+              <h4 class="text-base sm:text-lg font-semibold text-white leading-snug">${d.title}</h4>
+            </div>
+
+            <p class="text-xs text-slate-300 leading-relaxed">${d.summary}</p>
+
+            <div class="space-y-1.5 pt-2 border-t border-slate-800/80 text-xs">
+              <div><strong class="text-sky-300">${dict.inspector.climateHeading}:</strong> <span class="text-slate-300">${d.climate}</span></div>
+              <div><strong class="text-[#5df0a8]">${dict.inspector.vegetationHeading}:</strong> <span class="text-slate-300">${d.vegetation}</span></div>
+              <div><strong class="text-amber-300">${dict.inspector.faunaHeading}:</strong> <span class="text-slate-300">${d.fauna}</span></div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+            <div class="font-mono-tech text-[11px] text-slate-400">
+              NPP: <span class="text-white font-semibold">${d.nppVal}</span>
+            </div>
+            <button type="button" data-focus-biome="${biome.id}" class="focus-3d-trigger px-3 py-1.5 rounded-xl text-xs font-mono-tech font-medium bg-[#5df0a8]/10 hover:bg-[#5df0a8]/20 text-[#5df0a8] border border-[#5df0a8]/40 transition flex items-center gap-1.5">
+              <span>${dict.hud.focus3DBtn}</span>
+            </button>
+          </div>
+        `;
+        cardsGrid.appendChild(card);
+
+        // 2. Quantitative Matrix Table Row
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition cursor-pointer';
+        tr.innerHTML = `
+          <td class="py-3.5 px-4 font-semibold text-white whitespace-nowrap">${d.short}</td>
+          <td class="py-3.5 px-4 font-mono-tech text-xs text-sky-300 whitespace-nowrap">${d.tempVal}</td>
+          <td class="py-3.5 px-4 font-mono-tech text-xs text-[#5df0a8] whitespace-nowrap">${d.rainVal}</td>
+          <td class="py-3.5 px-4 font-mono-tech text-xs text-amber-300 whitespace-nowrap">${d.nppVal}</td>
+          <td class="py-3.5 px-4 text-xs text-slate-300 min-w-[220px]">${d.soil}</td>
+          <td class="py-3.5 px-4 font-mono-tech text-xs text-slate-300 whitespace-nowrap">${d.bioScoreLabel}</td>
+        `;
+        tr.addEventListener('click', () => {
+          setArticleOverlay(false);
+          selectBiome(biome.id, true);
+        });
+        tableBody.appendChild(tr);
+      });
+
+      // Attach click listeners to "Fokus di 3D / Focus in 3D" buttons
+      document.querySelectorAll('.focus-3d-trigger').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetBiome = btn.getAttribute('data-focus-biome');
+          setArticleOverlay(false);
+          selectBiome(targetBiome, true);
+        });
+      });
+    }
+
+    /* =========================================================================
+       9. BILINGUAL TRANSLATION ENGINE (ID <-> EN)
+       ========================================================================= */
+    function applyLanguage(lang) {
+      currentLang = lang;
+      document.documentElement.lang = lang;
+
+      // Update Language Toggle Buttons (pola pill-group BAB 01)
+      const btnID = document.getElementById('langBtnID');
+      const btnEN = document.getElementById('langBtnEN');
+      btnID.classList.toggle('active', lang === 'id');
+      btnEN.classList.toggle('active', lang === 'en');
+
+      // Translate static [data-i18n] nodes
+      const dict = I18N[lang];
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const keyPath = el.getAttribute('data-i18n');
+        if (keyPath.startsWith('biomes.')) {
+          const parts = keyPath.split('.');
+          const bId = parts[1];
+          const bData = lang === 'id' ? BIOME_DATA[bId].idData : BIOME_DATA[bId].enData;
+          el.textContent = bData.short;
+          return;
+        }
+
+        const val = keyPath.split('.').reduce((acc, part) => acc && acc[part], dict);
+        if (val !== undefined) {
+          el.innerHTML = val;
+        }
+      });
+
+      // Update Pin Labels button text
+      const togglePinsSpan = document.querySelector('#togglePinsBtn span');
+      if (togglePinsSpan) {
+        togglePinsSpan.textContent = pinsVisible ? dict.hud.togglePinsOn : dict.hud.togglePinsOff;
+      }
+
+      // Re-render 3D Pins, Inspector Panel, and Scientific Article Cards/Table
+      createFloatingPins();
+      renderInspectorPanel();
+      renderArticleDynamicSections();
+    }
+
+    /* =========================================================================
+       10. UI EVENT LISTENERS
+       ========================================================================= */
+    document.getElementById('langBtnID').addEventListener('click', () => applyLanguage('id'));
+    document.getElementById('langBtnEN').addEventListener('click', () => applyLanguage('en'));
+
+    // Bottom Biome Selector Pills — klik bioma aktif lagi = sembunyikan info (toggle)
+    document.querySelectorAll('.biome-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.biome === selectedBiomeId) {
+          deselectBiome(true);
+        } else {
+          selectBiome(btn.dataset.biome, true);
+        }
+      });
+    });
+
+    /**
+     * Mengosongkan seleksi bioma: highlight 3D dimatikan, pill dinetralkan,
+     * inspector disembunyikan, dan kamera kembali ke sudut default.
+     */
+    function deselectBiome(resetCam = true) {
+      selectedBiomeId = null;
+      if (animatedEntities.selectionBox) animatedEntities.selectionBox.visible = false;
+      if (animatedEntities.selectionRing) animatedEntities.selectionRing.visible = false;
+      Object.values(biomeGroups).forEach((grp) => {
+        grp.traverse((child) => {
+          if (child.isMesh && child.material && 'emissive' in child.material) {
+            child.material.emissiveIntensity = 0.0;
+          }
+        });
+      });
+      document.querySelectorAll('.biome-pill').forEach((b) => b.classList.remove('active'));
+      Object.values(pinElements).forEach((el) => el.classList.remove('active'));
+      hideInspector();
+      if (resetCam) {
+        cameraGoalPos = DEFAULT_CAM_POS.clone();
+        cameraGoalTarget = DEFAULT_CAM_TARGET.clone();
+      }
+    }
+
+    // Auto-Rotate Toggle
+    const toggleAutoRotateBtn = document.getElementById('toggleAutoRotateBtn');
+    toggleAutoRotateBtn.addEventListener('click', () => {
+      autoRotateEnabled = !autoRotateEnabled;
+      toggleAutoRotateBtn.classList.toggle('active', autoRotateEnabled);
+    });
+
+    // Toggle 3D Floating Pins
+    const togglePinsBtn = document.getElementById('togglePinsBtn');
+    togglePinsBtn.addEventListener('click', () => {
+      pinsVisible = !pinsVisible;
+      pinsContainer.style.display = pinsVisible ? 'block' : 'none';
+      togglePinsBtn.classList.toggle('active', pinsVisible);
+      const dict = I18N[currentLang];
+      togglePinsBtn.querySelector('span').textContent = pinsVisible
+        ? dict.hud.togglePinsOn
+        : dict.hud.togglePinsOff;
+    });
+
+    // Reset Camera View
+    document.getElementById('resetCameraBtn').addEventListener('click', () => {
+      cameraGoalPos = DEFAULT_CAM_POS.clone();
+      cameraGoalTarget = DEFAULT_CAM_TARGET.clone();
+    });
+
+    // Mobile Inspector Collapse Toggle
+    const inspectorBody = document.getElementById('inspectorBodyContent');
+    document.getElementById('toggleInspectorCollapseBtn').addEventListener('click', () => {
+      inspectorBody.classList.toggle('hidden');
+    });
+
+    // ===== Mode app-like BAB 01: overlay artikel + inspector tersembunyi sampai diklik =====
+    const articleOverlayEl = document.getElementById('articleOverlay');
+    const biomeInfoCardEl = document.getElementById('biomeInfoCard');
+
+    function setArticleOverlay(open) {
+      articleOverlayEl.classList.toggle('open', open);
+      articleOverlayEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+      document.body.classList.toggle('article-overlay-open', open);
+    }
+
+    function showInspector() {
+      biomeInfoCardEl.classList.add('open');
+    }
+
+    function hideInspector() {
+      biomeInfoCardEl.classList.remove('open');
+    }
+
+    document.getElementById('openArticleOverlayBtn').addEventListener('click', () => setArticleOverlay(true));
+    document.getElementById('closeArticleOverlayBtn').addEventListener('click', () => setArticleOverlay(false));
+    articleOverlayEl.querySelector('.cap-backdrop').addEventListener('click', () => setArticleOverlay(false));
+    document.getElementById('inspectorCloseBtn').addEventListener('click', hideInspector);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (articleOverlayEl.classList.contains('open')) {
+          setArticleOverlay(false);
+        } else if (biomeInfoCardEl.classList.contains('open')) {
+          hideInspector();
+        }
+      }
+    });
+
+    // Close Modal Button: keluar kembali ke halaman utama TerraPedia
+    document.getElementById('closeArticleModalBtn').addEventListener('click', () => {
+      window.location.href = 'terrapedia.html';
+    });
+
+    // Responsive Resize Handler
+    window.addEventListener('resize', () => {
+      if (!container) return;
+      applyCameraViewOffset();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    /* =========================================================================
+       11. MAIN ANIMATION LOOP (TREES, FAUNA, WATER, PARTICLES & CAMERA)
+       ========================================================================= */
+    const clock = new THREE.Clock();
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
+    const fpsEl = document.getElementById('fpsCounter');
+
+    // Store initial water surface vertex Y coords
+    const waterPosAttr = animatedEntities.waterSurfaceMesh.geometry.attributes.position;
+    const waterBaseZ = new Float32Array(waterPosAttr.count);
+    for (let i = 0; i < waterPosAttr.count; i++) {
+      waterBaseZ[i] = waterPosAttr.getY(i);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+
+      // Starfield twinkle (pola BAB 01)
+      starMat.uniforms.uTime.value = elapsed;
+
+      // FPS Telemetry
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsUpdate >= 1000) {
+        if (fpsEl) fpsEl.textContent = `${frameCount} FPS`;
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      // 1. Gentle Turntable Rotation when Auto-Rotate is active & not mid-transition
+      if (autoRotateEnabled && !cameraGoalPos) {
+        worldRoot.rotation.y += 0.0018;
+      }
+
+      // 2. Smooth Camera Focus Interpolation
+      if (cameraGoalPos && cameraGoalTarget) {
+        camera.position.lerp(cameraGoalPos, 0.06);
+        controls.target.lerp(cameraGoalTarget, 0.06);
+        if (camera.position.distanceTo(cameraGoalPos) < 0.15) {
+          cameraGoalPos = null;
+          cameraGoalTarget = null;
+        }
+      }
+
+      // 3. Swaying Trees, Cacti, Palms & Savanna Grass
+      animatedEntities.trees.forEach((item) => {
+        item.mesh.rotation.z = item.baseRotZ + Math.sin(elapsed * item.speed + item.phase) * item.amp;
+      });
+
+      // 4. Circling Bird Flocks above Rainforest, Desert, and Savanna
+      animatedEntities.birds.forEach((flock) => {
+        flock.pivot.rotation.y += flock.speed * 0.015;
+        flock.pivot.position.y += Math.sin(elapsed * 1.5) * 0.002;
+      });
+
+      // 5. Waterfall Cascading Droplets
+      animatedEntities.waterfallDrops.forEach((d) => {
+        d.mesh.position.y -= d.speed;
+        if (d.mesh.position.y < d.minY) {
+          d.mesh.position.y = d.maxY;
+        }
+      });
+
+      // 6. Tundra Snowfall Particles
+      animatedEntities.snowFlakes.forEach((s) => {
+        s.mesh.position.y -= s.speedY;
+        s.mesh.position.x += Math.sin(elapsed * 1.8 + s.driftPhase) * 0.006;
+        if (s.mesh.position.y < s.minY) {
+          s.mesh.position.y = s.maxY;
+        }
+      });
+
+      // 7. Rising Ocean Bubbles
+      animatedEntities.bubbles.forEach((b) => {
+        b.mesh.position.y += b.speedY;
+        if (b.mesh.position.y > b.maxY) {
+          b.mesh.position.y = b.minY;
+        }
+      });
+
+      // 7b. Articulated Desert Camel Walking Stride
+      animatedEntities.camelLegs.forEach((leg) => {
+        leg.pivot.rotation.z = Math.sin(elapsed * 2.4 + leg.phase) * 0.24;
+      });
+
+      // 8. Articulated Savanna Giraffe Neck Grazing Motion
+      if (animatedEntities.giraffeNeck) {
+        animatedEntities.giraffeNeck.rotation.x = Math.sin(elapsed * 1.1) * 0.09;
+        animatedEntities.giraffeNeck.rotation.z = Math.cos(elapsed * 0.8) * 0.05;
+      }
+
+      // 9. Polar Bear Swimming & Bobbing in Arctic Channel
+      if (animatedEntities.polarBearSwim) {
+        animatedEntities.polarBearSwim.position.y = -2.0 + Math.sin(elapsed * 1.8) * 0.14;
+        animatedEntities.polarBearSwim.rotation.z = Math.sin(elapsed * 1.4) * 0.06;
+      }
+
+      // 10. Shark Sinusoidal Cruising & Tail Fin Propulsion
+      if (animatedEntities.shark) {
+        const sh = animatedEntities.shark;
+        sh.tail.rotation.y = Math.sin(elapsed * 5.2) * 0.35;
+        sh.group.position.x = sh.baseX + Math.sin(elapsed * 0.75) * 0.85;
+        sh.group.position.y = sh.baseY + Math.cos(elapsed * 1.2) * 0.12;
+        sh.group.rotation.y = 0.18 + Math.cos(elapsed * 0.75) * 0.14;
+      }
+
+      // 11. School of Tropical Reef Fish & Cold Arctic Fish
+      animatedEntities.fishSchool.forEach((f) => {
+        f.mesh.position.x = f.originX + Math.sin(elapsed * 2.2 + f.phase) * 0.28;
+        f.mesh.position.y = f.originY + Math.cos(elapsed * 2.8 + f.phase) * 0.09;
+      });
+
+      // 12. Scuba Diver Hovering Motion
+      if (animatedEntities.diver) {
+        animatedEntities.diver.position.y = -1.55 + Math.sin(elapsed * 1.6) * 0.12;
+        animatedEntities.diver.rotation.z = Math.sin(elapsed * 1.2) * 0.05;
+      }
+
+      // 13. Drifting Volumetric Clouds
+      animatedEntities.clouds.forEach((c) => {
+        c.mesh.position.x = c.baseX + Math.sin(elapsed * 0.35 + c.phase) * 0.55;
+      });
+
+      // 14. Undulating Ocean Surface Waves
+      for (let i = 0; i < waterPosAttr.count; i++) {
+        const vx = waterPosAttr.getX(i);
+        const vz = waterPosAttr.getZ(i);
+        const wave = Math.sin(vx * 0.55 + elapsed * 2.1) * 0.06 + Math.cos(vz * 0.65 + elapsed * 1.7) * 0.05;
+        waterPosAttr.setY(i, wave);
+      }
+      waterPosAttr.needsUpdate = true;
+
+      // 15. Pulsing Selection Beacon Ring
+      if (animatedEntities.selectionRing) {
+        const pulse = 1 + Math.sin(elapsed * 3.5) * 0.12;
+        animatedEntities.selectionRing.scale.set(pulse, pulse, 1);
+        animatedEntities.selectionRing.rotation.z = elapsed * 0.6;
+      }
+
+      controls.update();
+      updateFloatingPinsProjection();
+      renderer.render(scene, camera);
+    }
+
+    // Boot Application
+    window.onload = () => {
+      applyLanguage('id');
+      selectBiome('rainforest', false);
+      animate();
+    };
+  </script>
+  <script>
+    // Toggle bilah navigasi samping (sidebar) — sembunyikan / tampilkan
+    (function () {
+      var btn = document.getElementById('navHandleBtn');
+      if (!btn) return;
+      var root = document.documentElement;
+      function apply(closed) {
+        root.classList.toggle('nav-closed', closed);
+        btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+        btn.setAttribute('aria-label', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        btn.setAttribute('title', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+      }
+      var stored = null;
+      try { stored = localStorage.getItem('tpNavClosed'); } catch (e) { }
+      // Mobile (≤900px): drawer selalu mulai tertutup agar 3D terlihat penuh
+      var isMobileNav = window.matchMedia('(max-width:900px)').matches;
+      if (isMobileNav || stored === '1') apply(true);
+      btn.addEventListener('click', function () {
+        var closed = !root.classList.contains('nav-closed');
+        apply(closed);
+        try { localStorage.setItem('tpNavClosed', closed ? '1' : '0'); } catch (e) { }
+      });
+    })();
+  </script>
+  <script>
+    // (c) Roda scroll mouse menggeser bilah navbar horizontal (bukan hanya trackpad)
+    (function () {
+      document.addEventListener('wheel', function (e) {
+        var el = e.target instanceof Element ? e.target : null;
+        while (el && el !== document.documentElement) {
+          var cs = getComputedStyle(el);
+          if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              e.preventDefault();
+              el.scrollLeft += e.deltaY;
+            }
+            return;
+          }
+          el = el.parentElement;
+        }
+      }, { passive: false, capture: true });
+    })();
+  </script>
+</body>
+</html>

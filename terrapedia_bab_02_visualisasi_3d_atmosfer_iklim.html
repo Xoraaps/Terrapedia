@@ -1,0 +1,2930 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>TerraPedia - BAB 02: Atmosfer &amp; Iklim (3D Floating HUD)</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono sesuai identitas visual TerraPedia -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS untuk utilitas layout responsif -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            terra: {
+              bg: '#050811',
+              surface: '#0b1220',
+              accent: '#5df0a8',
+              accentDim: 'rgba(93, 240, 168, 0.14)',
+              border: 'rgba(255, 255, 255, 0.08)',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Importmap Three.js v0.143.0 sesuai spesifikasi project utama TerraPedia -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.143.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.143.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    /* TerraPedia BAB 02 — arah: observatorium malam + atlas ilmiah (sama dengan BAB 01).
+       Chrome tenang: permukaan gelap bersih, hairline, satu aksen aurora.
+       Kekayaan warna hanya hidup di diorama 3D. Signature: kelompeng skala. */
+    :root{
+      --tp-bg-deep:#050811;
+      --surface:rgba(12,18,30,.92);
+      --surface-2:rgba(17,24,40,.94);
+      --tp-accent:#5df0a8;
+      --tp-border:rgba(255,255,255,.08);
+      --tp-border-strong:rgba(255,255,255,.16);
+      --tp-text-main:#f1f5f9;
+      --tp-text-body:#cbd5e1;
+      --tp-text-muted:#94a3b8;
+      --amber:#fbbf24;
+      --shadow-float:0 12px 32px rgba(0,0,0,.38);
+      --radius-lg:16px;
+      --radius-md:12px;
+      --radius-sm:8px;
+      --font:'Inter',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent;-webkit-tap-highlight-color:transparent}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24)}
+    button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+    html,body{height:100%}
+    html{overflow:hidden}
+    body{background:var(--tp-bg-deep);color:var(--tp-text-main);font-family:var(--font);overflow:hidden}
+
+    /* Kanvas 3D layar penuh (pola BAB 01) */
+    #atmosphereCanvas{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block;cursor:grab;z-index:0;touch-action:none}
+    #atmosphereCanvas:active{cursor:grabbing}
+
+    /* Overlay label 3D terproyeksi: fixed di atas kanvas, di bawah HUD */
+    #labelsOverlayContainer{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+
+    /* Floating HUD shell (struktur kontainer sama persis dengan BAB 01) */
+    .ui-shell{position:fixed;inset:0;pointer-events:none;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
+    .top-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+    .brand-pill{pointer-events:auto;display:inline-flex;align-items:center;gap:12px;padding:8px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .brand-mark{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--tp-accent);font-size:12px;background:rgba(93,240,168,.1);border:1px solid rgba(93,240,168,.35);flex:none}
+    .brand-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .brand-title{font-weight:600;font-size:13px;letter-spacing:-.01em;color:#fff;white-space:nowrap}
+    .brand-sub{font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .brand-chapter{font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .top-controls{pointer-events:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .cam-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:var(--surface-2);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .cam-btn:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+    .cam-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .pill-group{display:inline-flex;gap:2px;padding:4px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .pill-group button{padding:4px 10px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--tp-text-muted);border:1px solid transparent;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .pill-group button:hover{color:#fff}
+    .pill-group button.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .exit-btn{width:32px;height:32px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--surface-2);border:1px solid var(--tp-border);color:var(--tp-text-muted);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .exit-btn:hover{color:#fda4af;background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35)}
+    .exit-btn svg{width:15px;height:15px;display:block}
+    /* Tombol ✕ berputar 90° saat hover (nicety dari versi modal) */
+    #closeArticleModal svg{transition:transform .2s ease}
+    #closeArticleModal:hover svg,#closeArticleModal:focus-visible svg{transform:rotate(90deg)}
+
+    .touch-prompt{align-self:center;margin-top:26px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--tp-text-body);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .prompt-dot{width:8px;height:8px;border-radius:9999px;background:var(--tp-accent);flex:none}
+
+    /* Dock melayang terpusat tengah bawah (pola bottom-dock BAB 01) */
+    .bottom-dock{pointer-events:auto;align-self:center;width:fit-content;max-width:90vw;background:var(--surface);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:12px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-float);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .layer-pills{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 3px;cursor:grab}
+    .layer-pills.dragging{cursor:grabbing}
+    .layer-pills::-webkit-scrollbar{display:none;width:0;height:0}
+
+    .layer-pill-btn{flex:0 0 auto;touch-action:pan-x;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);white-space:nowrap;font-size:12px;font-weight:500;color:var(--tp-text-body);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .layer-pill-btn:hover{color:#fff;background:rgba(255,255,255,.08);border-color:var(--tp-border-strong)}
+    .layer-pill-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .layer-pill-btn .swatch{width:8px;height:8px;border-radius:9999px;flex-shrink:0}
+
+    .controls-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .toggle-row{display:flex;gap:6px;flex-wrap:wrap}
+    .scene-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .scene-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .scene-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .scene-btn-neutral{color:var(--tp-text-body);background:rgba(255,255,255,.05);border-color:var(--tp-border)}
+    .scene-btn-neutral:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+
+    .chapter-nav-row{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .chapter-next-card{display:inline-flex;align-items:center;gap:10px;max-width:100%;padding:6px 8px 6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.04);border:1px solid var(--tp-border);text-decoration:none;transition:border-color .18s ease,background-color .18s ease}
+    .chapter-next-card:hover{border-color:rgba(93,240,168,.4);background:rgba(93,240,168,.06)}
+    .chapter-next-text{display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+    .chapter-next-card.is-prev .chapter-next-text{align-items:flex-start}
+    .chapter-next-label{font-family:var(--font-mono);font-size:9px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .chapter-next-title{font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .18s ease}
+    .chapter-next-card:hover .chapter-next-title{color:var(--tp-accent)}
+    .chapter-next-arrow{width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .chapter-next-card:hover .chapter-next-arrow{color:var(--tp-accent);background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.4)}
+
+    /* Permukaan kartu artikel (dipakai konten di dalam #articleOverlay) */
+    .tp-glass{background:var(--surface);border:1px solid var(--tp-border)}
+    .tp-glass-card{background:var(--surface-2);border:1px solid var(--tp-border);transition:border-color 0.18s ease,background-color 0.18s ease}
+    .tp-glass-card:hover{border-color:var(--tp-border-strong)}
+    .tp-glass-card.is-active{border-color:rgba(93,240,168,0.45);background:rgba(93,240,168,0.05)}
+
+    /* Label 3D terproyeksi dari world space */
+    .tp-3d-label{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:500;color:#f8fafc;background:rgba(8,14,26,0.92);border:1px solid rgba(255,255,255,0.16);box-shadow:var(--shadow-float);transition:border-color 0.18s ease,background-color 0.18s ease,opacity 0.2s ease;white-space:nowrap;z-index:12}
+    .tp-3d-label:hover{border-color:rgba(93,240,168,0.45);background:rgba(13,25,43,0.95)}
+    .tp-3d-label.is-selected{border-color:rgba(93,240,168,0.5);background:rgba(93,240,168,0.1);color:var(--tp-accent)}
+    .tp-3d-label.is-hidden{opacity:0;pointer-events:none}
+
+    /* Layer stack referensi vertikal di dalam artikel */
+    .tp-stack-slab{position:relative;transition:border-color 0.18s ease,background-color 0.18s ease;cursor:pointer}
+    .tp-stack-slab:hover{border-color:var(--tp-border-strong) !important}
+    .tp-stack-slab.active-slab{border-color:rgba(93,240,168,0.55) !important;box-shadow:inset 0 1px 0 rgba(255,255,255,0.08)}
+
+    /* --- Panel detail lapisan: popup samping kanan (pola info-popup BAB 01) --- */
+    #selectedLayerPanel{position:fixed;right:16px;top:96px;width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 230px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;z-index:45;background:var(--surface-2);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:16px 16px 16px 24px;box-shadow:var(--shadow-float);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px);transition:opacity .26s ease,transform .26s ease,visibility .26s;user-select:text}
+    /* Signature: kelompeng skala di tepi kiri panel (sama dengan BAB 01) */
+    #selectedLayerPanel::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border-strong) 0 1px,transparent 1px 8px);pointer-events:none}
+    #selectedLayerPanel.open{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+    #layerSheetCloseBtn{position:absolute;top:10px;right:12px;width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:15px;z-index:5;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    #layerSheetCloseBtn:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+
+    /* --- Overlay artikel: drawer kanan desktop, sheet layar penuh pada mobile --- */
+    #articleOverlay{position:fixed;inset:0;z-index:60;pointer-events:none}
+    #articleOverlay.open{pointer-events:auto}
+    .cap-backdrop{position:absolute;inset:0;background:rgba(3,6,12,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .3s ease}
+    #articleOverlay.open .cap-backdrop{opacity:1}
+    .cap-panel{position:absolute;top:0;right:0;bottom:0;width:min(760px,52vw);display:flex;flex-direction:column;background:var(--surface-2);border-left:1px solid var(--tp-border);box-shadow:-25px 0 60px -18px rgba(0,0,0,.8);transform:translateX(103%);visibility:hidden;transition:transform .34s cubic-bezier(.16,1,.3,1),visibility .34s}
+    /* Signature: kelompeng skala di tepi kiri drawer artikel (sama dengan panel inspeksi BAB 01) */
+    .cap-panel::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border-strong) 0 1px,transparent 1px 8px);pointer-events:none;z-index:5}
+    #articleOverlay.open .cap-panel{transform:translateX(0);visibility:visible}
+    .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--tp-border);background:rgba(7,12,24,.9)}
+    .cap-eyebrow{display:block;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-muted);white-space:nowrap}
+    .cap-title{font-size:13px;font-weight:600;color:#fff;margin-top:6px;line-height:1.35}
+    .cap-close{width:32px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cap-close:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+    .cap-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:1.5rem}
+    .cap-body main,.cap-body aside{width:100% !important;max-width:none !important;margin:0 !important}
+
+    /* Toast status non-intrusif: fixed top-center di atas seluruh HUD */
+    #modalToast{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--radius-md);background:var(--surface-2);border:1px solid rgba(93,240,168,.4);color:var(--tp-text-body);font-size:12px;box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);pointer-events:none;max-width:90vw}
+    #modalToast.hidden{display:none}
+
+    @media (max-width:720px){
+      .brand-sub{display:none}
+      #selectedLayerPanel{left:12px;right:12px;top:58px;width:auto;max-height:46dvh;padding-left:20px}
+      #selectedLayerPanel::before{left:6px}
+      /* Shell & safe-area (perangkat berponi/notch) */
+      .ui-shell{padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      /* Bilah atas lebih ramping */
+      .brand-pill{padding:6px 10px;gap:8px}
+      .brand-mark{width:26px;height:26px;border-radius:8px}
+      .brand-title{font-size:12px}
+      .brand-chapter{font-size:9px}
+      .cam-btn{padding:5px 9px;font-size:11px}
+      .pill-group button{padding:4px 8px;font-size:10px}
+      .exit-btn{width:30px;height:30px}
+      .touch-prompt{font-size:10px;padding:5px 11px}
+      /* Dock bawah lebih ringkas */
+      .bottom-dock{max-width:calc(100vw - 24px);padding:8px 12px;gap:6px}
+      .layer-pill-btn{padding:4px 9px;font-size:11px}
+      .scene-btn{padding:4px 8px;font-size:11px}
+      .controls-row{gap:8px;padding-top:6px}
+      .chapter-next-card{padding:5px 6px 5px 10px}
+      .chapter-next-title{max-width:190px;font-size:11.5px}
+      .chapter-next-arrow{width:22px;height:22px}
+    }
+    @media (max-width:380px){
+      .top-controls{gap:4px}
+      .cam-btn{padding:4px 7px;font-size:10.5px}
+      .pill-group button{padding:4px 6px}
+      .brand-chapter{max-width:150px}
+      .chapter-next-title{max-width:140px;font-size:11px}
+      .scene-btn{padding:4px 6px;font-size:10.5px}
+      .layer-pill-btn{padding:4px 7px;font-size:10.5px}
+      #selectedLayerPanel{max-height:52dvh;padding:12px;padding-left:20px}
+      #selectedLayerPanel::before{left:5px}
+    }
+    @media (max-width:640px){
+      .cap-panel{width:100%;left:0;right:0;top:auto;height:92dvh;border-left:none;border-top:1px solid var(--tp-border);border-radius:18px 18px 0 0;transform:translateY(104%);box-shadow:0 -25px 60px -18px rgba(0,0,0,.8)}
+      #articleOverlay.open .cap-panel{transform:translateY(0)}
+      .cap-body{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+    }
+    @media (prefers-reduced-motion:reduce){
+      #selectedLayerPanel,.cap-panel,.cap-backdrop,.touch-prompt{transition:none}
+    }
+  </style>
+<style id="tpNavStyle">
+    /* ====== TerraPedia NAV: bilah navigasi menjadi sidebar kiri penuh + tombol navbar ====== */
+    :root{--tp-nav-w:min(280px,86vw)}
+    .ui-shell .bottom-dock{
+      position:fixed;top:0;bottom:0;left:0;z-index:30;
+      width:var(--tp-nav-w);max-width:86vw;height:auto;max-height:none;
+      border-width:0 1px 0 0;border-radius:0 18px 18px 0;
+      overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+      padding:20px 14px calc(16px + env(safe-area-inset-bottom,0px));
+      transition:left .34s cubic-bezier(.22,.7,.2,1),visibility .34s;
+    }
+    html.nav-closed .ui-shell .bottom-dock{left:calc(-1 * var(--tp-nav-w));visibility:hidden}
+
+    /* Tombol navbar (handle) menempel di tepi kanan sidebar */
+    .nav-handle{position:fixed;top:50%;left:var(--tp-nav-w);transform:translateY(-50%);margin-left:-1px;z-index:41;width:26px;height:52px;display:inline-flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;color:var(--tp-text-muted);background:var(--surface);border:1px solid var(--tp-border);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 18px -10px rgba(0,0,0,.65);transition:left .34s cubic-bezier(.22,.7,.2,1),color .18s ease,background-color .18s ease}
+    .nav-handle:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .nav-handle svg{width:14px;height:14px;pointer-events:none}
+    .nav-handle .ic-open{display:none}
+    html.nav-closed .nav-handle{left:0}
+    html.nav-closed .nav-handle .ic-close{display:none}
+    html.nav-closed .nav-handle .ic-open{display:block}
+    .nav-handle:focus-visible{outline:2px solid rgba(93,240,168,.7);outline-offset:1px}
+
+    /* Kartu navigasi bab: fixed di ujung kiri & kanan viewport (di luar dock) */
+    .tp-nav-card{position:fixed;bottom:16px;z-index:40;pointer-events:auto;width:auto;max-width:min(330px,38vw)}
+    .tp-nav-card.tp-card-next{right:16px;transition:opacity .25s ease,visibility .25s}
+    .tp-nav-card.tp-card-prev{left:16px}
+
+    /* HUD atas (brand & bar petunjuk) mengambang di atas sidebar — tidak pernah bergeser */
+    .ui-shell .top-bar .brand-pill{position:relative;z-index:45}
+    .ui-shell .touch-prompt{position:relative;z-index:45}
+    /* (b) Ketinggian dock di desktop: isi naik, ruang kosong atas berkurang */
+    @media (min-width:901px){
+      .ui-shell .bottom-dock{padding-top:24px}
+    }
+
+    /* (e) Struktur item navbar seragam: lingkaran warna + nomor + nama */
+    .tp-pill-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-pill-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-text-muted,#94a3b8);flex:none}
+    button.active .tp-pill-num{color:inherit}
+
+    /* (d) Struktur floating text seragam: lingkaran warna + nomor + nama */
+    .tp-f-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-f-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-accent,#5df0a8);flex:none}
+
+    /* Tagline di area atas dock navigasi */
+    .tp-dock-tagline{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--tp-text-body,#cbd5e1);padding:0 2px 2px;white-space:nowrap}
+    .tp-dock-tagline::before{content:'';width:6px;height:6px;border-radius:9999px;background:var(--tp-accent,#5df0a8);box-shadow:0 0 0 3px rgba(93,240,168,.14);flex:none}
+    .tp-dock-tagline::after{content:'';height:1px;flex:1;min-width:12px;background:linear-gradient(90deg,rgba(93,240,168,.28),transparent)}
+
+    /* Mobile: sidebar menjadi drawer overlay */
+    @media (max-width:900px){
+      html:not(.nav-closed) .ui-shell .bottom-dock{box-shadow:18px 0 50px -18px rgba(0,0,0,.78)}
+      html:not(.nav-closed) .tp-card-prev{opacity:0;visibility:hidden;pointer-events:none}
+    }
+    @media (max-width:640px){
+      .tp-nav-card{max-width:calc(50vw - 24px)}
+      /* Judul kartu navigasi harus menyusut mengikuti kartu (anti tabrakan) */
+      .tp-nav-card .chapter-next-text{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden}
+      .tp-nav-card .chapter-next-title{max-width:100%}
+      .tp-nav-card .chapter-next-label{overflow:hidden;text-overflow:ellipsis}
+      .nav-handle{width:24px;height:44px}
+    }
+    @media (max-width:720px){
+      /* Pill brand compact (brand-sub disembunyikan) -> padding atas lebih pendek */
+      .ui-shell .bottom-dock{padding-top:16px}
+    }
+    /* ====== Mobile UX: target sentuh, scrim drawer, keterbacaan ====== */
+    @media (max-width:720px){
+      /* Tap target min 40px (pedoman iOS HIG / Material Design) */
+      #openArticleOverlayBtn{min-height:42px;padding-top:9px;padding-bottom:9px}
+      .cap-close{width:42px !important;height:42px !important;font-size:16px !important}
+      button[id*="lose" i],#exitModuleBtn{min-width:40px;min-height:40px}
+      button[id*="ang" i],button[data-lang]{min-width:42px;min-height:36px}
+      /* Area sentuh handle navigasi diperluas tanpa mengubah tampilan */
+      .nav-handle{overflow:visible}
+      .nav-handle::before{content:'';position:absolute;inset:-12px -14px}
+      /* Item di dalam drawer lebih nyaman disentuh */
+      .ui-shell .bottom-dock button{min-height:38px}
+      /* Judul & padding overlay artikel di layar sempit */
+      .cap-title{font-size:16px}
+      .cap-body{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+      /* Perluas area sentuh pin/label 3D (posisi visual tidak berubah) */
+      #tp3dLabels .tp-layer-label::before,
+      #labelsOverlayContainer .tp-3d-label::before,
+      #floatingPinsContainer .biome-3d-pin::before,
+      #hudPinsContainer .hud-pin::before,
+      #hotspotLayer .hotspot-pin::before{content:'';position:absolute;inset:-9px}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .ui-shell .bottom-dock,.nav-handle,.tp-nav-card{transition:none}
+    }
+  </style>
+</head>
+<body>
+  <!-- KANVAS 3D LAYAR PENUH (pola BAB 01): fixed inset-0, di bawah seluruh HUD -->
+  <canvas id="atmosphereCanvas" aria-label="Model 3D Planet Bumi dan 5 Lapisan Atmosfer"></canvas>
+
+  <!-- Container untuk Label 3D Terproyeksi (overlay fixed, koordinat = viewport window) -->
+  <div id="labelsOverlayContainer"></div>
+
+  <!-- PANEL INFORMASI LAPISAN YANG DIPILIH (popup samping, pola info-popup BAB 01) -->
+  <aside id="selectedLayerPanel">
+    <button id="layerSheetCloseBtn" type="button" aria-label="Tutup panel lapisan" title="Tutup panel lapisan (Esc)">✕</button>
+    <div class="flex flex-col gap-3 pb-3 border-b border-white/10">
+      <div class="flex items-start gap-3">
+        <div id="detailColorBadge" class="w-10 h-10 rounded-xl flex items-center justify-center text-base font-medium font-mono shrink-0 border border-[#8be8ff]/50 bg-[#8be8ff]/10 text-[#8be8ff]">
+          01
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span id="detailLayerTag" class="text-[11px] font-mono px-2 py-0.5 rounded bg-[#5df0a8]/10 text-[#5df0a8] border border-[#5df0a8]/40">
+              LAPISAN 01 • TERENDAH &amp; TERPADAT
+            </span>
+            <span id="detailEnglishName" class="text-xs font-mono text-slate-400">TROPOSPHERE</span>
+          </div>
+          <h3 id="detailLayerTitle" class="text-base font-semibold text-white mt-1 leading-snug">
+            Troposfer — Lapisan Cuaca &amp; Biosfer
+          </h3>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnPrevLayer" type="button" data-i18n="detail.prevLayerBtn" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-200 transition">
+          ← Lapisan Bawah
+        </button>
+        <button id="btnNextLayer" type="button" data-i18n="detail.nextLayerBtn" class="px-3 py-1.5 rounded-lg bg-[#5df0a8]/15 hover:bg-[#5df0a8]/25 border border-[#5df0a8]/40 text-xs font-medium text-[#5df0a8] transition">
+          Lapisan Atas →
+        </button>
+      </div>
+    </div>
+
+    <!-- Metrik Telemetri Lapisan -->
+    <div class="grid grid-cols-2 gap-2.5 my-3">
+      <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+        <div data-i18n="detail.lblAltitude" class="text-[11px] text-slate-400 font-mono">Ketinggian</div>
+        <div id="detailAltitude" class="text-sm sm:text-base font-medium font-mono text-white mt-0.5">0 – 12 km</div>
+        <div id="detailAltitudeSub" class="text-[11px] text-slate-400 mt-0.5">8 km (Kutub) – 18 km (Ekuator)</div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+        <div data-i18n="detail.lblTemp" class="text-[11px] text-slate-400 font-mono">Rentang Suhu</div>
+        <div id="detailTemp" class="text-sm sm:text-base font-medium font-mono text-[#8be8ff] mt-0.5">+15°C s/d -56°C</div>
+        <div id="detailTempSub" class="text-[11px] text-slate-400 mt-0.5">Turun ~6,5°C tiap kenaikan 1 km</div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+        <div data-i18n="detail.lblPressure" class="text-[11px] text-slate-400 font-mono">Tekanan &amp; Massa</div>
+        <div id="detailPressure" class="text-sm sm:text-base font-medium font-mono text-white mt-0.5">1013 – 200 hPa</div>
+        <div id="detailPressureSub" class="text-[11px] text-slate-400 mt-0.5">Menyimpan ~80% massa atmosfer</div>
+      </div>
+
+      <div class="p-3 rounded-xl bg-white/[0.03] border border-white/10">
+        <div data-i18n="detail.lblObjects" class="text-[11px] text-slate-400 font-mono">Objek &amp; Fenomena 3D</div>
+        <div id="detailObjects" class="text-sm font-medium text-[#5df0a8] mt-0.5">Awan &amp; Cuaca Aktif</div>
+        <div id="detailBoundary" class="text-[11px] text-slate-400 mt-0.5">Puncak: Tropopause (~12 km)</div>
+      </div>
+    </div>
+
+    <!-- Deskripsi Ilmiah & Karakteristik Lapisan -->
+    <div class="flex flex-col gap-2.5 bg-[#060b16]/80 p-3.5 rounded-xl border border-white/10">
+      <div class="space-y-2">
+        <p id="detailDescription" class="text-xs text-slate-200 leading-relaxed">
+          Troposfer adalah lapisan atmosfer paling bawah dan paling rapat yang bersentuhan langsung dengan permukaan Bumi. Hampir seluruh uap air, pembentukan awan kumulonimbus, presipitasi hujan, badai petir, dan sirkulasi angin berlangsung di lapisan ini.
+        </p>
+        <div id="detailHighlights" class="flex flex-wrap gap-1.5 pt-1">
+          <!-- Diisi secara dinamis -->
+        </div>
+      </div>
+      <div class="flex flex-col gap-2 border-t border-white/10 pt-2.5">
+        <div data-i18n="detail.lblComposition" class="text-[11px] font-mono text-slate-400">Komposisi Dominan</div>
+        <div id="detailGasComposition" class="text-xs font-mono text-slate-200">
+          N₂ (78%), O₂ (21%), H₂O (0–4%), CO₂, Ar
+        </div>
+        <button id="btnZoomSelectedLayer" type="button" class="mt-1 w-full py-2 px-3 rounded-lg bg-[#5df0a8]/10 hover:bg-[#5df0a8]/20 text-[#5df0a8] border border-[#5df0a8]/40 text-xs font-medium transition flex items-center justify-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z"/>
+          </svg>
+          <span data-i18n="detail.focusCameraBtn">Fokus Kamera ke Lapisan Ini</span>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- FLOATING HUD OVERLAY (struktur kontainer sama persis dengan BAB 01):
+       pointer-events:none di shell, pointer-events:auto hanya pada kartu/tombol interaktif -->
+  <div class="ui-shell">
+    <div>
+      <header class="top-bar">
+        <div class="brand-pill">
+          <span class="brand-mark">▲</span>
+          <div class="brand-col">
+            <span class="brand-title">TerraPedia 3D</span>
+            <span class="brand-chapter" data-i18n="header.chapterBadge">BAB 02 — ATMOSFER &amp; IKLIM</span>
+            <span class="brand-sub" data-i18n="header.title">Struktur Atmosfer dan Dinamika Iklim Bumi</span>
+          </div>
+        </div>
+
+        <!-- Pojok kanan atas: tombol artikel, sakelar bahasa (ID/EN), dan ✕ melayang tanpa bar memanjang -->
+        <div class="top-controls">
+          <button id="openArticleOverlayBtn" type="button" class="cam-btn" data-i18n="header.articleBtn">Artikel Ilmiah</button>
+          <div class="pill-group" role="group" aria-label="Language Switcher">
+            <button id="btnLangID" type="button" data-lang-switch="id" class="active">ID</button>
+            <button id="btnLangEN" type="button" data-lang-switch="en">EN</button>
+          </div>
+          <button id="closeArticleModal" type="button" title="Keluar ke TerraPedia" aria-label="Keluar ke TerraPedia" class="exit-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Pil petunjuk tepat di bawah kartu judul kiri atas -->
+      <div style="display:flex;justify-content:center">
+        <div class="touch-prompt">
+          <span id="hudHoverDot" class="prompt-dot"></span>
+          <span id="hudHoverText" class="font-mono">Klik lapisan atmosfer atau objek 3D</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCK MELAYANG TERPUSAT TENGAH BAWAH: pemilih lapisan + kontrol scene + navigasi bab -->
+    <div class="bottom-dock" id="bottomDock">
+      <div class="tp-dock-tagline">Kenali Bumi Lebih Dalam</div>
+      <!-- Baris 1: Pemilih lapisan (klik lagi = sembunyikan info) -->
+      <div class="layer-pills" id="layerPillDock">
+        <button type="button" data-layer-pill="troposfer" class="layer-pill-btn active">
+          <span class="swatch" style="background:#8be8ff"></span>
+          <span class="tp-pill-num">01</span>
+          <span data-i18n="pills.troposfer">Troposfer</span>
+        </button>
+        <button type="button" data-layer-pill="stratosfer" class="layer-pill-btn">
+          <span class="swatch" style="background:#47b5ff"></span>
+          <span class="tp-pill-num">02</span>
+          <span data-i18n="pills.stratosfer">Stratosfer</span>
+        </button>
+        <button type="button" data-layer-pill="mesosfer" class="layer-pill-btn">
+          <span class="swatch" style="background:#3b6ef5"></span>
+          <span class="tp-pill-num">03</span>
+          <span data-i18n="pills.mesosfer">Mesosfer</span>
+        </button>
+        <button type="button" data-layer-pill="termosfer" class="layer-pill-btn">
+          <span class="swatch" style="background:#6936f5"></span>
+          <span class="tp-pill-num">04</span>
+          <span data-i18n="pills.termosfer">Termosfer</span>
+        </button>
+        <button type="button" data-layer-pill="eksosfer" class="layer-pill-btn">
+          <span class="swatch" style="background:#4f63e8"></span>
+          <span class="tp-pill-num">05</span>
+          <span data-i18n="pills.eksosfer">Eksosfer</span>
+        </button>
+      </div>
+
+      <!-- Baris 2: Kontrol scene 3D -->
+      <div class="controls-row">
+        <div class="toggle-row">
+          <button id="btnToggleCutaway" type="button" class="scene-btn active">
+            <span id="cutawayBtnLabel">Mode Irisan 3D</span>
+          </button>
+          <button id="btnToggleLabels" type="button" class="scene-btn active">Label 3D: ON</button>
+          <button id="btnToggleRotate" type="button" class="scene-btn active">Rotasi Otomatis: ON</button>
+          <button id="btnResetCamera" type="button" data-i18n="viewport.resetCamera" class="scene-btn scene-btn-neutral">Reset Kamera</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tombol navbar: sembunyikan / tampilkan bilah navigasi samping -->
+    <button id="navHandleBtn" type="button" class="nav-handle" aria-expanded="true" aria-controls="bottomDock" aria-label="Sembunyikan navigasi bab" title="Sembunyikan navigasi bab">
+      <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+      <svg class="ic-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button>
+
+    <!-- Kartu navigasi bab: fixed di ujung kiri & kanan viewport -->
+    <a class="chapter-next-card is-prev tp-nav-card tp-card-prev" href="terrapedia-3d.html" title="Buka BAB 01 — Geosfer &amp; Tektonik" aria-label="Kembali ke BAB 01 — Geosfer dan Tektonik">
+      <span class="chapter-next-arrow">←</span>
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="chapNav.prevLabel">BAB SEBELUMNYA</span>
+        <span class="chapter-next-title" data-i18n="chapNav.prevTitle">BAB 01 — Geosfer &amp; Tektonik</span>
+      </span>
+    </a>
+    <a class="chapter-next-card tp-nav-card tp-card-next" href="terrapedia_bab_03_biosfer_ekosistem.html" title="Buka BAB 03 — Biosfer &amp; Ekosistem" aria-label="Lanjut ke BAB 03 — Biosfer dan Ekosistem">
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="chapNav.nextLabel">BAB SELANJUTNYA</span>
+        <span class="chapter-next-title" data-i18n="chapNav.nextTitle">BAB 03 — Biosfer &amp; Ekosistem</span>
+      </span>
+      <span class="chapter-next-arrow">→</span>
+    </a>
+  </div>
+
+  <!-- Toast status non-intrusif (fixed top-center, tampil di atas seluruh HUD) -->
+  <div id="modalToast" class="hidden">
+    <span class="w-2 h-2 rounded-full bg-[#5df0a8]"></span>
+    <span id="modalToastText">Notifikasi sistem TerraPedia</span>
+  </div>
+
+  <!-- =========================================================================
+       OVERLAY ARTIKEL (pola info-popup BAB 01):
+       seluruh konten artikel hanya tampil setelah tombol "Artikel" diklik.
+       Desktop: drawer kanan. Mobile (≤640px): sheet layar penuh.
+       ========================================================================= -->
+  <div id="articleOverlay" aria-hidden="true">
+    <div class="cap-backdrop" data-overlay-close></div>
+    <section class="cap-panel" role="dialog" aria-modal="true" aria-label="Artikel BAB 02 — Atmosfer &amp; Iklim">
+      <header class="cap-head">
+        <div class="min-w-0">
+          <span class="cap-eyebrow" data-i18n="header.articleBtn">Artikel Ilmiah</span>
+          <h2 class="cap-title" data-i18n="header.title">Struktur Atmosfer dan Dinamika Iklim Bumi</h2>
+        </div>
+        <button id="closeArticleOverlayBtn" type="button" class="cap-close" aria-label="Tutup artikel" title="Tutup artikel (Esc)">✕</button>
+      </header>
+      <div class="cap-body">
+        <main class="space-y-8">
+
+          <!-- =================================================================
+               SEKSI ARTIKEL 01: KOMPOSISI & EVOLUSI ATMOSFER BUMI
+               ================================================================= -->
+          <section id="section-ikhtisar" class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+            <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+              <span data-i18n="article.s1Tag">01 // KOMPOSISI &amp; EVOLUSI ATMOSFER</span>
+              <span class="h-px flex-1 bg-white/10"></span>
+            </div>
+            <h2 data-i18n="article.s1Title" class="text-lg sm:text-2xl font-semibold text-white">
+              Selubung Gas Pelindung &amp; Mesin Termodinamika Planet Bumi
+            </h2>
+            <p data-i18n-html="article.s1Para1" class="text-sm text-slate-300 leading-relaxed">
+              Atmosfer Bumi merupakan lapisan fluida gas yang menyelimuti planet kita dan tertahan oleh gaya gravitasi Bumi. Meskipun batas luar eksosfer memudar hingga ketinggian sekitar <strong class="text-white font-mono">10.000 km</strong> (mendekati sepertiga jarak menuju orbit geosinkron), sekitar <strong class="text-[#5df0a8] font-mono">75%–80% massa total atmosfer</strong> terkonsentrasi di dalam <strong class="text-white font-mono">12 km pertama</strong> (Troposfer).
+            </p>
+            <p data-i18n-html="article.s1Para2" class="text-sm text-slate-300 leading-relaxed">
+              Secara fungsional, stratifikasi vertikal atmosfer ditentukan oleh <strong class="text-white">gradien suhu terhadap ketinggian (lapse rate)</strong>. Setiap lapisan dipisahkan oleh zona transisi tipis yang disebut <em>pausa</em> (Tropopause, Stratopause, Mesopause, dan Termopause) di mana terjadi pembalikan tren temperatur akibat penyerapan selektif spektrum radiasi matahari.
+            </p>
+
+            <!-- Ringkasan Fungsi Vital Atmosfer -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
+              <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10">
+                <div data-i18n="article.s1Box1Title" class="text-xs font-mono text-[#8be8ff] mb-1">Perisai Radiasi &amp; Meteoroid</div>
+                <p data-i18n="article.s1Box1Desc" class="text-xs text-slate-300 leading-relaxed">
+                  Menyerap sinar X, EUV di termosfer, menyaring 97–99% radiasi UV-B/UV-C di lapisan ozon stratosfer, dan mengikis jutaan meteoroid harian di mesosfer.
+                </p>
+              </div>
+              <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10">
+                <div data-i18n="article.s1Box2Title" class="text-xs font-mono text-[#5df0a8] mb-1">Regulasi Suhu Global</div>
+                <p data-i18n-html="article.s1Box2Desc" class="text-xs text-slate-300 leading-relaxed">
+                  Efek rumah kaca alami mempertahankan suhu rata-rata permukaan Bumi pada <span class="font-mono text-white">+14,8°C</span> (tanpa atmosfer suhu rata-rata akan anjlok ke <span class="font-mono text-white">-18°C</span>).
+                </p>
+              </div>
+              <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10">
+                <div data-i18n="article.s1Box3Title" class="text-xs font-mono text-slate-300 mb-1">Siklus Hidrologi &amp; Akustik</div>
+                <p data-i18n="article.s1Box3Desc" class="text-xs text-slate-300 leading-relaxed">
+                  Menjadi medium sirkulasi uap air global dari lautan ke daratan serta menyediakan tekanan barometrik yang memungkinkan air tetap berwujud cair.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- =================================================================
+               SEKSI ARTIKEL 02: DETAIL LIMA LAPISAN ATMOSFER (Sinkron dengan 3D)
+               ================================================================= -->
+          <section id="section-lapisan" class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-5">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="article.s2Tag">02 // STRATIFIKASI VERTIKAL</span>
+              </div>
+              <span data-i18n="article.s2Hint" class="text-xs text-slate-400">Klik kartu lapisan di bawah untuk menyorotnya pada model 3D</span>
+            </div>
+
+            <h2 data-i18n="article.s2Title" class="text-lg sm:text-2xl font-semibold text-white">
+              Karakteristik Lima Lapisan Utama Atmosfer
+            </h2>
+
+            <!-- Daftar Kartu Lapisan Artikel -->
+            <div id="articleLayerCardsContainer" class="space-y-3.5">
+              <!-- Kartu 1: Troposfer -->
+              <article data-article-layer="troposfer" class="article-layer-card tp-glass-card is-active rounded-xl p-4 sm:p-5 cursor-pointer">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full bg-[#8be8ff]"></span>
+                    <h3 data-i18n="article.card1Title" class="text-base font-semibold text-white">1. Troposfer (0 – 12 km)</h3>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-mono">
+                    <span data-i18n="article.card1Temp" class="px-2 py-0.5 rounded bg-[#8be8ff]/10 text-[#8be8ff] border border-[#8be8ff]/30">Suhu: +15°C → -56°C</span>
+                    <span data-i18n="article.card1Phenom" class="px-2 py-0.5 rounded bg-white/5 text-slate-300">Awan &amp; Cuaca Aktif</span>
+                  </div>
+                </div>
+                <p data-i18n-html="article.card1Desc" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Dipanaskan dari bawah oleh radiasi inframerah permukaan Bumi, sehingga suhu turun rata-rata <span class="font-mono text-white">6,5°C per kilometer</span> (<em>normal environmental lapse rate</em>). Ketebalannya bervariasi dari ~8 km di kutub hingga ~18 km di ekuator akibat gaya sentrifugal rotasi Bumi dan konveksi termal tropis yang kuat.
+                </p>
+              </article>
+
+              <!-- Kartu 2: Stratosfer -->
+              <article data-article-layer="stratosfer" class="article-layer-card tp-glass-card rounded-xl p-4 sm:p-5 cursor-pointer">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full bg-[#47b5ff]"></span>
+                    <h3 data-i18n="article.card2Title" class="text-base font-semibold text-white">2. Stratosfer (12 – 50 km)</h3>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-mono">
+                    <span data-i18n="article.card2Temp" class="px-2 py-0.5 rounded bg-[#47b5ff]/10 text-[#47b5ff] border border-[#47b5ff]/30">Suhu: -56°C → -2°C</span>
+                    <span data-i18n="article.card2Phenom" class="px-2 py-0.5 rounded bg-white/5 text-slate-300">Pesawat Jet &amp; Lapisan Ozon</span>
+                  </div>
+                </div>
+                <p data-i18n-html="article.card2Desc" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Mengalami <strong>inversi suhu</strong> (semakin tinggi semakin hangat) karena konsentrasi gas ozon (<span class="font-mono text-white">O₃</span>) pada ketinggian 20–35 km menyerap radiasi ultraviolet matahari. Karena udara sangat stabil dan bebas turbulensi konvektif vertikal, stratosfer bawah menjadi jalur jelajah utama pesawat komersial dan balon cuaca.
+                </p>
+              </article>
+
+              <!-- Kartu 3: Mesosfer -->
+              <article data-article-layer="mesosfer" class="article-layer-card tp-glass-card rounded-xl p-4 sm:p-5 cursor-pointer">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full bg-[#3b6ef5]"></span>
+                    <h3 data-i18n="article.card3Title" class="text-base font-semibold text-white">3. Mesosfer (50 – 85 km)</h3>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-mono">
+                    <span data-i18n="article.card3Temp" class="px-2 py-0.5 rounded bg-[#3b6ef5]/10 text-[#6695ff] border border-[#3b6ef5]/40">Suhu: -2°C → -90°C</span>
+                    <span data-i18n="article.card3Phenom" class="px-2 py-0.5 rounded bg-white/5 text-slate-300">Pembakaran Meteor</span>
+                  </div>
+                </div>
+                <p data-i18n-html="article.card3Desc" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Lapisan terdingin di atmosfer Bumi, mencapai <span class="font-mono text-white">-90°C hingga -100°C</span> di puncak <em>Mesopause</em>. Meskipun kerapatan udaranya kurang dari 0,1% permukaan laut, gesekan ram-pressure molekul gas di mesosfer sudah cukup padat untuk memanaskan dan membakar ribuan ton meteoroid yang masuk dengan kecepatan 11–72 km/detik.
+                </p>
+              </article>
+
+              <!-- Kartu 4: Termosfer -->
+              <article data-article-layer="termosfer" class="article-layer-card tp-glass-card rounded-xl p-4 sm:p-5 cursor-pointer">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full bg-[#6936f5]"></span>
+                    <h3 data-i18n="article.card4Title" class="text-base font-semibold text-white">4. Termosfer (85 – 600 km)</h3>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-mono">
+                    <span data-i18n="article.card4Temp" class="px-2 py-0.5 rounded bg-[#6936f5]/10 text-[#a480ff] border border-[#6936f5]/40">Suhu: -90°C → +1.500°C</span>
+                    <span data-i18n="article.card4Phenom" class="px-2 py-0.5 rounded bg-white/5 text-slate-300">Aurora &amp; Orbit ISS</span>
+                  </div>
+                </div>
+                <p data-i18n-html="article.card4Desc" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Mencakup bagian utama <strong>Ionosfer</strong> dan melewati <strong>Garis Kármán (100 km)</strong>. Molekul oksigen dan nitrogen menyerap radiasi ekstrem ultraviolet (EUV) serta sinar-X matahari sehingga energi kinetik per molekul melonjak hingga >1.500°C. Interaksi angin surya dengan medan magnet Bumi di lapisan ini menghasilkan tirai cahaya <em>Aurora Borealis</em> dan <em>Australis</em>.
+                </p>
+              </article>
+
+              <!-- Kartu 5: Eksosfer -->
+              <article data-article-layer="eksosfer" class="article-layer-card tp-glass-card rounded-xl p-4 sm:p-5 cursor-pointer">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-3 h-3 rounded-full bg-[#4f63e8]"></span>
+                    <h3 data-i18n="article.card5Title" class="text-base font-semibold text-white">5. Eksosfer (600 – 10.000 km)</h3>
+                  </div>
+                  <div class="flex items-center gap-2 text-xs font-mono">
+                    <span data-i18n="article.card5Temp" class="px-2 py-0.5 rounded bg-[#4f63e8]/10 text-[#8da0ff] border border-[#4f63e8]/40">Transisi Antarplanet</span>
+                    <span data-i18n="article.card5Phenom" class="px-2 py-0.5 rounded bg-white/5 text-slate-300">Satelit Orbit Tinggi</span>
+                  </div>
+                </div>
+                <p data-i18n-html="article.card5Desc" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Zona transisi terluar antara atmosfer Bumi dan ruang hampa antarplanet. Jarak bebas rata-rata antar atom (hidrogen dan helium ringan) mencapai ratusan kilometer sehingga partikel bergerak pada lintasan balistik bebas tumbukan. Satelit observasi cuaca, navigasi, dan teleskop antariksa mengorbit di wilayah hampir hampa ini.
+                </p>
+              </article>
+            </div>
+          </section>
+
+          <!-- =================================================================
+               SEKSI ARTIKEL 03: DINAMIKA RADIASI, EFEK RUMAH KACA & SIRKULASI GLOBAL
+               ================================================================= -->
+          <section id="section-iklim" class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+            <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+              <span data-i18n="article.s3Tag">03 // DINAMIKA RADIASI &amp; SIRKULASI ATMOSFER GLOBAL</span>
+              <span class="h-px flex-1 bg-white/10"></span>
+            </div>
+            <h2 data-i18n="article.s3Title" class="text-lg sm:text-2xl font-semibold text-white">
+              Sirkulasi Atmosfer Global &amp; Anggaran Energi Bumi
+            </h2>
+            <p data-i18n-html="article.s3Para" class="text-sm text-slate-300 leading-relaxed">
+              Sistem iklim Bumi digerakkan oleh distribusi pemanasan matahari yang tidak merata antara wilayah ekuator (surplus radiasi) dan kutub (defisit radiasi). Ketidakseimbangan termal ini memicu tiga sel sirkulasi meridional utama di setiap belahan Bumi—<strong class="text-white">Sel Hadley</strong> (0°–30°), <strong class="text-white">Sel Ferrel</strong> (30°–60°), dan <strong class="text-white">Sel Kutub</strong> (60°–90°)—yang dibelokkan oleh <em>Efek Coriolis</em> akibat rotasi Bumi.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div class="p-4 rounded-xl bg-[#070d1a] border border-white/10 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span data-i18n="article.s3RadTitle" class="text-xs font-mono text-[#5df0a8]">Anggaran Radiasi Surya</span>
+                  <span data-i18n="article.s3RadVal" class="text-xs font-mono text-slate-400">340 W/m² Rata-Rata</span>
+                </div>
+                <div class="w-full bg-white/5 h-2.5 rounded-full overflow-hidden flex">
+                  <div class="bg-[#8be8ff] h-full" style="width: 29%" title="Albedo (29%)"></div>
+                  <div class="bg-[#47b5ff] h-full" style="width: 23%" title="Atmosphere (23%)"></div>
+                  <div class="bg-[#5df0a8] h-full" style="width: 48%" title="Surface (48%)"></div>
+                </div>
+                <div class="flex justify-between text-[11px] font-mono text-slate-400 pt-1">
+                  <span data-i18n="article.s3RadLeg1">• 29% Albedo</span>
+                  <span data-i18n="article.s3RadLeg2">• 23% Atmosfer</span>
+                  <span data-i18n="article.s3RadLeg3">• 48% Permukaan</span>
+                </div>
+              </div>
+
+              <div class="p-4 rounded-xl bg-[#070d1a] border border-white/10 space-y-2">
+                <div class="flex items-center justify-between">
+                  <span data-i18n="article.s3GhgTitle" class="text-xs font-mono text-[#8be8ff]">Gas Rumah Kaca Utama</span>
+                  <span data-i18n="article.s3GhgSub" class="text-xs font-mono text-slate-400">Penyerap Inframerah</span>
+                </div>
+                <p data-i18n-html="article.s3GhgDesc" class="text-xs text-slate-300 leading-relaxed">
+                  Uap air (<span class="font-mono text-white">H₂O</span>), karbon dioksida (<span class="font-mono text-white">CO₂ ~422 ppm</span>), metana (<span class="font-mono text-white">CH₄</span>), dan dinitrogen oksida (<span class="font-mono text-white">N₂O</span>) menahan radiasi gelombang panjang dari permukaan Bumi.
+                </p>
+              </div>
+            </div>
+          </section>
+
+        </main>
+
+        <!-- ===================================================================
+             KOLOM SIDEBAR KANAN: INFOBOX, LAYER LIST, & NAVIGASI BAB (4 KOLOM)
+             =================================================================== -->
+        <aside class="lg:col-span-4 space-y-6">
+
+          <!-- 1. DIAGRAM VERTIKAL LAYER LIST (Terinspirasi langsung dari Gambar Referensi) -->
+          <div class="tp-glass-card rounded-2xl p-5 border border-white/10 space-y-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <span data-i18n="sidebar.layerListTag" class="text-[10px] font-mono text-[#5df0a8]">INTERAKTIF • SINKRON 3D</span>
+                <h3 data-i18n="sidebar.layerListTitle" class="text-sm font-semibold text-white mt-0.5">Daftar Lapisan Atmosfer</h3>
+              </div>
+              <span data-i18n="sidebar.layerListOrder" class="text-[11px] font-mono text-slate-400">Atas → Bawah</span>
+            </div>
+
+            <!-- Susunan Balok Vertikal 5 Lapisan (Eksosfer di atas hingga Troposfer di bawah) -->
+            <div id="sidebarLayerStack" class="space-y-2.5">
+              <!-- Eksosfer -->
+              <div data-stack-layer="eksosfer" class="tp-stack-slab rounded-xl p-3 border border-[#4f63e8]/40 bg-[#4f63e8]/10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-[#4f63e8]/15 border border-[#4f63e8]/40 flex items-center justify-center text-xs font-mono font-medium text-[#a9b5ff]">
+                    05
+                  </div>
+                  <div>
+                    <div data-i18n="sidebar.slab5Name" class="text-xs font-medium text-white">EKSOSFER</div>
+                    <div data-i18n="sidebar.slab5Sub" class="text-[11px] text-slate-300">Satelit Orbit Tinggi • Transisi Kosmik</div>
+                  </div>
+                </div>
+                <span class="text-xs font-mono text-[#a9b5ff] font-medium">600–10.000 km</span>
+              </div>
+
+              <!-- Termosfer -->
+              <div data-stack-layer="termosfer" class="tp-stack-slab rounded-xl p-3 border border-[#6936f5]/40 bg-[#6936f5]/10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-[#6936f5]/15 border border-[#6936f5]/40 flex items-center justify-center text-xs font-mono font-medium text-[#c7b3ff]">
+                    04
+                  </div>
+                  <div>
+                    <div data-i18n="sidebar.slab4Name" class="text-xs font-medium text-white">TERMOSFER</div>
+                    <div data-i18n="sidebar.slab4Sub" class="text-[11px] text-slate-200">Aurora Kutub &amp; Orbit ISS</div>
+                  </div>
+                </div>
+                <span class="text-xs font-mono text-[#c7b3ff] font-medium">85–600 km</span>
+              </div>
+
+              <!-- Mesosfer -->
+              <div data-stack-layer="mesosfer" class="tp-stack-slab rounded-xl p-3 border border-[#3b6ef5]/40 bg-[#3b6ef5]/10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-[#3b6ef5]/15 border border-[#3b6ef5]/40 flex items-center justify-center text-xs font-mono font-medium text-[#b3c7ff]">
+                    03
+                  </div>
+                  <div>
+                    <div data-i18n="sidebar.slab3Name" class="text-xs font-medium text-white">MESOSFER</div>
+                    <div data-i18n="sidebar.slab3Sub" class="text-[11px] text-slate-200">Pembakaran Meteor • Lapisan Terdingin</div>
+                  </div>
+                </div>
+                <span class="text-xs font-mono text-[#b3c7ff] font-medium">50–85 km</span>
+              </div>
+
+              <!-- Stratosfer -->
+              <div data-stack-layer="stratosfer" class="tp-stack-slab rounded-xl p-3 border border-[#47b5ff]/40 bg-[#47b5ff]/10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-[#47b5ff]/15 border border-[#47b5ff]/40 flex items-center justify-center text-xs font-mono font-medium text-[#c2e7ff]">
+                    02
+                  </div>
+                  <div>
+                    <div data-i18n="sidebar.slab2Name" class="text-xs font-medium text-white">STRATOSFER</div>
+                    <div data-i18n="sidebar.slab2Sub" class="text-[11px] text-slate-100">Pesawat Jet &amp; Lapisan Ozon</div>
+                  </div>
+                </div>
+                <span class="text-xs font-mono text-[#c2e7ff] font-medium">12–50 km</span>
+              </div>
+
+              <!-- Troposfer -->
+              <div data-stack-layer="troposfer" class="tp-stack-slab active-slab rounded-xl p-3 border border-[#8be8ff]/40 bg-[#8be8ff]/10 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-[#8be8ff]/15 border border-[#8be8ff]/40 flex items-center justify-center text-xs font-mono font-medium text-white">
+                    01
+                  </div>
+                  <div>
+                    <div data-i18n="sidebar.slab1Name" class="text-xs font-medium text-white">TROPOSFER</div>
+                    <div data-i18n="sidebar.slab1Sub" class="text-[11px] text-white/90">Awan &amp; Cuaca Aktif</div>
+                  </div>
+                </div>
+                <span class="text-xs font-mono text-white font-medium">0–12 km</span>
+              </div>
+            </div>
+
+            <div class="pt-1 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span data-i18n="sidebar.earthSurfaceNote">Permukaan Bumi (R = 6.371 km)</span>
+              <span data-i18n="sidebar.surfacePressureNote">Tekanan: 1 atm</span>
+            </div>
+          </div>
+
+          <!-- 2. INFOBOX TERRAPEDIA (Dipertahankan sesuai struktur project) -->
+          <div id="section-data" class="tp-glass-card rounded-2xl p-5 border border-white/10 space-y-4">
+            <div class="border-b border-white/10 pb-3 flex items-center justify-between">
+              <div>
+                <span data-i18n="infobox.tag" class="text-[10px] font-mono text-[#5df0a8]">INFOBOX TELEMETRI</span>
+                <h3 data-i18n="infobox.title" class="text-sm font-semibold text-white mt-0.5">Data Fisik Atmosfer</h3>
+              </div>
+              <span class="text-[10px] font-mono text-slate-500">ICAO STD</span>
+            </div>
+
+            <dl class="space-y-2.5 text-xs">
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <dt data-i18n="infobox.lblMass" class="text-slate-400">Massa Total Atmosfer</dt>
+                <dd data-i18n="infobox.valMass" class="font-mono text-white font-semibold">5,15 × 10¹⁸ kg</dd>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <dt data-i18n="infobox.lblPressure" class="text-slate-400">Tekanan Permukaan Rata-Rata</dt>
+                <dd data-i18n="infobox.valPressure" class="font-mono text-[#5df0a8] font-semibold">1.013,25 hPa (1 atm)</dd>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <dt data-i18n="infobox.lblScaleHeight" class="text-slate-400">Tinggi Skala (Scale Height)</dt>
+                <dd data-i18n="infobox.valScaleHeight" class="font-mono text-white">~8,5 km</dd>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <dt data-i18n="infobox.lblTropopause" class="text-slate-400">Ketinggian Tropopause</dt>
+                <dd data-i18n="infobox.valTropopause" class="font-mono text-white">8 km (Kutub) – 18 km (Ekuator)</dd>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <dt data-i18n="infobox.lblSolarConstant" class="text-slate-400">Konstanta Surya (TSI)</dt>
+                <dd data-i18n="infobox.valSolarConstant" class="font-mono text-[#8be8ff] font-semibold">1.361 W/m²</dd>
+              </div>
+              <div class="flex justify-between py-1.5 border-b border-white/5">
+                <dt data-i18n="infobox.lblAlbedo" class="text-slate-400">Albedo Rata-Rata Bumi</dt>
+                <dd data-i18n="infobox.valAlbedo" class="font-mono text-white">0,30 (~30% Dipantulkan)</dd>
+              </div>
+              <div class="flex justify-between py-1.5">
+                <dt data-i18n="infobox.lblGreenhouse" class="text-slate-400">Pemanasan Efek Rumah Kaca</dt>
+                <dd data-i18n="infobox.valGreenhouse" class="font-mono text-[#5df0a8] font-semibold">+33 °C (-18°C → +14,8°C)</dd>
+              </div>
+            </dl>
+
+            <!-- Komposisi Gas Udara Kering -->
+            <div class="pt-2 border-t border-white/10 space-y-2.5">
+              <div data-i18n="infobox.compTitle" class="text-[11px] font-mono text-slate-400">Komposisi Kimia Udara Kering</div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span data-i18n="infobox.gasN2" class="text-slate-200 font-medium">Nitrogen (N₂)</span>
+                  <span class="font-mono text-[#8be8ff]">78,084%</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div class="h-full bg-[#8be8ff]" style="width: 78.08%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span data-i18n="infobox.gasO2" class="text-slate-200 font-medium">Oksigen (O₂)</span>
+                  <span class="font-mono text-[#5df0a8]">20,946%</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div class="h-full bg-[#5df0a8]" style="width: 20.95%"></div>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span data-i18n="infobox.gasTrace" class="text-slate-200 font-medium">Argon (Ar) &amp; Gas Jejak (CO₂, Ne, He)</span>
+                  <span class="font-mono text-slate-400">0,970%</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-white/5 overflow-hidden">
+                  <div class="h-full bg-slate-400" style="width: 4%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </aside>
+
+      <!-- NAVIGASI BAB: BILAH BAWAH (Model BAB 04) — kini berada di dalam overlay artikel -->
+      <footer class="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <a href="terrapedia-3d.html" title="Buka BAB 01 — Geosfer &amp; Tektonik" aria-label="Kembali ke BAB 01 — Geosfer dan Tektonik"
+           class="group w-full sm:w-auto inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-[#5df0a8]/50 transition text-left">
+          <span class="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-[#5df0a8]/20 flex items-center justify-center text-slate-300 group-hover:text-[#5df0a8] transition shrink-0">←</span>
+          <span class="min-w-0">
+            <span data-i18n="chapNav.prevLabel" class="block text-[10px] font-mono text-slate-400 group-hover:text-[#5df0a8] transition">BAB SEBELUMNYA</span>
+            <span data-i18n="chapNav.prevTitle" class="block text-xs sm:text-sm font-semibold text-white group-hover:text-[#5df0a8] transition truncate">BAB 01 — Geosfer &amp; Tektonik</span>
+          </span>
+        </a>
+
+        <a href="terrapedia_bab_03_biosfer_ekosistem.html" title="Buka BAB 03 — Biosfer &amp; Ekosistem" aria-label="Lanjut ke BAB 03 — Biosfer dan Ekosistem"
+           class="group w-full sm:w-auto inline-flex items-center gap-3 px-5 py-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-[#5df0a8]/50 transition">
+          <span class="min-w-0">
+            <span data-i18n="chapNav.nextLabel" class="block text-[10px] font-mono text-slate-400 group-hover:text-[#5df0a8] transition">BAB SELANJUTNYA</span>
+            <span data-i18n="chapNav.nextTitle" class="block text-xs sm:text-sm font-semibold text-white group-hover:text-[#5df0a8] transition truncate">BAB 03 — Biosfer &amp; Ekosistem</span>
+          </span>
+          <span class="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-[#5df0a8]/20 flex items-center justify-center text-slate-300 group-hover:text-[#5df0a8] transition shrink-0">→</span>
+        </a>
+      </footer>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================================
+       SCRIPT MODUL 3D & SISTEM DWIBAHASA (ID / EN) — MUDAH DIINTEGRASIKAN
+       ========================================================================= -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /**
+     * KAMUS BAHASA LENGKAP (BAHASA INDONESIA 'id' & ENGLISH 'en')
+     */
+    const TERRAPEDIA_I18N = {
+      id: {
+        header: {
+          chapterBadge: 'Bab 02 — Atmosfer & Iklim',
+          title: 'Struktur Atmosfer dan Dinamika Iklim Bumi',
+          articleBtn: 'Artikel Ilmiah',
+          closeTitle: 'Keluar ke TerraPedia'
+        },
+        viewport: {
+          cutawayMode: 'Mode Irisan 3D',
+          fullSphereMode: 'Mode Bola Utuh',
+          labelsOn: 'Label 3D: ON',
+          labelsOff: 'Label 3D: OFF',
+          rotateOn: 'Rotasi Otomatis: ON',
+          rotateOff: 'Rotasi Otomatis: OFF',
+          resetCamera: 'Reset Kamera'
+        },
+        pills: {
+          troposfer: 'Troposfer',
+          stratosfer: 'Stratosfer',
+          mesosfer: 'Mesosfer',
+          termosfer: 'Termosfer',
+          eksosfer: 'Eksosfer'
+        },
+        hud: {
+          defaultPrompt: 'Klik lapisan atmosfer atau objek 3D',
+          hoverPrefix: 'Sorot:',
+          hoverSuffix: '— Klik untuk inspeksi'
+        },
+        detail: {
+          overviewTag: 'Ikhtisar 5 lapisan',
+          prevLayerBtn: '← Lapisan Bawah',
+          nextLayerBtn: 'Lapisan Atas →',
+          lblAltitude: 'Ketinggian',
+          lblTemp: 'Rentang Suhu',
+          lblPressure: 'Tekanan & Massa',
+          lblObjects: 'Objek & Fenomena 3D',
+          lblComposition: 'Komposisi Dominan',
+          focusCameraBtn: 'Fokus Kamera ke Lapisan Ini'
+        },
+        article: {
+          s1Tag: '01 // KOMPOSISI & EVOLUSI ATMOSFER',
+          s1Title: 'Selubung Gas Pelindung & Mesin Termodinamika Planet Bumi',
+          s1Para1:
+            'Atmosfer Bumi merupakan lapisan fluida gas yang menyelimuti planet kita dan tertahan oleh gaya gravitasi Bumi. Meskipun batas luar eksosfer memudar hingga ketinggian sekitar <strong class="text-white font-mono">10.000 km</strong> (mendekati sepertiga jarak menuju orbit geosinkron), sekitar <strong class="text-[#5df0a8] font-mono">75%–80% massa total atmosfer</strong> terkonsentrasi di dalam <strong class="text-white font-mono">12 km pertama</strong> (Troposfer).',
+          s1Para2:
+            'Secara fungsional, stratifikasi vertikal atmosfer ditentukan oleh <strong class="text-white">gradien suhu terhadap ketinggian (lapse rate)</strong>. Setiap lapisan dipisahkan oleh zona transisi tipis yang disebut <em>pausa</em> (Tropopause, Stratopause, Mesopause, dan Termopause) di mana terjadi pembalikan tren temperatur akibat penyerapan selektif spektrum radiasi matahari.',
+          s1Box1Title: 'Perisai Radiasi & Meteoroid',
+          s1Box1Desc:
+            'Menyerap sinar X, EUV di termosfer, menyaring 97–99% radiasi UV-B/UV-C di lapisan ozon stratosfer, dan mengikis jutaan meteoroid harian di mesosfer.',
+          s1Box2Title: 'Regulasi Suhu Global',
+          s1Box2Desc:
+            'Efek rumah kaca alami mempertahankan suhu rata-rata permukaan Bumi pada <span class="font-mono text-white">+14,8°C</span> (tanpa atmosfer suhu rata-rata akan anjlok ke <span class="font-mono text-white">-18°C</span>).',
+          s1Box3Title: 'Siklus Hidrologi & Akustik',
+          s1Box3Desc:
+            'Menjadi medium sirkulasi uap air global dari lautan ke daratan serta menyediakan tekanan barometrik yang memungkinkan air tetap berwujud cair.',
+          s2Tag: '02 // STRATIFIKASI VERTIKAL',
+          s2Hint: 'Klik kartu lapisan di bawah untuk menyorotnya pada model 3D',
+          s2Title: 'Karakteristik Lima Lapisan Utama Atmosfer',
+          card1Title: '1. Troposfer (0 – 12 km)',
+          card1Temp: 'Suhu: +15°C → -56°C',
+          card1Phenom: 'Awan & Cuaca Aktif',
+          card1Desc:
+            'Dipanaskan dari bawah oleh radiasi inframerah permukaan Bumi, sehingga suhu turun rata-rata <span class="font-mono text-white">6,5°C per kilometer</span> (<em>normal environmental lapse rate</em>). Ketebalannya bervariasi dari ~8 km di kutub hingga ~18 km di ekuator akibat gaya sentrifugal rotasi Bumi dan konveksi termal tropis yang kuat.',
+          card2Title: '2. Stratosfer (12 – 50 km)',
+          card2Temp: 'Suhu: -56°C → -2°C',
+          card2Phenom: 'Pesawat Jet & Lapisan Ozon',
+          card2Desc:
+            'Mengalami <strong>inversi suhu</strong> (semakin tinggi semakin hangat) karena konsentrasi gas ozon (<span class="font-mono text-white">O₃</span>) pada ketinggian 20–35 km menyerap radiasi ultraviolet matahari. Karena udara sangat stabil dan bebas turbulensi konvektif vertikal, stratosfer bawah menjadi jalur jelajah utama pesawat komersial dan balon cuaca.',
+          card3Title: '3. Mesosfer (50 – 85 km)',
+          card3Temp: 'Suhu: -2°C → -90°C',
+          card3Phenom: 'Pembakaran Meteor',
+          card3Desc:
+            'Lapisan terdingin di atmosfer Bumi, mencapai <span class="font-mono text-white">-90°C hingga -100°C</span> di puncak <em>Mesopause</em>. Meskipun kerapatan udaranya kurang dari 0,1% permukaan laut, gesekan ram-pressure molekul gas di mesosfer sudah cukup padat untuk memanaskan dan membakar ribuan ton meteoroid yang masuk dengan kecepatan 11–72 km/detik.',
+          card4Title: '4. Termosfer (85 – 600 km)',
+          card4Temp: 'Suhu: -90°C → +1.500°C',
+          card4Phenom: 'Aurora & Orbit ISS',
+          card4Desc:
+            'Mencakup bagian utama <strong>Ionosfer</strong> dan melewati <strong>Garis Kármán (100 km)</strong>. Molekul oksigen dan nitrogen menyerap radiasi ekstrem ultraviolet (EUV) serta sinar-X matahari sehingga energi kinetik per molekul melonjak hingga >1.500°C. Interaksi angin surya dengan medan magnet Bumi di lapisan ini menghasilkan tirai cahaya <em>Aurora Borealis</em> dan <em>Australis</em>.',
+          card5Title: '5. Eksosfer (600 – 10.000 km)',
+          card5Temp: 'Transisi Antarplanet',
+          card5Phenom: 'Satelit Orbit Tinggi',
+          card5Desc:
+            'Zona transisi terluar antara atmosfer Bumi dan ruang hampa antarplanet. Jarak bebas rata-rata antar atom (hidrogen dan helium ringan) mencapai ratusan kilometer sehingga partikel bergerak pada lintasan balistik bebas tumbukan. Satelit observasi cuaca, navigasi, dan teleskop antariksa mengorbit di wilayah hampir hampa ini.',
+          s3Tag: '03 // DINAMIKA RADIASI & SIRKULASI GLOBAL',
+          s3Title: 'Sirkulasi Atmosfer Global & Anggaran Energi Bumi',
+          s3Para:
+            'Sistem iklim Bumi digerakkan oleh distribusi pemanasan matahari yang tidak merata antara wilayah ekuator (surplus radiasi) dan kutub (defisit radiasi). Ketidakseimbangan termal ini memicu tiga sel sirkulasi meridional utama di setiap belahan Bumi—<strong class="text-white">Sel Hadley</strong> (0°–30°), <strong class="text-white">Sel Ferrel</strong> (30°–60°), dan <strong class="text-white">Sel Kutub</strong> (60°–90°)—yang dibelokkan oleh <em>Efek Coriolis</em> akibat rotasi Bumi.',
+          s3RadTitle: 'Anggaran Radiasi Surya',
+          s3RadVal: '340 W/m² Rata-Rata',
+          s3RadLeg1: '29% Albedo',
+          s3RadLeg2: '23% Atmosfer',
+          s3RadLeg3: '48% Permukaan',
+          s3GhgTitle: 'Gas Rumah Kaca Utama',
+          s3GhgSub: 'Penyerap Inframerah',
+          s3GhgDesc:
+            'Uap air (<span class="font-mono text-white">H₂O</span>), karbon dioksida (<span class="font-mono text-white">CO₂ ~422 ppm</span>), metana (<span class="font-mono text-white">CH₄</span>), dan dinitrogen oksida (<span class="font-mono text-white">N₂O</span>) menahan radiasi gelombang panjang dari permukaan Bumi.'
+        },
+        sidebar: {
+          layerListTag: 'Interaktif · sinkron 3D',
+          layerListTitle: 'Daftar Lapisan Atmosfer',
+          layerListOrder: 'Atas → Bawah',
+          slab5Name: 'Eksosfer',
+          slab5Sub: 'Satelit Orbit Tinggi • Transisi Kosmik',
+          slab4Name: 'Termosfer',
+          slab4Sub: 'Aurora Kutub & Orbit ISS',
+          slab3Name: 'Mesosfer',
+          slab3Sub: 'Pembakaran Meteor • Lapisan Terdingin',
+          slab2Name: 'Stratosfer',
+          slab2Sub: 'Pesawat Jet & Lapisan Ozon',
+          slab1Name: 'Troposfer',
+          slab1Sub: 'Awan & Cuaca Aktif',
+          earthSurfaceNote: 'Permukaan Bumi (R = 6.371 km)',
+          surfacePressureNote: 'Tekanan: 1 atm'
+        },
+        infobox: {
+          tag: 'Infobox telemetri',
+          title: 'Data Fisik Atmosfer',
+          lblMass: 'Massa Total Atmosfer',
+          valMass: '5,15 × 10¹⁸ kg',
+          lblPressure: 'Tekanan Permukaan Rata-Rata',
+          valPressure: '1.013,25 hPa (1 atm)',
+          lblScaleHeight: 'Tinggi Skala (Scale Height)',
+          valScaleHeight: '~8,5 km',
+          lblTropopause: 'Ketinggian Tropopause',
+          valTropopause: '8 km (Kutub) – 18 km (Ekuator)',
+          lblSolarConstant: 'Konstanta Surya (TSI)',
+          valSolarConstant: '1.361 W/m²',
+          lblAlbedo: 'Albedo Rata-Rata Bumi',
+          valAlbedo: '0,30 (~30% Dipantulkan)',
+          lblGreenhouse: 'Pemanasan Efek Rumah Kaca',
+          valGreenhouse: '+33 °C (-18°C → +14,8°C)',
+          compTitle: 'Komposisi Kimia Udara Kering',
+          gasN2: 'Nitrogen (N₂)',
+          gasO2: 'Oksigen (O₂)',
+          gasTrace: 'Argon (Ar) & Gas Jejak (CO₂, Ne, He)'
+        },
+        chapNav: {
+          sectionTag: 'SISTEM NAVIGASI KURIKULUM TERRAPEDIA',
+          prevLabel: 'Sebelumnya',
+          prevTitle: 'BAB 01 — Geosfer & Tektonik',
+          currLabel: 'Sedang dibuka',
+          currTitle: 'BAB 02 — Atmosfer & Iklim',
+          nextLabel: 'Berikutnya',
+          nextTitle: 'BAB 03 — Biosfer & Ekosistem'
+        },
+        toast: {
+          closeModal: 'Mode Preview Mandiri: Di website utama, tombol ini menutup #articleModal.',
+          navPrev: 'Navigasi TerraPedia: Memuat BAB 01 — Geosfer & Struktur Dalam Bumi...',
+          navNext: 'Navigasi TerraPedia: Memuat BAB 03 — Hidrosfer & Siklus Air...',
+          langChanged: 'Bahasa diubah ke Bahasa Indonesia (ID)'
+        }
+      },
+      en: {
+        header: {
+          chapterBadge: 'CH 02 — Atmosphere & Climate',
+          title: "Earth's Atmospheric Structure & Climate Dynamics",
+          articleBtn: 'Scientific Article',
+          closeTitle: 'Exit to TerraPedia'
+        },
+        viewport: {
+          cutawayMode: '3D Cutaway Mode',
+          fullSphereMode: 'Full Sphere Mode',
+          labelsOn: '3D Labels: ON',
+          labelsOff: '3D Labels: OFF',
+          rotateOn: 'Auto-Rotate: ON',
+          rotateOff: 'Auto-Rotate: OFF',
+          resetCamera: 'Reset Camera'
+        },
+        pills: {
+          troposfer: 'Troposphere',
+          stratosfer: 'Stratosphere',
+          mesosfer: 'Mesosphere',
+          termosfer: 'Thermosphere',
+          eksosfer: 'Exosphere'
+        },
+        hud: {
+          defaultPrompt: 'Click any atmospheric layer or 3D object',
+          hoverPrefix: 'Hovering:',
+          hoverSuffix: '— Click to inspect'
+        },
+        detail: {
+          overviewTag: '5-layer overview',
+          prevLayerBtn: '← Lower Layer',
+          nextLayerBtn: 'Upper Layer →',
+          lblAltitude: 'Altitude Range',
+          lblTemp: 'Temperature Range',
+          lblPressure: 'Pressure & Mass',
+          lblObjects: '3D Objects & Phenomena',
+          lblComposition: 'Dominant Composition',
+          focusCameraBtn: 'Focus Camera on This Layer'
+        },
+        article: {
+          s1Tag: '01 // ATMOSPHERIC COMPOSITION & EVOLUTION',
+          s1Title: "Protective Gaseous Envelope & Earth's Thermodynamic Engine",
+          s1Para1:
+            'Earth’s atmosphere is a fluid envelope of gases surrounding our planet, bound by terrestrial gravity. Although the outer exosphere gradually fades into interplanetary space at around <strong class="text-white font-mono">10,000 km</strong> (nearly one-third of the way to geosynchronous orbit), approximately <strong class="text-[#5df0a8] font-mono">75%–80% of the total atmospheric mass</strong> is compressed within the lowest <strong class="text-white font-mono">12 km</strong> (the Troposphere).',
+          s1Para2:
+            'Functionally, the vertical stratification of the atmosphere is defined by its <strong class="text-white">vertical temperature gradient (lapse rate)</strong>. Each concentric shell is bounded by a thin transition zone known as a <em>pause</em> (Tropopause, Stratopause, Mesopause, and Thermopause) where temperature trends invert due to selective absorption of solar radiation.',
+          s1Box1Title: 'Radiation & Meteoroid Shield',
+          s1Box1Desc:
+            'Absorbs lethal X-rays and EUV in the thermosphere, filters 97–99% of UV-B/UV-C radiation in the stratospheric ozone layer, and vaporizes millions of daily meteoroids in the mesosphere.',
+          s1Box2Title: 'Global Thermal Regulation',
+          s1Box2Desc:
+            'The natural greenhouse effect sustains Earth’s mean surface temperature at <span class="font-mono text-white">+14.8°C</span> (without an atmosphere, the global average would plunge to <span class="font-mono text-white">-18°C</span>).',
+          s1Box3Title: 'Hydrological & Acoustic Medium',
+          s1Box3Desc:
+            'Serves as the global conveyor for water vapor transport from oceans to continents while maintaining barometric pressure required for liquid surface water.',
+          s2Tag: '02 // VERTICAL STRATIFICATION',
+          s2Hint: 'Click any layer card below to highlight and inspect it on the 3D model',
+          s2Title: 'Characteristics of the Five Principal Atmospheric Layers',
+          card1Title: '1. Troposphere (0 – 12 km)',
+          card1Temp: 'Temp: +15°C → -56°C',
+          card1Phenom: 'Clouds & Active Weather',
+          card1Desc:
+            'Heated from below by terrestrial infrared radiation, causing temperature to drop at an average <span class="font-mono text-white">6.5°C per kilometer</span> (<em>normal environmental lapse rate</em>). Its thickness spans from ~8 km at the poles to ~18 km at the equator due to rotational centrifugal force and vigorous tropical convection.',
+          card2Title: '2. Stratosphere (12 – 50 km)',
+          card2Temp: 'Temp: -56°C → -2°C',
+          card2Phenom: 'Commercial Jets & Ozone Layer',
+          card2Desc:
+            'Experiences a <strong>temperature inversion</strong> (warming with altitude) because concentrated ozone (<span class="font-mono text-white">O₃</span>) between 20–35 km absorbs solar ultraviolet radiation. Because the air is highly stratified and free of vertical convective storms, the lower stratosphere serves as the primary cruising corridor for commercial jetliners and weather balloons.',
+          card3Title: '3. Mesosphere (50 – 85 km)',
+          card3Temp: 'Temp: -2°C → -90°C',
+          card3Phenom: 'Meteor Ablation',
+          card3Desc:
+            'The coldest layer of Earth’s atmosphere, dropping to <span class="font-mono text-white">-90°C to -100°C</span> at the <em>Mesopause</em>. Although air density is less than 0.1% of sea level, ram-pressure compression against gas molecules is sufficient to incinerate thousands of tons of incoming meteoroids traveling at 11–72 km/s.',
+          card4Title: '4. Thermosphere (85 – 600 km)',
+          card4Temp: 'Temp: -90°C → +1,500°C',
+          card4Phenom: 'Aurora & ISS Orbit',
+          card4Desc:
+            'Encompasses the bulk of the <strong>Ionosphere</strong> and crosses the <strong>Kármán Line (100 km)</strong>. Atomic oxygen and nitrogen absorb extreme ultraviolet (EUV) and solar X-rays, raising kinetic temperatures above 1,500°C. Solar wind particles channeled by Earth’s magnetosphere excite gases here to produce <em>Aurora Borealis</em> and <em>Australis</em> curtains.',
+          card5Title: '5. Exosphere (600 – 10,000 km)',
+          card5Temp: 'Interplanetary Transition',
+          card5Phenom: 'High-Orbit Satellites',
+          card5Desc:
+            'The outermost transition zone between Earth’s atmosphere and interplanetary vacuum. The mean free path between light hydrogen and helium atoms spans hundreds of kilometers, allowing particles to travel on collisionless ballistic trajectories. Weather, navigation, and earth-observation satellites orbit within this near-vacuum.',
+          s3Tag: '03 // RADIATIVE DYNAMICS & GLOBAL CIRCULATION',
+          s3Title: "Global Atmospheric Circulation & Earth's Energy Budget",
+          s3Para:
+            'Earth’s climate engine is driven by differential solar heating between the equatorial regions (radiative surplus) and polar regions (radiative deficit). This thermal imbalance powers three primary meridional overturning cells in each hemisphere—the <strong class="text-white">Hadley Cell</strong> (0°–30°), <strong class="text-white">Ferrel Cell</strong> (30°–60°), and <strong class="text-white">Polar Cell</strong> (60°–90°)—deflected zonally by the planetary <em>Coriolis Effect</em>.',
+          s3RadTitle: 'Solar Radiation Budget',
+          s3RadVal: '340 W/m² Global Mean',
+          s3RadLeg1: '29% Albedo',
+          s3RadLeg2: '23% Atmosphere',
+          s3RadLeg3: '48% Surface',
+          s3GhgTitle: 'Primary Greenhouse Gases',
+          s3GhgSub: 'Infrared Absorbers',
+          s3GhgDesc:
+            'Water vapor (<span class="font-mono text-white">H₂O</span>), carbon dioxide (<span class="font-mono text-white">CO₂ ~422 ppm</span>), methane (<span class="font-mono text-white">CH₄</span>), and nitrous oxide (<span class="font-mono text-white">N₂O</span>) trap outgoing longwave infrared radiation emitted by Earth’s surface.'
+        },
+        sidebar: {
+          layerListTag: 'Interactive · 3D synced',
+          layerListTitle: 'Atmospheric Layer List',
+          layerListOrder: 'Top → Bottom',
+          slab5Name: 'Exosphere',
+          slab5Sub: 'High-Orbit Satellites • Cosmic Fringe',
+          slab4Name: 'Thermosphere',
+          slab4Sub: 'Polar Aurora & ISS Orbit',
+          slab3Name: 'Mesosphere',
+          slab3Sub: 'Meteor Ablation • Coldest Layer',
+          slab2Name: 'Stratosphere',
+          slab2Sub: 'Commercial Jets & Ozone Layer',
+          slab1Name: 'Troposphere',
+          slab1Sub: 'Clouds & Active Weather',
+          earthSurfaceNote: 'Earth Surface (R = 6,371 km)',
+          surfacePressureNote: 'Pressure: 1 atm'
+        },
+        infobox: {
+          tag: 'Telemetry infobox',
+          title: 'Atmospheric Physical Data',
+          lblMass: 'Total Atmospheric Mass',
+          valMass: '5.15 × 10¹⁸ kg',
+          lblPressure: 'Mean Surface Pressure',
+          valPressure: '1,013.25 hPa (1 atm)',
+          lblScaleHeight: 'Scale Height',
+          valScaleHeight: '~8.5 km',
+          lblTropopause: 'Tropopause Altitude',
+          valTropopause: '8 km (Poles) – 18 km (Equator)',
+          lblSolarConstant: 'Solar Constant (TSI)',
+          valSolarConstant: '1,361 W/m²',
+          lblAlbedo: 'Mean Planetary Albedo',
+          valAlbedo: '0.30 (~30% Reflected)',
+          lblGreenhouse: 'Greenhouse Warming',
+          valGreenhouse: '+33 °C (-18°C → +14.8°C)',
+          compTitle: 'Dry Air Chemical Composition',
+          gasN2: 'Nitrogen (N₂)',
+          gasO2: 'Oxygen (O₂)',
+          gasTrace: 'Argon (Ar) & Trace Gases (CO₂, Ne, He)'
+        },
+        chapNav: {
+          sectionTag: 'TERRAPEDIA CURRICULUM NAVIGATION',
+          prevLabel: 'Previous',
+          prevTitle: 'CH 01 — Geosphere & Tectonics',
+          currLabel: 'Currently viewing',
+          currTitle: 'CH 02 — Atmosphere & Climate',
+          nextLabel: 'Next',
+          nextTitle: 'CH 03 — Biosphere & Ecosystems'
+        },
+        toast: {
+          closeModal: 'Standalone Preview Mode: In the main app, this button closes #articleModal.',
+          navPrev: "TerraPedia Navigation: Loading CH 01 — Geosphere & Earth's Interior...",
+          navNext: 'TerraPedia Navigation: Loading CH 03 — Hydrosphere & Water Cycle...',
+          langChanged: 'Language switched to English (EN)'
+        }
+      }
+    };
+
+    /**
+     * DATA ILMIAH & VISUAL 5 LAPISAN ATMOSFER TERRAPEDIA (MENDUKUNG DWIBAHASA ID & EN)
+     */
+    const ATMOSPHERE_LAYERS_DATA = [
+      {
+        id: 'troposfer',
+        index: '01',
+        colorHex: 0x8be8ff,
+        cssColor: '#8be8ff',
+        innerRadius: 2.38,
+        outerRadius: 2.92,
+        baseOpacity: 0.34,
+        labelAnchorRadius: 2.66,
+        labelPhi: 0.45,
+        labelTheta: 0.32,
+        i18n: {
+          id: {
+            name: 'Troposfer',
+            secondaryCode: 'TROPOSPHERE',
+            subtitle: 'Troposfer — Lapisan Cuaca & Biosfer',
+            tag: 'Lapisan 01 · Terendah & terpadat',
+            altitude: '0 – 12 km',
+            altitudeSub: '8 km (Kutub) – 18 km (Ekuator)',
+            temp: '+15°C s/d -56°C',
+            tempSub: 'Turun ~6,5°C tiap kenaikan 1 km',
+            pressure: '1013 – 200 hPa',
+            pressureSub: 'Menyimpan ~80% massa atmosfer',
+            objectsLabel: 'Awan & Cuaca Aktif',
+            boundary: 'Puncak: Tropopause (~12 km)',
+            gasComposition: 'N₂ (78%), O₂ (21%), H₂O (uap air 0–4%), Ar, CO₂',
+            description:
+              'Troposfer adalah lapisan atmosfer paling bawah dan paling rapat yang bersentuhan langsung dengan permukaan Bumi. Hampir seluruh uap air, pembentukan awan kumulonimbus, presipitasi hujan, badai petir, dan dinamika cuaca harian berlangsung di lapisan ini.',
+            highlights: ['Siklus Hidrologi & Awan', 'Penerbangan Baling-Baling', 'Biosfer Kehidupan', 'Efek Rumah Kaca']
+          },
+          en: {
+            name: 'Troposphere',
+            secondaryCode: 'TROPOSFER',
+            subtitle: 'Troposphere — Weather & Biosphere Layer',
+            tag: 'Layer 01 · Lowest & densest',
+            altitude: '0 – 12 km',
+            altitudeSub: '8 km (Poles) – 18 km (Equator)',
+            temp: '+15°C to -56°C',
+            tempSub: 'Drops ~6.5°C per km gained',
+            pressure: '1013 – 200 hPa',
+            pressureSub: 'Contains ~80% of atmospheric mass',
+            objectsLabel: 'Clouds & Active Weather',
+            boundary: 'Top: Tropopause (~12 km)',
+            gasComposition: 'N₂ (78%), O₂ (21%), H₂O (water vapor 0–4%), Ar, CO₂',
+            description:
+              'The troposphere is the lowest and densest atmospheric layer in direct contact with Earth’s surface. Virtually all water vapor, cumulonimbus cloud formation, precipitation, thunderstorms, and daily weather dynamics occur within this shell.',
+            highlights: ['Hydrological Cycle & Clouds', 'Propeller Aviation', 'Terrestrial Biosphere', 'Greenhouse Effect']
+          }
+        }
+      },
+      {
+        id: 'stratosfer',
+        index: '02',
+        colorHex: 0x47b5ff,
+        cssColor: '#47b5ff',
+        innerRadius: 2.96,
+        outerRadius: 3.56,
+        baseOpacity: 0.28,
+        labelAnchorRadius: 3.26,
+        labelPhi: 0.18,
+        labelTheta: -0.35,
+        i18n: {
+          id: {
+            name: 'Stratosfer',
+            secondaryCode: 'STRATOSPHERE',
+            subtitle: 'Stratosfer — Sabuk Ozon & Jalur Pesawat Jet',
+            tag: 'Lapisan 02 · Perisai ultraviolet',
+            altitude: '12 – 50 km',
+            altitudeSub: 'Mencakup Lapisan Ozon (20–35 km)',
+            temp: '-56°C s/d -2°C',
+            tempSub: 'Inversi suhu karena serapan UV oleh O₃',
+            pressure: '200 – 1 hPa',
+            pressureSub: '~19% massa total atmosfer',
+            objectsLabel: 'Pesawat Jet & Lapisan Ozon',
+            boundary: 'Puncak: Stratopause (~50 km)',
+            gasComposition: 'N₂, O₂, Konsentrasi Tinggi Ozon (O₃), Udara Sangat Kering',
+            description:
+              'Stratosfer memiliki profil suhu yang terbalik (semakin tinggi semakin hangat) karena molekul Ozon (O₃) menyerap radiasi ultraviolet UV-B dan UV-C dari Matahari. Ketiadaan turbulensi konvektif vertikal menjadikan stratosfer bawah koridor ideal bagi pesawat jet komersial.',
+            highlights: ['Sabuk Ozon (O₃)', 'Jelajah Pesawat Komersial', 'Balon Cuaca Stratosfer', 'Bebas Badai Konvektif']
+          },
+          en: {
+            name: 'Stratosphere',
+            secondaryCode: 'STRATOSFER',
+            subtitle: 'Stratosphere — Ozone Belt & Commercial Jet Corridor',
+            tag: 'Layer 02 · Ultraviolet shield',
+            altitude: '12 – 50 km',
+            altitudeSub: 'Contains the Ozone Layer (20–35 km)',
+            temp: '-56°C to -2°C',
+            tempSub: 'Thermal inversion via UV absorption by O₃',
+            pressure: '200 – 1 hPa',
+            pressureSub: '~19% of total atmospheric mass',
+            objectsLabel: 'Commercial Jets & Ozone Layer',
+            boundary: 'Top: Stratopause (~50 km)',
+            gasComposition: 'N₂, O₂, High Ozone Concentration (O₃), Very Dry Air',
+            description:
+              'The stratosphere exhibits an inverted temperature profile (warming with altitude) as Ozone (O₃) molecules absorb solar UV-B and UV-C radiation. The absence of vertical convective turbulence makes the lower stratosphere an ideal cruising corridor for commercial jet aircraft.',
+            highlights: ['Ozone Belt (O₃)', 'Commercial Jet Cruising', 'Stratospheric Weather Balloons', 'Turbulence-Free Stability']
+          }
+        }
+      },
+      {
+        id: 'mesosfer',
+        index: '03',
+        colorHex: 0x3b6ef5,
+        cssColor: '#3b6ef5',
+        innerRadius: 3.60,
+        outerRadius: 4.24,
+        baseOpacity: 0.24,
+        labelAnchorRadius: 3.92,
+        labelPhi: -0.15,
+        labelTheta: 0.42,
+        i18n: {
+          id: {
+            name: 'Mesosfer',
+            secondaryCode: 'MESOSPHERE',
+            subtitle: 'Mesosfer — Zona Ablasi Meteor & Titik Terdingin',
+            tag: 'Lapisan 03 · Perisai meteoroid',
+            altitude: '50 – 85 km',
+            altitudeSub: 'Di atas stratosfer, di bawah termosfer',
+            temp: '-2°C s/d -90°C',
+            tempSub: 'Titik terdingin atmosfer Bumi (-90°C)',
+            pressure: '1 – 0,01 hPa',
+            pressureSub: '< 0,1% massa atmosfer',
+            objectsLabel: 'Pembakaran Meteor',
+            boundary: 'Puncak: Mesopause (~85 km)',
+            gasComposition: 'N₂, O₂, Atom Logam Ablasi Meteor (Fe, Mg, Na)',
+            description:
+              'Mesosfer adalah lapisan tempat sebagian besar meteor dan batuan antariksa terbakar habis akibat gesekan kompresi udara berkecepatan hipersonik. Di puncak mesosfer (Mesopause), suhu turun drastis hingga -90°C dan terkadang membentuk awan es kutub noktilusen.',
+            highlights: ['Ablasi Meteor (Bintang Jatuh)', 'Suhu Terdingin -90°C', 'Awan Noktilusen', 'Roket Sonde Suborbital']
+          },
+          en: {
+            name: 'Mesosphere',
+            secondaryCode: 'MESOSFER',
+            subtitle: 'Mesosphere — Meteor Ablation Zone & Coldest Point',
+            tag: 'Layer 03 · Meteoroid shield',
+            altitude: '50 – 85 km',
+            altitudeSub: 'Above stratosphere, below thermosphere',
+            temp: '-2°C to -90°C',
+            tempSub: 'Coldest region of Earth’s atmosphere (-90°C)',
+            pressure: '1 – 0.01 hPa',
+            pressureSub: '< 0.1% of atmospheric mass',
+            objectsLabel: 'Meteor Ablation',
+            boundary: 'Top: Mesopause (~85 km)',
+            gasComposition: 'N₂, O₂, Ablated Meteoric Metal Atoms (Fe, Mg, Na)',
+            description:
+              'The mesosphere is where most incoming meteors and space debris incinerate due to hypersonic ram-pressure compression. At its upper boundary (the Mesopause), temperatures plummet to -90°C, occasionally forming high-altitude polar noctilucent ice clouds.',
+            highlights: ['Meteor Ablation (Shooting Stars)', 'Coldest Temp -90°C', 'Noctilucent Clouds', 'Suborbital Sounding Rockets']
+          }
+        }
+      },
+      {
+        id: 'termosfer',
+        index: '04',
+        colorHex: 0x6936f5,
+        cssColor: '#8b63ff',
+        innerRadius: 4.28,
+        outerRadius: 5.02,
+        baseOpacity: 0.20,
+        labelAnchorRadius: 4.65,
+        labelPhi: 0.48,
+        labelTheta: -0.45,
+        i18n: {
+          id: {
+            name: 'Termosfer',
+            secondaryCode: 'THERMOSPHERE',
+            subtitle: 'Termosfer — Fenomena Aurora & Orbit Stasiun ISS',
+            tag: 'Lapisan 04 · Ionosfer & Garis Kármán',
+            altitude: '85 – 600 km',
+            altitudeSub: 'Melintasi Garis Kármán (100 km)',
+            temp: '-90°C s/d +1.500°C',
+            tempSub: 'Energi kinetik partikel ekstrem oleh EUV',
+            pressure: '< 0,01 hPa (Vakum Rendah)',
+            pressureSub: 'Partikel terionisasi (Ionosfer)',
+            objectsLabel: 'Aurora & Orbit ISS',
+            boundary: 'Puncak: Termopause (~600 km)',
+            gasComposition: 'Oksigen Atomik (O), Nitrogen (N₂), Ion Bermuatan & Elektron Bebas',
+            description:
+              'Termosfer menyerap radiasi sinar-X dan ultraviolet ekstrem (EUV) Matahari, memicu ionisasi gas yang membentuk lapisan Ionosfer pemantul gelombang radio. Di wilayah kutub, tumbukan partikel angin surya menghasilkan pendaran cahaya Aurora Borealis dan Australis, sementara Stasiun ISS mengorbit pada ~408 km.',
+            highlights: ['Aurora Borealis & Australis', 'Stasiun Antariksa ISS', 'Garis Kármán (100 km)', 'Pemantulan Radio Ionosfer']
+          },
+          en: {
+            name: 'Thermosphere',
+            secondaryCode: 'TERMOSFER',
+            subtitle: 'Thermosphere — Polar Auroras & ISS Orbital Zone',
+            tag: 'Layer 04 · Ionosphere & Kármán line',
+            altitude: '85 – 600 km',
+            altitudeSub: 'Crosses the Kármán Line (100 km)',
+            temp: '-90°C to +1,500°C',
+            tempSub: 'Extreme particle kinetic energy from solar EUV',
+            pressure: '< 0.01 hPa (High Vacuum)',
+            pressureSub: 'Ionized plasma layer (Ionosphere)',
+            objectsLabel: 'Aurora & ISS Orbit',
+            boundary: 'Top: Thermopause (~600 km)',
+            gasComposition: 'Atomic Oxygen (O), Nitrogen (N₂), Charged Ions & Free Electrons',
+            description:
+              'The thermosphere absorbs high-energy solar X-rays and extreme ultraviolet (EUV) radiation, photo-ionizing gases into the radio-reflecting Ionosphere. Near the magnetic poles, solar wind particles excite oxygen and nitrogen to glow as Aurora Borealis and Australis, while the ISS orbits at ~408 km.',
+            highlights: ['Aurora Borealis & Australis', 'International Space Station (ISS)', 'Kármán Line (100 km)', 'Ionospheric Radio Propagation']
+          }
+        }
+      },
+      {
+        id: 'eksosfer',
+        index: '05',
+        colorHex: 0x4152d9,
+        cssColor: '#667aff',
+        innerRadius: 5.06,
+        outerRadius: 5.88,
+        baseOpacity: 0.15,
+        labelAnchorRadius: 5.48,
+        labelPhi: -0.35,
+        labelTheta: -0.18,
+        i18n: {
+          id: {
+            name: 'Eksosfer',
+            secondaryCode: 'EXOSPHERE',
+            subtitle: 'Eksosfer — Batas Kosmik & Satelit Orbit Tinggi',
+            tag: 'Lapisan 05 · Transisi ruang hampa',
+            altitude: '600 – 10.000 km',
+            altitudeSub: 'Berangsur menyatu dengan ruang antarplanet',
+            temp: '300°C s/d >1.700°C',
+            tempSub: 'Suhu kinetik tinggi, namun tak menghantarkan panas',
+            pressure: '~10⁻¹² hPa (Eksovakum)',
+            pressureSub: 'Lintasan atom balistik bebas tumbukan',
+            objectsLabel: 'Satelit Orbit Tinggi',
+            boundary: 'Batas Luar: Geokorona (~10.000 km)',
+            gasComposition: 'Hidrogen (H) sangat ringan, Helium (He), jejak Oksigen Atomik',
+            description:
+              'Eksosfer adalah lapisan terluar atmosfer Bumi di mana kerapatan molekul gas sedemikian tipisnya sehingga atom-atom hidrogen dan helium bergerak ribuan kilometer tanpa saling bertumbukan. Wilayah ini menjadi rumah bagi berbagai satelit cuaca, komunikasi, dan ilmiah.',
+            highlights: ['Satelit Observasi & Komunikasi', 'Geokorona Hidrogen', 'Lintasan Bebas Tumbukan', 'Batas Gravitasi Atmosfer']
+          },
+          en: {
+            name: 'Exosphere',
+            secondaryCode: 'EKSOSFER',
+            subtitle: 'Exosphere — Cosmic Boundary & High-Orbit Satellites',
+            tag: 'Layer 05 · Interplanetary transition',
+            altitude: '600 – 10,000 km',
+            altitudeSub: 'Gradually merges with interplanetary space',
+            temp: '300°C to >1,700°C',
+            tempSub: 'High kinetic speed, negligible thermal transfer',
+            pressure: '~10⁻¹² hPa (Exovacuum)',
+            pressureSub: 'Collisionless ballistic atomic trajectories',
+            objectsLabel: 'High-Orbit Satellites',
+            boundary: 'Outer Limit: Geocorona (~10,000 km)',
+            gasComposition: 'Ultra-light Hydrogen (H), Helium (He), trace Atomic Oxygen',
+            description:
+              'The exosphere is the outermost fringe of Earth’s atmosphere where gas density is so tenuous that hydrogen and helium atoms travel thousands of kilometers without colliding. Numerous weather, navigation, and scientific satellites operate within this near-vacuum region.',
+            highlights: ['Observation & Comms Satellites', 'Hydrogen Geocorona', 'Collisionless Trajectories', 'Gravitational Escape Fringe']
+          }
+        }
+      }
+    ];
+
+    /**
+     * CLASS MODUL VISUALISASI 3D ATMOSFER TERRAPEDIA
+     * Dirancang agar modular dan dapat langsung dipanggil di dalam #articleModal
+     */
+    export class TerraPediaAtmosphere3D {
+      constructor(options) {
+        this.canvas = options.canvas;
+        this.labelsContainer = options.labelsContainer;
+        this.lang = options.lang || 'id';
+        this.onSelectLayerCallback = options.onSelectLayer || (() => {});
+        this.onHoverLayerCallback = options.onHoverLayer || (() => {});
+
+        this.selectedLayerId = 'troposfer';
+        this.hoveredLayerId = null;
+        this.isCutawayMode = true; // Default: Irisan 3D agar semua 5 lapisan mudah dilihat & diklik langsung
+        this.showLabels = true;
+        this.autoRotate = true;
+
+        this.layerGroups = new Map();
+        this.interactiveMeshes = [];
+        this.projectedLabels = [];
+        this.animatedActors = {
+          clouds: [],
+          airplanes: [],
+          meteors: [],
+          auroraRings: [],
+          issGroup: null,
+          satellites: [],
+          highlightRings: []
+        };
+
+        this.clock = new THREE.Clock();
+        this.raycaster = new THREE.Raycaster();
+        this.pointer = new THREE.Vector2();
+        this.pointerDownPos = new THREE.Vector2();
+
+        this.initScene();
+        this.createStarfield();
+        this.createEarthCore();
+        this.createAtmosphericShells();
+        this.createSupportingObjects();
+        this.create3DCalloutLabels();
+        this.bindEvents();
+        this.highlightLayer(this.selectedLayerId, false);
+        this.animate();
+      }
+
+      initScene() {
+        const width = window.innerWidth || 800;
+        const height = window.innerHeight || 600;
+
+        this.scene = new THREE.Scene();
+
+        this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 200);
+        this.camera.position.set(8.2, 4.1, 10.6);
+
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: this.canvas,
+          antialias: true,
+          alpha: true,
+          powerPreference: 'high-performance'
+        });
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.sortObjects = true;
+
+        this.controls = new OrbitControls(this.camera, this.canvas);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.06;
+        this.controls.rotateSpeed = 0.75;
+        this.controls.zoomSpeed = 0.9;
+        this.controls.minDistance = 4.6;
+        this.controls.maxDistance = 22.0;
+        this.controls.enablePan = false;
+
+        // Pencahayaan Kosmik
+        const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.72);
+        this.scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.35);
+        sunLight.position.set(14, 10, 12);
+        this.scene.add(sunLight);
+
+        const rimLight = new THREE.DirectionalLight(0x5df0a8, 0.55);
+        rimLight.position.set(-12, -8, -10);
+        this.scene.add(rimLight);
+
+        // DEEP-SPACE STARFIELD (pola BAB 01): bintang berkelip di latar belakang atmosfer
+        const starCount = 1400, starGeo = new THREE.BufferGeometry(), starPos = new Float32Array(starCount * 3), starSeed = new Float32Array(starCount);
+        for (let i = 0; i < starCount; i++) {
+          const r = 40 + Math.random() * 80, th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1);
+          starPos[i * 3] = Math.sin(ph) * Math.cos(th) * r; starPos[i * 3 + 1] = Math.cos(ph) * r; starPos[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * r;
+          starSeed[i] = Math.random() * 100;
+        }
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        starGeo.setAttribute('aSeed', new THREE.BufferAttribute(starSeed, 1));
+
+        this.starMat = new THREE.ShaderMaterial({
+          transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+          uniforms: { uTime: { value: 0 }, uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) } },
+          vertexShader: `attribute float aSeed; uniform float uTime; uniform float uDpr; varying float vTw; varying float vTint; void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vTw=0.45+0.55*sin(uTime*(1.2+fract(aSeed)*1.8)+aSeed);vTint=fract(aSeed*3.17);gl_PointSize=(1.4+1.8*fract(aSeed*7.1))*(65.0/max(-mv.z,1.0))*uDpr;gl_Position=projectionMatrix*mv;}`,
+          fragmentShader: `varying float vTw; varying float vTint; void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;vec3 col=mix(vec3(0.80,0.88,1.0),vec3(0.45,0.96,0.72),step(0.82,vTint));gl_FragColor=vec4(col,pow(1.0-d,2.2)*vTw);}`
+        });
+        const starPoints = new THREE.Points(starGeo, this.starMat);
+        this.scene.add(starPoints);
+
+        // Group Induk Planet & Atmosfer — dinaikkan agar diorama memenuhi area atas,
+        // karena UI (pemilih lapisan & kontrol scene) kini berada di dock bawah
+        this.worldGroup = new THREE.Group();
+        this.worldGroup.position.y = 1.05;
+        this.scene.add(this.worldGroup);
+      }
+
+      /**
+       * Membuat tekstur prosedural Planet Bumi berkualitas tinggi menggunakan HTML5 Canvas
+       */
+      generateEarthTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1024;
+        canvas.height = 512;
+        const ctx = canvas.getContext('2d');
+
+        // Samudra Dalam
+        const oceanGrad = ctx.createLinearGradient(0, 0, 0, 512);
+        oceanGrad.addColorStop(0, '#0a2342');
+        oceanGrad.addColorStop(0.5, '#0d3b66');
+        oceanGrad.addColorStop(1, '#081c36');
+        ctx.fillStyle = oceanGrad;
+        ctx.fillRect(0, 0, 1024, 512);
+
+        // Grid garis lintang & bujur halus untuk estetika sains TerraPedia
+        ctx.strokeStyle = 'rgba(93, 240, 168, 0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 1024; x += 64) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 512);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 512; y += 64) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(1024, y);
+          ctx.stroke();
+        }
+
+        // Fungsi pembantu menggambar benua organik
+        const drawContinent = (points, fillStyle, strokeStyle) => {
+          ctx.beginPath();
+          ctx.moveTo(points[0][0], points[0][1]);
+          for (let i = 1; i < points.length; i++) {
+            const xc = (points[i][0] + points[i - 1][0]) / 2;
+            const yc = (points[i][1] + points[i - 1][1]) / 2;
+            ctx.quadraticCurveTo(points[i - 1][0], points[i - 1][1], xc, yc);
+          }
+          ctx.closePath();
+          ctx.fillStyle = fillStyle;
+          ctx.fill();
+          if (strokeStyle) {
+            ctx.strokeStyle = strokeStyle;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        };
+
+        const landColor = '#1e6b52';
+        const landHighlight = '#38a169';
+        const coastStroke = 'rgba(93, 240, 168, 0.35)';
+
+        // Amerika Utara & Selatan
+        drawContinent([[130,90],[230,80],[270,150],[220,210],[180,220],[140,160]], landColor, coastStroke);
+        drawContinent([[230,245],[295,270],[310,340],[270,425],[240,410],[225,310]], landColor, coastStroke);
+        // Eurasia & Afrika
+        drawContinent([[460,190],[550,185],[590,260],[560,375],[505,380],[475,295],[445,250]], landColor, coastStroke);
+        drawContinent([[470,75],[680,65],[820,95],[860,180],[770,245],[670,235],[595,185],[480,155]], landColor, coastStroke);
+        // Kepulauan Indonesia & Australia
+        drawContinent([[760,260],[825,265],[845,285],[775,290]], landHighlight, coastStroke);
+        drawContinent([[790,320],[880,315],[900,385],[825,405],[780,370]], landColor, coastStroke);
+
+        // Tudung Es Kutub Utara & Selatan
+        ctx.fillStyle = 'rgba(226, 242, 255, 0.85)';
+        ctx.fillRect(0, 0, 1024, 24);
+        ctx.fillRect(0, 486, 1024, 26);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+      }
+
+      /**
+       * Latar belakang bintang kosmik
+       */
+      createStarfield() {
+        const starCount = 1400;
+        const positions = new Float32Array(starCount * 3);
+        const colors = new Float32Array(starCount * 3);
+
+        for (let i = 0; i < starCount; i++) {
+          const r = 32 + Math.random() * 55;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+
+          positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+          positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+          positions[i * 3 + 2] = r * Math.cos(phi);
+
+          const c = 0.72 + Math.random() * 0.28;
+          colors[i * 3] = c;
+          colors[i * 3 + 1] = c + (Math.random() * 0.08);
+          colors[i * 3 + 2] = 1.0;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+        const mat = new THREE.PointsMaterial({
+          size: 0.22,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.85
+        });
+
+        this.starfield = new THREE.Points(geo, mat);
+        this.scene.add(this.starfield);
+      }
+
+      /**
+       * Membuat Bola Inti Planet Bumi di Pusat
+       */
+      createEarthCore() {
+        const earthRadius = 2.32;
+        const earthGeo = new THREE.SphereGeometry(earthRadius, 64, 64);
+        const earthMat = new THREE.MeshPhongMaterial({
+          map: this.generateEarthTexture(),
+          specular: new THREE.Color(0x2b6cb0),
+          shininess: 18,
+          emissive: new THREE.Color(0x06152d),
+          emissiveIntensity: 0.35
+        });
+
+        this.earthMesh = new THREE.Mesh(earthGeo, earthMat);
+        this.worldGroup.add(this.earthMesh);
+
+        // Garis Ekuator Halus di Permukaan Bumi
+        const eqCurve = new THREE.EllipseCurve(0, 0, earthRadius + 0.01, earthRadius + 0.01, 0, Math.PI * 2, false, 0);
+        const eqPoints = eqCurve.getPoints(96);
+        const eqGeo = new THREE.BufferGeometry().setFromPoints(eqPoints);
+        eqGeo.rotateX(Math.PI / 2);
+        const eqMat = new THREE.LineBasicMaterial({
+          color: 0x5df0a8,
+          transparent: true,
+          opacity: 0.35
+        });
+        const eqLine = new THREE.Line(eqGeo, eqMat);
+        this.worldGroup.add(eqLine);
+      }
+
+      /**
+       * Membuat 5 Lapisan Atmosfer Transparan Konsentris (Mendukung Mode Irisan 3D & Bola Utuh)
+       */
+      createAtmosphericShells() {
+        if (this.shellsContainer) {
+          this.worldGroup.remove(this.shellsContainer);
+        }
+        this.shellsContainer = new THREE.Group();
+        this.worldGroup.add(this.shellsContainer);
+
+        this.layerGroups.clear();
+        // Pertahankan hanya mesh aktor pendukung saat membangun ulang bola lapisan
+        this.interactiveMeshes = this.interactiveMeshes.filter((m) => m.userData.isActor);
+
+        const phiStart = 0.38;
+        const phiLength = this.isCutawayMode ? Math.PI * 1.52 : Math.PI * 2;
+
+        ATMOSPHERE_LAYERS_DATA.forEach((layer) => {
+          const group = new THREE.Group();
+          group.userData = { layerId: layer.id };
+
+          // 1. Bola Lapisan Luar Transparan
+          const shellGeo = new THREE.SphereGeometry(
+            layer.outerRadius,
+            56,
+            40,
+            phiStart,
+            phiLength,
+            0,
+            Math.PI
+          );
+
+          const shellMat = new THREE.MeshPhongMaterial({
+            color: layer.colorHex,
+            emissive: layer.colorHex,
+            emissiveIntensity: 0.18,
+            transparent: true,
+            opacity: layer.baseOpacity,
+            shininess: 40,
+            side: this.isCutawayMode ? THREE.DoubleSide : THREE.FrontSide,
+            depthWrite: false
+          });
+
+          const shellMesh = new THREE.Mesh(shellGeo, shellMat);
+          shellMesh.userData = { layerId: layer.id, part: 'shell' };
+          group.add(shellMesh);
+          this.interactiveMeshes.push(shellMesh);
+
+          // 2. Dinding Penampang Irisan (Cross-Section End Caps) pada Mode Irisan 3D
+          const capMeshes = [];
+          if (this.isCutawayMode) {
+            const capGeo = new THREE.RingGeometry(
+              layer.innerRadius,
+              layer.outerRadius,
+              48,
+              1,
+              -Math.PI / 2,
+              Math.PI
+            );
+
+            const capMat = new THREE.MeshBasicMaterial({
+              color: layer.colorHex,
+              transparent: true,
+              opacity: Math.min(layer.baseOpacity + 0.24, 0.68),
+              side: THREE.DoubleSide,
+              depthWrite: false
+            });
+
+            const cap1 = new THREE.Mesh(capGeo, capMat);
+            cap1.rotation.y = phiStart - Math.PI / 2;
+            cap1.userData = { layerId: layer.id, part: 'cap' };
+            group.add(cap1);
+            capMeshes.push(cap1);
+            this.interactiveMeshes.push(cap1);
+
+            const cap2 = new THREE.Mesh(capGeo, capMat.clone());
+            cap2.rotation.y = phiStart + phiLength - Math.PI / 2;
+            cap2.userData = { layerId: layer.id, part: 'cap' };
+            group.add(cap2);
+            capMeshes.push(cap2);
+            this.interactiveMeshes.push(cap2);
+          }
+
+          // 3. Cincin Highlight Ekuator
+          const ringCurve = new THREE.EllipseCurve(
+            0,
+            0,
+            layer.outerRadius + 0.015,
+            layer.outerRadius + 0.015,
+            0,
+            Math.PI * 2,
+            false,
+            0
+          );
+          const ringPoints = ringCurve.getPoints(96);
+          const ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints);
+          ringGeo.rotateX(Math.PI / 2);
+
+          const ringMat = new THREE.LineBasicMaterial({
+            color: 0x5df0a8,
+            transparent: true,
+            opacity: 0.15
+          });
+          const eqRing = new THREE.Line(ringGeo, ringMat);
+          group.add(eqRing);
+
+          this.shellsContainer.add(group);
+          this.layerGroups.set(layer.id, {
+            data: layer,
+            group,
+            shellMesh,
+            capMeshes,
+            eqRing
+          });
+        });
+
+        this.highlightLayer(this.selectedLayerId, false);
+      }
+
+      /**
+       * Membuat Objek Pendukung 3D di setiap ketinggian lapisan yang sesuai
+       */
+      createSupportingObjects() {
+        this.actorsGroup = new THREE.Group();
+        this.worldGroup.add(this.actorsGroup);
+
+        // 1. TROPOSFER: Gugusan Awan 3D
+        const cloudRadius = 2.66;
+        const cloudCoords = [
+          { lat: 0.25, lon: 0.2, scale: 1.0 },
+          { lat: -0.35, lon: 1.4, scale: 0.9 },
+          { lat: 0.55, lon: 2.6, scale: 1.1 },
+          { lat: -0.15, lon: 3.9, scale: 0.95 },
+          { lat: 0.12, lon: 5.1, scale: 1.05 },
+          { lat: -0.5, lon: -0.8, scale: 0.85 }
+        ];
+
+        const puffGeo = new THREE.SphereGeometry(0.11, 16, 16);
+        const cloudMat = new THREE.MeshPhongMaterial({
+          color: 0xffffff,
+          emissive: 0x8be8ff,
+          emissiveIntensity: 0.22,
+          transparent: true,
+          opacity: 0.92
+        });
+
+        cloudCoords.forEach((c, idx) => {
+          const cloudCluster = new THREE.Group();
+          const offsets = [
+            [0, 0, 0, 1.15],
+            [0.11, -0.02, 0.03, 0.9],
+            [-0.11, -0.01, -0.02, 0.85],
+            [0.04, 0.05, -0.05, 0.8],
+            [-0.05, 0.04, 0.06, 0.75]
+          ];
+          offsets.forEach(([ox, oy, oz, s]) => {
+            const puff = new THREE.Mesh(puffGeo, cloudMat.clone());
+            puff.position.set(ox, oy, oz);
+            puff.scale.setScalar(s * c.scale);
+            puff.userData = { layerId: 'troposfer', isActor: true };
+            cloudCluster.add(puff);
+            this.interactiveMeshes.push(puff);
+          });
+
+          cloudCluster.userData = {
+            lat: c.lat,
+            lon: c.lon,
+            radius: cloudRadius + (idx % 2) * 0.06,
+            speed: 0.08 + idx * 0.015,
+            layerId: 'troposfer'
+          };
+          this.actorsGroup.add(cloudCluster);
+          this.animatedActors.clouds.push(cloudCluster);
+        });
+
+        // 2. STRATOSFER: Pesawat Jet 3D & Contrail
+        const buildAirplane = (colorAccent = 0x5df0a8) => {
+          const plane = new THREE.Group();
+
+          const bodyMat = new THREE.MeshPhongMaterial({
+            color: 0xf8fafc,
+            emissive: 0x1e293b,
+            shininess: 80
+          });
+          const wingMat = new THREE.MeshPhongMaterial({
+            color: colorAccent,
+            emissive: colorAccent,
+            emissiveIntensity: 0.35
+          });
+
+          const fuselageGeo = new THREE.ConeGeometry(0.055, 0.38, 14);
+          fuselageGeo.rotateX(Math.PI / 2);
+          const fuselage = new THREE.Mesh(fuselageGeo, bodyMat);
+          fuselage.userData = { layerId: 'stratosfer', isActor: true };
+          plane.add(fuselage);
+          this.interactiveMeshes.push(fuselage);
+
+          const wingGeo = new THREE.BoxGeometry(0.42, 0.012, 0.09);
+          const wing = new THREE.Mesh(wingGeo, wingMat);
+          wing.position.set(0, 0, -0.02);
+          wing.userData = { layerId: 'stratosfer', isActor: true };
+          plane.add(wing);
+          this.interactiveMeshes.push(wing);
+
+          const tailGeo = new THREE.BoxGeometry(0.014, 0.11, 0.08);
+          const tail = new THREE.Mesh(tailGeo, wingMat);
+          tail.position.set(0, 0.045, -0.14);
+          tail.userData = { layerId: 'stratosfer', isActor: true };
+          plane.add(tail);
+
+          const trailGeo = new THREE.CylinderGeometry(0.008, 0.035, 0.55, 10);
+          trailGeo.rotateX(Math.PI / 2);
+          const trailMat = new THREE.MeshBasicMaterial({
+            color: 0x8be8ff,
+            transparent: true,
+            opacity: 0.48
+          });
+          const trail = new THREE.Mesh(trailGeo, trailMat);
+          trail.position.set(0, 0, -0.42);
+          plane.add(trail);
+
+          return plane;
+        };
+
+        const planeConfigs = [
+          { radius: 3.24, inclination: 0.32, angle: 0.4, speed: 0.38, color: 0x47b5ff },
+          { radius: 3.32, inclination: -0.45, angle: 3.1, speed: 0.32, color: 0x5df0a8 }
+        ];
+
+        planeConfigs.forEach((cfg) => {
+          const airplane = buildAirplane(cfg.color);
+          airplane.userData = { ...cfg, layerId: 'stratosfer' };
+          this.actorsGroup.add(airplane);
+          this.animatedActors.airplanes.push(airplane);
+        });
+
+        // 3. MESOSFER: Meteor Terbakar 3D
+        const buildMeteor = () => {
+          const meteorGroup = new THREE.Group();
+
+          const headGeo = new THREE.DodecahedronGeometry(0.065, 1);
+          const headMat = new THREE.MeshBasicMaterial({
+            color: 0xffedd5
+          });
+          const head = new THREE.Mesh(headGeo, headMat);
+          head.userData = { layerId: 'mesosfer', isActor: true };
+          meteorGroup.add(head);
+          this.interactiveMeshes.push(head);
+
+          const glowGeo = new THREE.SphereGeometry(0.11, 14, 14);
+          const glowMat = new THREE.MeshBasicMaterial({
+            color: 0xf97316,
+            transparent: true,
+            opacity: 0.65
+          });
+          const glow = new THREE.Mesh(glowGeo, glowMat);
+          meteorGroup.add(glow);
+
+          const tailGeo = new THREE.ConeGeometry(0.075, 0.78, 14);
+          tailGeo.rotateX(-Math.PI / 2);
+          tailGeo.translate(0, 0, -0.42);
+          const tailMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.65
+          });
+          const tail = new THREE.Mesh(tailGeo, tailMat);
+          tail.userData = { layerId: 'mesosfer', isActor: true };
+          meteorGroup.add(tail);
+          this.interactiveMeshes.push(tail);
+
+          return meteorGroup;
+        };
+
+        for (let i = 0; i < 4; i++) {
+          const meteor = buildMeteor();
+          meteor.userData = {
+            orbitAngle: (i * Math.PI) / 2 + 0.3,
+            inclination: 0.55 - i * 0.32,
+            speed: 0.72 + i * 0.12,
+            radius: 3.92 + (i % 2) * 0.12,
+            phaseOffset: i * 1.7,
+            layerId: 'mesosfer'
+          };
+          this.actorsGroup.add(meteor);
+          this.animatedActors.meteors.push(meteor);
+        }
+
+        // 4. TERMOSFER: Aurora Kutub & Stasiun ISS
+        const createAuroraCurtain = (isNorth = true) => {
+          const auroraGeo = new THREE.CylinderGeometry(1.45, 1.15, 0.52, 48, 1, true);
+          const auroraMat = new THREE.MeshBasicMaterial({
+            color: 0x5df0a8,
+            transparent: true,
+            opacity: 0.42,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          });
+          const auroraMesh = new THREE.Mesh(auroraGeo, auroraMat);
+          auroraMesh.position.y = isNorth ? 4.35 : -4.35;
+          auroraMesh.userData = { layerId: 'termosfer', isNorth, isActor: true };
+          this.actorsGroup.add(auroraMesh);
+          this.interactiveMeshes.push(auroraMesh);
+          this.animatedActors.auroraRings.push(auroraMesh);
+        };
+        createAuroraCurtain(true);
+        createAuroraCurtain(false);
+
+        const issGroup = new THREE.Group();
+        const trussGeo = new THREE.BoxGeometry(0.62, 0.03, 0.03);
+        const trussMat = new THREE.MeshPhongMaterial({ color: 0xe2e8f0 });
+        const truss = new THREE.Mesh(trussGeo, trussMat);
+        issGroup.add(truss);
+
+        const moduleGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.28, 12);
+        moduleGeo.rotateX(Math.PI / 2);
+        const moduleMesh = new THREE.Mesh(moduleGeo, trussMat);
+        moduleMesh.userData = { layerId: 'termosfer', isActor: true };
+        issGroup.add(moduleMesh);
+        this.interactiveMeshes.push(moduleMesh);
+
+        const panelGeo = new THREE.BoxGeometry(0.09, 0.01, 0.38);
+        const panelMat = new THREE.MeshPhongMaterial({
+          color: 0x6936f5,
+          emissive: 0x5df0a8,
+          emissiveIntensity: 0.3
+        });
+        [-0.24, -0.12, 0.12, 0.24].forEach((xPos) => {
+          const panel = new THREE.Mesh(panelGeo, panelMat);
+          panel.position.set(xPos, 0, 0);
+          panel.userData = { layerId: 'termosfer', isActor: true };
+          issGroup.add(panel);
+          this.interactiveMeshes.push(panel);
+        });
+
+        issGroup.userData = {
+          radius: 4.66,
+          inclination: 0.62,
+          angle: 0.8,
+          speed: 0.42,
+          layerId: 'termosfer'
+        };
+        this.actorsGroup.add(issGroup);
+        this.animatedActors.issGroup = issGroup;
+
+        // 5. EKSOSFER: Satelit Orbit Tinggi
+        const buildSatellite = () => {
+          const sat = new THREE.Group();
+
+          const bodyGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.22, 8);
+          const goldMat = new THREE.MeshPhongMaterial({
+            color: 0xfbbf24,
+            emissive: 0x92400e,
+            emissiveIntensity: 0.35,
+            shininess: 90
+          });
+          const body = new THREE.Mesh(bodyGeo, goldMat);
+          body.userData = { layerId: 'eksosfer', isActor: true };
+          sat.add(body);
+          this.interactiveMeshes.push(body);
+
+          const solarGeo = new THREE.BoxGeometry(0.68, 0.014, 0.16);
+          const solarMat = new THREE.MeshPhongMaterial({
+            color: 0x3b82f6,
+            emissive: 0x1d4ed8,
+            emissiveIntensity: 0.45
+          });
+          const solarWings = new THREE.Mesh(solarGeo, solarMat);
+          solarWings.userData = { layerId: 'eksosfer', isActor: true };
+          sat.add(solarWings);
+          this.interactiveMeshes.push(solarWings);
+
+          const dishGeo = new THREE.ConeGeometry(0.07, 0.05, 16, 1, true);
+          const dishMat = new THREE.MeshPhongMaterial({
+            color: 0xf8fafc,
+            side: THREE.DoubleSide
+          });
+          const dish = new THREE.Mesh(dishGeo, dishMat);
+          dish.position.set(0, 0.14, 0);
+          sat.add(dish);
+
+          return sat;
+        };
+
+        const satConfigs = [
+          { radius: 5.46, inclination: 0.42, angle: 0.2, speed: 0.26 },
+          { radius: 5.58, inclination: -0.68, angle: 2.4, speed: 0.22 },
+          { radius: 5.42, inclination: 1.05, angle: 4.2, speed: 0.29 }
+        ];
+
+        satConfigs.forEach((cfg) => {
+          const sat = buildSatellite();
+          sat.userData = { ...cfg, layerId: 'eksosfer' };
+          this.actorsGroup.add(sat);
+          this.animatedActors.satellites.push(sat);
+        });
+      }
+
+      /**
+       * Membuat Label HTML 3D Terproyeksi untuk setiap Lapisan (Mendukung Ganti Bahasa)
+       */
+      create3DCalloutLabels() {
+        this.labelsContainer.innerHTML = '';
+        this.projectedLabels = [];
+
+        ATMOSPHERE_LAYERS_DATA.forEach((layer) => {
+          const localized = layer.i18n[this.lang];
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'tp-3d-label';
+          el.dataset.layerId = layer.id;
+          el.innerHTML = `
+            <span style="width:8px;height:8px;border-radius:9999px;background:${layer.cssColor}"></span>
+            <span class="tp-f-num">${layer.index}</span>
+            <span class="tp-3d-label-name">${localized.name}</span>
+            <span class="tp-3d-label-alt font-mono text-[10px] opacity-75">(${localized.altitude})</span>
+          `;
+
+          el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Toggle: klik label lapisan yang sama lagi → kembali ke ikhtisar
+            this.highlightLayer(layer.id === this.selectedLayerId ? 'all' : layer.id, true);
+          });
+
+          this.labelsContainer.appendChild(el);
+
+          const r = (layer.innerRadius + layer.outerRadius) * 0.5;
+          const localAnchor = new THREE.Vector3(
+            r * Math.cos(layer.labelTheta) * Math.cos(layer.labelPhi),
+            r * Math.sin(layer.labelTheta),
+            r * Math.cos(layer.labelTheta) * Math.sin(layer.labelPhi)
+          );
+
+          this.projectedLabels.push({
+            layerId: layer.id,
+            layerRef: layer,
+            element: el,
+            localPosition: localAnchor
+          });
+        });
+      }
+
+      /**
+       * Memperbarui teks label 3D saat bahasa diubah tanpa membangun ulang scene WebGL
+       */
+      setLanguage(lang) {
+        this.lang = lang;
+        this.projectedLabels.forEach((item) => {
+          const localized = item.layerRef.i18n[lang];
+          const nameSpan = item.element.querySelector('.tp-3d-label-name');
+          const altSpan = item.element.querySelector('.tp-3d-label-alt');
+          if (nameSpan) nameSpan.textContent = localized.name;
+          if (altSpan) altSpan.textContent = `(${localized.altitude})`;
+        });
+      }
+
+      /**
+       * Memberikan efek Highlight pada lapisan yang dipilih (atau 'all' untuk ikhtisar)
+       */
+      highlightLayer(layerId, triggerCallback = true) {
+        this.selectedLayerId = layerId;
+
+        this.layerGroups.forEach((entry, id) => {
+          const isExactMatch = id === layerId;
+
+          if (layerId === 'all') {
+            entry.shellMesh.material.opacity = entry.data.baseOpacity;
+            entry.shellMesh.material.emissiveIntensity = 0.2;
+            entry.eqRing.material.opacity = 0.18;
+            entry.eqRing.material.color.setHex(entry.data.colorHex);
+          } else if (isExactMatch) {
+            entry.shellMesh.material.opacity = Math.min(entry.data.baseOpacity + 0.28, 0.65);
+            entry.shellMesh.material.emissiveIntensity = 0.58;
+            entry.eqRing.material.opacity = 0.92;
+            entry.eqRing.material.color.setHex(0x5df0a8);
+          } else {
+            entry.shellMesh.material.opacity = entry.data.baseOpacity * 0.32;
+            entry.shellMesh.material.emissiveIntensity = 0.06;
+            entry.eqRing.material.opacity = 0.05;
+          }
+
+          entry.capMeshes.forEach((cap) => {
+            if (layerId === 'all') {
+              cap.material.opacity = Math.min(entry.data.baseOpacity + 0.24, 0.65);
+            } else if (isExactMatch) {
+              cap.material.opacity = 0.82;
+            } else {
+              cap.material.opacity = 0.16;
+            }
+          });
+        });
+
+        this.projectedLabels.forEach((item) => {
+          item.element.classList.toggle('is-selected', item.layerId === layerId);
+        });
+
+        if (triggerCallback) {
+          const selectedObj =
+            ATMOSPHERE_LAYERS_DATA.find((l) => l.id === layerId) || ATMOSPHERE_LAYERS_DATA[0];
+          this.onSelectLayerCallback(selectedObj, layerId);
+        }
+      }
+
+      focusCameraOnLayer(layerId) {
+        const layer = ATMOSPHERE_LAYERS_DATA.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        const targetDist = layer.outerRadius * 2.55;
+        const currentDir = this.camera.position.clone().normalize();
+        this.targetCameraPos = currentDir.multiplyScalar(targetDist);
+      }
+
+      resetCamera() {
+        this.targetCameraPos = new THREE.Vector3(8.2, 4.1, 10.6);
+      }
+
+      setCutawayMode(enabled) {
+        this.isCutawayMode = enabled;
+        this.createAtmosphericShells();
+      }
+
+      setShowLabels(enabled) {
+        this.showLabels = enabled;
+        this.projectedLabels.forEach((lbl) => {
+          lbl.element.classList.toggle('is-hidden', !enabled);
+        });
+      }
+
+      setAutoRotate(enabled) {
+        this.autoRotate = enabled;
+      }
+
+      bindEvents() {
+        this.canvas.addEventListener('pointerdown', (e) => {
+          this.pointerDownPos.set(e.clientX, e.clientY);
+        });
+
+        this.canvas.addEventListener('pointermove', (e) => {
+          const rect = this.canvas.getBoundingClientRect();
+          this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+          this.raycaster.setFromCamera(this.pointer, this.camera);
+          const hits = this.raycaster.intersectObjects(this.interactiveMeshes, false);
+
+          if (hits.length > 0) {
+            const priorityHit =
+              hits.find((h) => h.object.userData.isActor || h.object.userData.part === 'cap') ||
+              hits[0];
+            const hoveredId = priorityHit.object.userData.layerId;
+            if (hoveredId && hoveredId !== this.hoveredLayerId) {
+              this.hoveredLayerId = hoveredId;
+              this.canvas.style.cursor = 'pointer';
+              const layerData = ATMOSPHERE_LAYERS_DATA.find((l) => l.id === hoveredId);
+              this.onHoverLayerCallback(layerData);
+            }
+          } else if (this.hoveredLayerId !== null) {
+            this.hoveredLayerId = null;
+            this.canvas.style.cursor = 'grab';
+            this.onHoverLayerCallback(null);
+          }
+        });
+
+        this.canvas.addEventListener('pointerup', (e) => {
+          const moveDist = Math.hypot(
+            e.clientX - this.pointerDownPos.x,
+            e.clientY - this.pointerDownPos.y
+          );
+          if (moveDist > 6) return;
+
+          const rect = this.canvas.getBoundingClientRect();
+          this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+          this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+          this.raycaster.setFromCamera(this.pointer, this.camera);
+          const hits = this.raycaster.intersectObjects(this.interactiveMeshes, false);
+
+          if (hits.length > 0) {
+            const bestHit =
+              hits.find((h) => h.object.userData.isActor || h.object.userData.part === 'cap') ||
+              hits[0];
+            const clickedLayerId = bestHit.object.userData.layerId;
+            if (clickedLayerId) {
+              // Toggle: klik lapisan yang sama lagi → kembali ke ikhtisar (panel tertutup)
+              this.highlightLayer(
+                clickedLayerId === this.selectedLayerId ? 'all' : clickedLayerId,
+                true
+              );
+            }
+          }
+        });
+
+        window.addEventListener('resize', () => this.handleResize());
+      }
+
+      handleResize() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        if (width === 0 || height === 0) return;
+
+        this.camera.aspect = width / height;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(width, height);
+      }
+
+      updateProjectedLabels() {
+        if (!this.showLabels) return;
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        this.projectedLabels.forEach((item) => {
+          const worldPos = item.localPosition.clone().applyMatrix4(this.worldGroup.matrixWorld);
+          const projected = worldPos.clone().project(this.camera);
+
+          if (projected.z > 1) {
+            item.element.classList.add('is-hidden');
+            return;
+          }
+
+          item.element.classList.remove('is-hidden');
+          const x = (projected.x * 0.5 + 0.5) * width;
+          const y = (-(projected.y * 0.5) + 0.5) * height;
+
+          item.element.style.left = `${x}px`;
+          item.element.style.top = `${y}px`;
+        });
+      }
+
+      animate() {
+        requestAnimationFrame(() => this.animate());
+
+        const elapsed = this.clock.getElapsedTime();
+
+        // Starfield twinkle (pola BAB 01)
+        if (this.starMat) this.starMat.uniforms.uTime.value = elapsed;
+
+        if (this.autoRotate) {
+          this.worldGroup.rotation.y += 0.0018;
+        }
+        if (this.earthMesh) {
+          this.earthMesh.rotation.y += 0.0012;
+        }
+
+        if (this.targetCameraPos) {
+          this.camera.position.lerp(this.targetCameraPos, 0.06);
+          if (this.camera.position.distanceTo(this.targetCameraPos) < 0.08) {
+            this.targetCameraPos = null;
+          }
+        }
+
+        if (this.selectedLayerId && this.selectedLayerId !== 'all') {
+          const selectedEntry = this.layerGroups.get(this.selectedLayerId);
+          if (selectedEntry) {
+            selectedEntry.shellMesh.material.emissiveIntensity =
+              0.48 + Math.sin(elapsed * 3.2) * 0.14;
+          }
+        }
+
+        // 1. Animasi Awan di Troposfer
+        this.animatedActors.clouds.forEach((cloud) => {
+          const u = cloud.userData;
+          const lon = u.lon + elapsed * u.speed;
+          const r = u.radius + Math.sin(elapsed * 1.5 + u.lon) * 0.025;
+          cloud.position.set(
+            r * Math.cos(u.lat) * Math.cos(lon),
+            r * Math.sin(u.lat),
+            r * Math.cos(u.lat) * Math.sin(lon)
+          );
+          cloud.lookAt(0, 0, 0);
+        });
+
+        // 2. Animasi Pesawat Jet di Stratosfer
+        this.animatedActors.airplanes.forEach((plane) => {
+          const u = plane.userData;
+          const t = u.angle + elapsed * u.speed;
+          const nextT = t + 0.05;
+
+          const getOrbitPos = (ang) =>
+            new THREE.Vector3(
+              u.radius * Math.cos(ang),
+              u.radius * Math.sin(ang) * Math.sin(u.inclination),
+              u.radius * Math.sin(ang) * Math.cos(u.inclination)
+            );
+
+          const pos = getOrbitPos(t);
+          const nextPos = getOrbitPos(nextT);
+          plane.position.copy(pos);
+          plane.lookAt(nextPos);
+        });
+
+        // 3. Animasi Meteor Terbakar di Mesosfer
+        this.animatedActors.meteors.forEach((meteor) => {
+          const u = meteor.userData;
+          const cycle = (elapsed * u.speed + u.phaseOffset) % 3.2;
+          const progress = cycle / 3.2;
+
+          const currentRadius = u.radius + 0.25 - progress * 0.45;
+          const ang = u.orbitAngle + progress * 0.9;
+
+          const pos = new THREE.Vector3(
+            currentRadius * Math.cos(ang),
+            currentRadius * Math.sin(ang) * Math.sin(u.inclination),
+            currentRadius * Math.sin(ang) * Math.cos(u.inclination)
+          );
+          const nextAng = ang + 0.05;
+          const nextPos = new THREE.Vector3(
+            (currentRadius - 0.03) * Math.cos(nextAng),
+            (currentRadius - 0.03) * Math.sin(nextAng) * Math.sin(u.inclination),
+            (currentRadius - 0.03) * Math.sin(nextAng) * Math.cos(u.inclination)
+          );
+
+          meteor.position.copy(pos);
+          meteor.lookAt(nextPos);
+
+          const scaleFade = Math.sin(progress * Math.PI);
+          meteor.scale.setScalar(Math.max(0.01, scaleFade));
+        });
+
+        // 4. Animasi Aurora & Stasiun ISS di Termosfer
+        this.animatedActors.auroraRings.forEach((aurora, idx) => {
+          aurora.rotation.y = elapsed * (idx === 0 ? 0.25 : -0.25);
+          aurora.scale.x = 1 + Math.sin(elapsed * 2.2 + idx) * 0.06;
+          aurora.scale.z = 1 + Math.cos(elapsed * 1.9 + idx) * 0.06;
+          aurora.material.opacity = 0.32 + Math.sin(elapsed * 2.8) * 0.14;
+        });
+
+        if (this.animatedActors.issGroup) {
+          const iss = this.animatedActors.issGroup;
+          const u = iss.userData;
+          const t = u.angle + elapsed * u.speed;
+          iss.position.set(
+            u.radius * Math.cos(t),
+            u.radius * Math.sin(t) * Math.sin(u.inclination),
+            u.radius * Math.sin(t) * Math.cos(u.inclination)
+          );
+          iss.rotation.y = elapsed * 0.6;
+          iss.rotation.z = Math.sin(elapsed * 0.5) * 0.3;
+        }
+
+        // 5. Animasi Satelit di Eksosfer
+        this.animatedActors.satellites.forEach((sat, idx) => {
+          const u = sat.userData;
+          const t = u.angle + elapsed * u.speed;
+          sat.position.set(
+            u.radius * Math.cos(t),
+            u.radius * Math.sin(t) * Math.sin(u.inclination),
+            u.radius * Math.sin(t) * Math.cos(u.inclination)
+          );
+          sat.lookAt(0, 0, 0);
+          sat.rotateZ(elapsed * 0.4 + idx);
+        });
+
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+        this.updateProjectedLabels();
+      }
+    }
+
+    /**
+     * =========================================================================
+     * INISIALISASI UI, PENGELOLA BAHASA (ID/EN), & SINKRONISASI 3D
+     * =========================================================================
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      let currentLang = 'id';
+
+      const canvasEl = document.getElementById('atmosphereCanvas');
+      const labelsContainerEl = document.getElementById('labelsOverlayContainer');
+
+      // Elemen Panel Detail Lapisan
+      const detailColorBadge = document.getElementById('detailColorBadge');
+      const detailLayerTag = document.getElementById('detailLayerTag');
+      const detailEnglishName = document.getElementById('detailEnglishName');
+      const detailLayerTitle = document.getElementById('detailLayerTitle');
+      const detailAltitude = document.getElementById('detailAltitude');
+      const detailAltitudeSub = document.getElementById('detailAltitudeSub');
+      const detailTemp = document.getElementById('detailTemp');
+      const detailTempSub = document.getElementById('detailTempSub');
+      const detailPressure = document.getElementById('detailPressure');
+      const detailPressureSub = document.getElementById('detailPressureSub');
+      const detailObjects = document.getElementById('detailObjects');
+      const detailBoundary = document.getElementById('detailBoundary');
+      const detailDescription = document.getElementById('detailDescription');
+      const detailHighlights = document.getElementById('detailHighlights');
+      const detailGasComposition = document.getElementById('detailGasComposition');
+
+      // HUD Hover & Kontrol
+      const hudHoverDot = document.getElementById('hudHoverDot');
+      const hudHoverText = document.getElementById('hudHoverText');
+      const cutawayBtnLabel = document.getElementById('cutawayBtnLabel');
+      const btnToggleCutaway = document.getElementById('btnToggleCutaway');
+      const btnToggleLabels = document.getElementById('btnToggleLabels');
+      const btnToggleRotate = document.getElementById('btnToggleRotate');
+      const btnLangID = document.getElementById('btnLangID');
+      const btnLangEN = document.getElementById('btnLangEN');
+
+      // Koleksi tombol/kartu untuk sinkronisasi state
+      const pillButtons = document.querySelectorAll('[data-layer-pill]');
+      const stackSlabs = document.querySelectorAll('[data-stack-layer]');
+      const articleCards = document.querySelectorAll('[data-article-layer]');
+
+      // Helper mengambil nilai nested key pada objek i18n
+      function getNestedText(obj, path) {
+        return path.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : null), obj);
+      }
+
+      /**
+       * Fungsi Pembaruan Seluruh Komponen UI saat Lapisan Dipilih atau Bahasa Berganti
+       */
+      function syncUIWithLayer(layerObj, rawModeId) {
+        const localized = layerObj.i18n[currentLang];
+        const dict = TERRAPEDIA_I18N[currentLang];
+
+        // 1. Update Panel Informasi Lapisan
+        detailColorBadge.textContent = layerObj.index;
+        detailColorBadge.style.color = layerObj.cssColor;
+        detailColorBadge.style.borderColor = layerObj.cssColor;
+        detailColorBadge.style.backgroundColor = `${layerObj.cssColor}22`;
+
+        detailLayerTag.textContent =
+          rawModeId === 'all' ? dict.detail.overviewTag : localized.tag;
+        detailEnglishName.textContent = localized.secondaryCode;
+        detailLayerTitle.textContent = localized.subtitle;
+        detailAltitude.textContent = localized.altitude;
+        detailAltitudeSub.textContent = localized.altitudeSub;
+        detailTemp.textContent = localized.temp;
+        detailTemp.style.color = layerObj.cssColor;
+        detailTempSub.textContent = localized.tempSub;
+        detailPressure.textContent = localized.pressure;
+        detailPressureSub.textContent = localized.pressureSub;
+        detailObjects.textContent = localized.objectsLabel;
+        detailBoundary.textContent = localized.boundary;
+        detailDescription.textContent = localized.description;
+        detailGasComposition.textContent = localized.gasComposition;
+
+        // Render badge fitur utama lapisan
+        detailHighlights.innerHTML = localized.highlights
+          .map(
+            (item) =>
+              `<span class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/5 text-slate-200 border border-white/10">${item}</span>`
+          )
+          .join('');
+
+        // 2. Sinkronisasi Tombol Pill di Dock Bawah
+        pillButtons.forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.layerPill === rawModeId);
+        });
+
+        // 3. Sinkronisasi Layer List Vertikal di Sidebar Kanan
+        stackSlabs.forEach((slab) => {
+          slab.classList.toggle('active-slab', slab.dataset.stackLayer === layerObj.id);
+        });
+
+        // 4. Sinkronisasi Kartu Lapisan di dalam Artikel
+        articleCards.forEach((card) => {
+          card.classList.toggle('is-active', card.dataset.articleLayer === layerObj.id);
+        });
+      }
+
+      // Inisialisasi Modul 3D Atmosfer TerraPedia
+      const atmosphere3D = new TerraPediaAtmosphere3D({
+        canvas: canvasEl,
+        labelsContainer: labelsContainerEl,
+        lang: currentLang,
+        onSelectLayer: (layerData, rawModeId) => {
+          syncUIWithLayer(layerData, rawModeId);
+          // Toggle: 'all' = tidak ada lapisan dipilih → panel info disembunyikan
+          setLayerSheet(rawModeId !== 'all');
+        },
+        onHoverLayer: (layerData) => {
+          const dict = TERRAPEDIA_I18N[currentLang];
+          if (layerData) {
+            const loc = layerData.i18n[currentLang];
+            hudHoverDot.style.backgroundColor = layerData.cssColor;
+            hudHoverText.textContent = `${dict.hud.hoverPrefix} ${loc.name} (${loc.altitude}) ${dict.hud.hoverSuffix}`;
+          } else {
+            hudHoverDot.style.backgroundColor = '#5df0a8';
+            hudHoverText.textContent = dict.hud.defaultPrompt;
+          }
+        }
+      });
+
+      /**
+       * Fungsi Utama Pengubah Bahasa (ID <-> EN)
+       * Diekspos juga ke `window.setTerraPediaLang(lang)` untuk integrasi ke aplikasi utama TerraPedia
+       */
+      function applyLanguage(lang, showNotification = false) {
+        if (lang !== 'id' && lang !== 'en') return;
+        currentLang = lang;
+        document.documentElement.lang = lang;
+
+        const dict = TERRAPEDIA_I18N[lang];
+
+        // 1. Update gaya visual tombol switcher ID | EN (pola pill-group BAB 01)
+        btnLangID.classList.toggle('active', lang === 'id');
+        btnLangEN.classList.toggle('active', lang === 'en');
+
+        // 2. Terjemahkan semua elemen statis dengan atribut data-i18n (textContent)
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          const key = el.getAttribute('data-i18n');
+          const translated = getNestedText(dict, key);
+          if (translated !== null) {
+            el.textContent = translated;
+          }
+        });
+
+        // 3. Terjemahkan elemen paragraf ilmiah kaya format dengan atribut data-i18n-html (innerHTML)
+        document.querySelectorAll('[data-i18n-html]').forEach((el) => {
+          const key = el.getAttribute('data-i18n-html');
+          const translated = getNestedText(dict, key);
+          if (translated !== null) {
+            el.innerHTML = translated;
+          }
+        });
+
+        // 4. Update tombol-tombol berstatus dinamis (Mode Irisan, Label 3D, Rotasi)
+        cutawayBtnLabel.textContent = atmosphere3D.isCutawayMode
+          ? dict.viewport.cutawayMode
+          : dict.viewport.fullSphereMode;
+
+        btnToggleLabels.textContent = atmosphere3D.showLabels
+          ? dict.viewport.labelsOn
+          : dict.viewport.labelsOff;
+        btnToggleLabels.classList.toggle('active', atmosphere3D.showLabels);
+
+        btnToggleRotate.textContent = atmosphere3D.autoRotate
+          ? dict.viewport.rotateOn
+          : dict.viewport.rotateOff;
+        btnToggleRotate.classList.toggle('active', atmosphere3D.autoRotate);
+
+        btnToggleCutaway.classList.toggle('active', atmosphere3D.isCutawayMode);
+
+        document.getElementById('closeArticleModal').title = dict.header.closeTitle;
+        hudHoverText.textContent = dict.hud.defaultPrompt;
+
+        // 5. Update label terproyeksi 3D di dalam kanvas
+        atmosphere3D.setLanguage(lang);
+
+        // 6. Sinkronkan ulang panel informasi lapisan yang sedang aktif
+        const activeLayerObj =
+          ATMOSPHERE_LAYERS_DATA.find((l) => l.id === atmosphere3D.selectedLayerId) ||
+          ATMOSPHERE_LAYERS_DATA[0];
+        syncUIWithLayer(activeLayerObj, atmosphere3D.selectedLayerId);
+
+        if (showNotification) {
+          showTerraToast(dict.toast.langChanged);
+        }
+      }
+
+      // Ekspos API global untuk integrasi dengan website utama TerraPedia
+      window.setTerraPediaLang = (lang) => applyLanguage(lang, false);
+
+      // Event klik tombol Bahasa ID / EN
+      btnLangID.addEventListener('click', () => applyLanguage('id', true));
+      btnLangEN.addEventListener('click', () => applyLanguage('en', true));
+
+      // Set tampilan awal
+      applyLanguage('id', false);
+
+      // ===== Mode app-like BAB 01: overlay artikel + panel lapisan popup samping =====
+      const articleOverlay = document.getElementById('articleOverlay');
+      const openArticleOverlayBtn = document.getElementById('openArticleOverlayBtn');
+      const closeArticleOverlayBtn = document.getElementById('closeArticleOverlayBtn');
+      const layerPanelEl = document.getElementById('selectedLayerPanel');
+      const layerSheetCloseBtn = document.getElementById('layerSheetCloseBtn');
+
+      function setArticleOverlay(open) {
+        articleOverlay.classList.toggle('open', open);
+        articleOverlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+      }
+
+      function setLayerSheet(open) {
+        layerPanelEl.classList.toggle('open', open);
+      }
+
+      openArticleOverlayBtn.addEventListener('click', () => setArticleOverlay(true));
+      closeArticleOverlayBtn.addEventListener('click', () => setArticleOverlay(false));
+      articleOverlay.querySelector('.cap-backdrop').addEventListener('click', () => setArticleOverlay(false));
+      layerSheetCloseBtn.addEventListener('click', () => setLayerSheet(false));
+
+      // Memilih lapisan dari dalam overlay menutup overlay
+      // agar sorotan 3D langsung terlihat di samping panel informasi.
+      stackSlabs.forEach((slab) => slab.addEventListener('click', () => setArticleOverlay(false)));
+      articleCards.forEach((card) => card.addEventListener('click', () => setArticleOverlay(false)));
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (layerPanelEl.classList.contains('open')) {
+            setLayerSheet(false);
+          } else {
+            setArticleOverlay(false);
+          }
+        }
+      });
+
+      // Event: Klik Pill Lapisan di Dock Bawah — klik lapisan aktif lagi = sembunyikan info
+      pillButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.dataset.layerPill;
+          if (targetId === atmosphere3D.selectedLayerId) {
+            atmosphere3D.highlightLayer('all', true);
+          } else {
+            atmosphere3D.highlightLayer(targetId, true);
+            atmosphere3D.focusCameraOnLayer(targetId);
+          }
+        });
+      });
+
+      // Event: Klik Layer List di Sidebar Kanan
+      stackSlabs.forEach((slab) => {
+        slab.addEventListener('click', () => {
+          const targetId = slab.dataset.stackLayer;
+          atmosphere3D.highlightLayer(targetId, true);
+          atmosphere3D.focusCameraOnLayer(targetId);
+        });
+      });
+
+      // Event: Klik Kartu Lapisan di Artikel
+      articleCards.forEach((card) => {
+        card.addEventListener('click', () => {
+          const targetId = card.dataset.articleLayer;
+          atmosphere3D.highlightLayer(targetId, true);
+        });
+      });
+
+      // Tombol Navigasi Lapisan Bawah / Atas pada Panel Informasi
+      document.getElementById('btnPrevLayer').addEventListener('click', () => {
+        const currentIdx = ATMOSPHERE_LAYERS_DATA.findIndex(
+          (l) => l.id === atmosphere3D.selectedLayerId
+        );
+        const nextIdx =
+          currentIdx <= 0 ? ATMOSPHERE_LAYERS_DATA.length - 1 : currentIdx - 1;
+        atmosphere3D.highlightLayer(ATMOSPHERE_LAYERS_DATA[nextIdx].id, true);
+      });
+
+      document.getElementById('btnNextLayer').addEventListener('click', () => {
+        const currentIdx = ATMOSPHERE_LAYERS_DATA.findIndex(
+          (l) => l.id === atmosphere3D.selectedLayerId
+        );
+        const nextIdx = (currentIdx + 1) % ATMOSPHERE_LAYERS_DATA.length;
+        atmosphere3D.highlightLayer(ATMOSPHERE_LAYERS_DATA[nextIdx].id, true);
+      });
+
+      // Tombol Fokus Kamera ke Lapisan Terpilih
+      document.getElementById('btnZoomSelectedLayer').addEventListener('click', () => {
+        const target =
+          atmosphere3D.selectedLayerId === 'all'
+            ? 'troposfer'
+            : atmosphere3D.selectedLayerId;
+        atmosphere3D.focusCameraOnLayer(target);
+      });
+
+      // Kontrol Scene: Toggle Irisan 3D (Cutaway) vs Bola Utuh
+      btnToggleCutaway.addEventListener('click', () => {
+        const nextState = !atmosphere3D.isCutawayMode;
+        atmosphere3D.setCutawayMode(nextState);
+        const dict = TERRAPEDIA_I18N[currentLang];
+        cutawayBtnLabel.textContent = nextState
+          ? dict.viewport.cutawayMode
+          : dict.viewport.fullSphereMode;
+        btnToggleCutaway.classList.toggle('active', nextState);
+      });
+
+      // Kontrol Scene: Toggle Label 3D
+      btnToggleLabels.addEventListener('click', () => {
+        const nextState = !atmosphere3D.showLabels;
+        atmosphere3D.setShowLabels(nextState);
+        const dict = TERRAPEDIA_I18N[currentLang];
+        btnToggleLabels.textContent = nextState
+          ? dict.viewport.labelsOn
+          : dict.viewport.labelsOff;
+        btnToggleLabels.classList.toggle('active', nextState);
+      });
+
+      // Kontrol Scene: Toggle Auto-Rotasi
+      btnToggleRotate.addEventListener('click', () => {
+        const nextState = !atmosphere3D.autoRotate;
+        atmosphere3D.setAutoRotate(nextState);
+        const dict = TERRAPEDIA_I18N[currentLang];
+        btnToggleRotate.textContent = nextState
+          ? dict.viewport.rotateOn
+          : dict.viewport.rotateOff;
+        btnToggleRotate.classList.toggle('active', nextState);
+      });
+
+      // Kontrol Scene: Reset Kamera
+      document.getElementById('btnResetCamera').addEventListener('click', () => {
+        atmosphere3D.resetCamera();
+      });
+
+      // Fungsi Toast Non-Intrusif
+      const toastEl = document.getElementById('modalToast');
+      const toastTextEl = document.getElementById('modalToastText');
+      let toastTimer = null;
+
+      function showTerraToast(message) {
+        toastTextEl.textContent = message;
+        toastEl.classList.remove('hidden');
+        toastEl.classList.add('flex');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          toastEl.classList.add('hidden');
+          toastEl.classList.remove('flex');
+        }, 3200);
+      }
+
+      document.getElementById('closeArticleModal').addEventListener('click', () => {
+        window.location.href = 'terrapedia.html';
+      });
+    });
+  </script>
+  <script>
+    // Toggle bilah navigasi samping (sidebar) — sembunyikan / tampilkan
+    (function () {
+      var btn = document.getElementById('navHandleBtn');
+      if (!btn) return;
+      var root = document.documentElement;
+      function apply(closed) {
+        root.classList.toggle('nav-closed', closed);
+        btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+        btn.setAttribute('aria-label', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        btn.setAttribute('title', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+      }
+      var stored = null;
+      try { stored = localStorage.getItem('tpNavClosed'); } catch (e) { }
+      // Mobile (≤900px): drawer selalu mulai tertutup agar 3D terlihat penuh
+      var isMobileNav = window.matchMedia('(max-width:900px)').matches;
+      if (isMobileNav || stored === '1') apply(true);
+      btn.addEventListener('click', function () {
+        var closed = !root.classList.contains('nav-closed');
+        apply(closed);
+        try { localStorage.setItem('tpNavClosed', closed ? '1' : '0'); } catch (e) { }
+      });
+    })();
+  </script>
+  <script>
+    // (c) Roda scroll mouse menggeser bilah navbar horizontal (bukan hanya trackpad)
+    (function () {
+      document.addEventListener('wheel', function (e) {
+        var el = e.target instanceof Element ? e.target : null;
+        while (el && el !== document.documentElement) {
+          var cs = getComputedStyle(el);
+          if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              e.preventDefault();
+              el.scrollLeft += e.deltaY;
+            }
+            return;
+          }
+          el = el.parentElement;
+        }
+      }, { passive: false, capture: true });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,3206 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>TerraPedia — BAB 06: Hidrosfer & Samudra (3D Ocean Cross-Section)</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', ' system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            terra: {
+              bg: '#04070f',
+              surface: '#09101f',
+              accent: '#5df0a8',
+              accentDim: 'rgba(93, 240, 168, 0.16)',
+              cyan: '#38bdf8',
+              amber: '#fbbf24',
+              coral: '#fb7185'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Three.js v0.143.0 Strict Importmap for TerraPedia Integration -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.143.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.143.0/examples/jsm/",
+      "three/examples/jsm/controls/OrbitControls.js": "https://unpkg.com/three@0.143.0/examples/jsm/controls/OrbitControls.js"
+    }
+  }
+  </script>
+  <style>
+    /* TerraPedia BAB 06 — arah: observatorium malam + atlas ilmiah (sama dengan BAB 01–05).
+       Chrome tenang: permukaan gelap bersih, hairline, satu aksen aurora.
+       Kekayaan warna hanya hidup di diorama 3D samudra. Signature: kelompeng skala. */
+    :root{
+      --terra-bg:#04070f;
+      --surface:rgba(12,18,30,.92);
+      --surface-2:rgba(17,24,40,.94);
+      --terra-accent:#5df0a8;
+      --tp-border:rgba(255,255,255,.08);
+      --tp-border-strong:rgba(255,255,255,.16);
+      --tp-text-main:#f1f5f9;
+      --tp-text-body:#cbd5e1;
+      --tp-text-muted:#94a3b8;
+      --shadow-float:0 12px 32px rgba(0,0,0,.38);
+      --radius-lg:16px;
+      --radius-md:12px;
+      --radius-sm:8px;
+      --font:'Inter',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent;-webkit-tap-highlight-color:transparent;user-select:none}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(148,163,184,.3);border-radius:8px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(148,163,184,.5)}
+    button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+    html,body{height:100%}
+    html{overflow:hidden}
+    body{background:var(--terra-bg);color:var(--tp-text-main);font-family:var(--font);overflow:hidden}
+
+    /* Teks artikel boleh diseleksi */
+    .selectable-text,.selectable-text *{user-select:text}
+
+    /* Kanvas samudra layar penuh (pola BAB 01) */
+    #viewportContainer{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;z-index:0;cursor:grab;touch-action:none;overflow:hidden}
+    #viewportContainer:active{cursor:grabbing}
+    #oceanCanvas{display:block;width:100%;height:100%}
+
+    /* Overlay label spasial 3D terproyeksi: fixed di atas kanvas, di bawah HUD */
+    #spatialLabelsContainer{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+
+    /* Label spasial 3D (HTML disinkron dengan koordinat 3D) */
+    .spatial-label{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;cursor:pointer;transition:opacity .25s ease;z-index:15}
+    .spatial-label-geology{pointer-events:none;letter-spacing:.22em;text-shadow:0 2px 10px rgba(0,0,0,.95)}
+
+    /* Floating HUD shell (struktur kontainer sama persis dengan BAB 01–05) */
+    .ui-shell{position:fixed;inset:0;pointer-events:none;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
+    .top-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+    .brand-pill{pointer-events:auto;display:inline-flex;align-items:center;gap:12px;padding:8px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .brand-mark{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--terra-accent);font-size:12px;background:rgba(93,240,168,.1);border:1px solid rgba(93,240,168,.35);flex:none}
+    .brand-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .brand-title{font-weight:600;font-size:13px;letter-spacing:-.01em;color:#fff;white-space:nowrap}
+    .brand-sub{font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .brand-chapter{font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .top-controls{pointer-events:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .cam-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:var(--surface-2);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .cam-btn:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+    .cam-btn.active{color:var(--terra-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .pill-group{display:inline-flex;gap:2px;padding:4px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .pill-group button{padding:4px 10px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--tp-text-muted);border:1px solid transparent;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .pill-group button:hover{color:#fff}
+    .pill-group button.active{color:var(--terra-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .exit-btn{width:32px;height:32px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--surface-2);border:1px solid var(--tp-border);color:var(--tp-text-muted);transition:color .18s ease,background-color .18s ease,border-color .18s ease;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .exit-btn:hover{color:#fda4af;background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35)}
+    .exit-btn svg{width:15px;height:15px;display:block}
+    /* Tombol ✕ berputar 90° saat hover (nicety dari versi modal) */
+    #exitModuleBtn svg{transition:transform .2s ease}
+    #exitModuleBtn:hover svg,#exitModuleBtn:focus-visible svg{transform:rotate(90deg)}
+
+    .touch-prompt{align-self:center;margin-top:26px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--tp-text-body);box-shadow:var(--shadow-float);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+    .prompt-dot{width:8px;height:8px;border-radius:9999px;background:var(--terra-accent);flex:none}
+
+    /* Dock melayang terpusat tengah bawah (pola bottom-dock BAB 01) */
+    .bottom-dock{pointer-events:auto;align-self:center;width:fit-content;max-width:90vw;background:var(--surface);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:12px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-float);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+    .layer-pills{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 3px;cursor:grab}
+    .layer-pills::-webkit-scrollbar{display:none;width:0;height:0}
+
+    .zone-pill{flex:0 0 auto;touch-action:pan-x;display:inline-flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);white-space:nowrap;font-size:12px;color:var(--tp-text-body);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .zone-pill:hover{color:#fff;background:rgba(255,255,255,.08);border-color:var(--tp-border-strong)}
+    .zone-pill.active{color:#fff;background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4);font-weight:500}
+    .zone-dot{width:8px;height:8px;border-radius:9999px;flex:none}
+    .zone-depth{font-family:var(--font-mono);font-size:10px;color:var(--tp-text-muted);flex:none}
+    .zone-pill.active .zone-depth{color:var(--terra-accent)}
+    .feature-pill{flex:0 0 auto;touch-action:pan-x;display:inline-flex;align-items:center;padding:5px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);white-space:nowrap;font-size:11.5px;font-weight:500;color:var(--tp-text-body);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .feature-pill:hover{color:var(--terra-accent);background:rgba(93,240,168,.1);border-color:rgba(93,240,168,.4)}
+
+    .controls-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .toggle-row{display:flex;gap:6px;flex-wrap:wrap}
+    .scene-btn{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);cursor:pointer;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .scene-btn:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .scene-btn.active{color:var(--terra-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .scene-btn-neutral{color:var(--tp-text-body);background:rgba(255,255,255,.05);border-color:var(--tp-border)}
+    .scene-btn-neutral:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+    .dot-dot{width:7px;height:7px;border-radius:9999px;flex:none;background:rgba(148,163,184,.9)}
+    .scene-btn.active .dot-dot{background:var(--terra-accent)}
+
+    .chapter-nav-row{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .chapter-next-card{display:inline-flex;align-items:center;gap:10px;max-width:100%;padding:6px 8px 6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.04);border:1px solid var(--tp-border);text-decoration:none;transition:border-color .18s ease,background-color .18s ease}
+    .chapter-next-card:hover{border-color:rgba(93,240,168,.4);background:rgba(93,240,168,.06)}
+    .chapter-next-text{display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+    .chapter-next-card.is-prev .chapter-next-text{align-items:flex-start}
+    .chapter-next-label{font-family:var(--font-mono);font-size:9px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .chapter-next-title{font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .18s ease}
+    .chapter-next-card:hover .chapter-next-title{color:var(--terra-accent)}
+    .chapter-next-arrow{width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .chapter-next-card:hover .chapter-next-arrow{color:var(--terra-accent);background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.4)}
+
+    /* Permukaan panel (dipakai popup telemetri, drawer artikel & kontennya) */
+    .terra-glass{background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float)}
+    .terra-glass-subtle{background:var(--surface-2);border:1px solid var(--tp-border)}
+    /* Kartu artikel (pola BAB 02) */
+    .tp-glass-card{background:var(--surface-2);border:1px solid var(--tp-border);transition:border-color .18s ease,background-color .18s ease}
+    .tp-glass-card:hover{border-color:var(--tp-border-strong)}
+    .terra-accent-border{border-color:rgba(93,240,168,.45) !important}
+
+    /* --- Panel telemetri zona: popup samping kanan (pola info-popup BAB 01–05),
+           tersembunyi sampai zona diklik --- */
+    #oceanInfoPanel{position:fixed;right:16px;top:96px;width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 230px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;z-index:45;border-radius:var(--radius-lg);padding:16px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);user-select:text;opacity:0;pointer-events:none;transform:translateY(8px) scale(.98);transition:opacity .26s ease,transform .26s ease}
+    #oceanInfoPanel.open{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+    #oceanInfoCloseBtn{width:26px;height:26px;border-radius:8px;flex:none;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    #oceanInfoCloseBtn:hover{color:#fff;background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.45)}
+
+    /* --- Overlay artikel (bekas sidebar): drawer kanan desktop, sheet layar penuh mobile --- */
+    #articleOverlay{position:fixed;inset:0;z-index:60;pointer-events:none}
+    #articleOverlay.open{pointer-events:auto}
+    .cap-backdrop{position:absolute;inset:0;background:rgba(3,6,12,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .3s ease}
+    #articleOverlay.open .cap-backdrop{opacity:1}
+    .cap-panel{position:absolute;top:0;right:0;bottom:0;width:min(600px,46vw);display:flex;flex-direction:column;background:var(--surface-2);border-left:1px solid var(--tp-border);box-shadow:-25px 0 60px -18px rgba(0,0,0,.8);transform:translateX(103%);visibility:hidden;transition:transform .34s cubic-bezier(.16,1,.3,1),visibility .34s}
+    /* Signature: kelompeng skala di tepi kiri drawer artikel (sama dengan BAB 01–05) */
+    .cap-panel::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border-strong) 0 1px,transparent 1px 8px);pointer-events:none;z-index:5}
+    #articleOverlay.open .cap-panel{transform:translateX(0);visibility:visible}
+    .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--tp-border);background:rgba(7,12,24,.9)}
+    .cap-eyebrow{display:block;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-muted);white-space:nowrap}
+    .cap-title{font-size:13px;font-weight:600;color:#fff;margin-top:6px;line-height:1.35}
+    .cap-close{width:32px;height:32px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cap-close:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+    .cap-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:14px 16px 16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+    .cap-tabs{display:flex;align-items:center;gap:6px;padding-bottom:2px;margin-bottom:14px}
+    .cap-tabs button{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;font-size:12px;font-weight:500;border:1px solid transparent;color:var(--tp-text-muted);border-radius:var(--radius-sm);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cap-tabs button:hover{color:#e2e8f0;background:rgba(255,255,255,.05)}
+    .cap-tabs button.active{color:var(--terra-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    #articleScrollArea{overflow:visible !important;padding:0 !important}
+
+    /* Toast status non-intrusif: fixed top-center di atas seluruh HUD */
+    #terraToast{position:fixed;top:70px;left:50%;transform:translate(-50%,8px);opacity:0;z-index:70;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:var(--radius-md);color:#fff;font-size:12px;pointer-events:none;max-width:90vw;transition:opacity .3s ease,transform .3s ease}
+    #terraToast.show{opacity:1;transform:translate(-50%,0)}
+    .toast-dot{width:8px;height:8px;border-radius:9999px;background:var(--terra-accent);flex:none}
+
+    @media (max-width:720px){
+      .brand-sub{display:none}
+      #oceanInfoPanel{left:12px;right:12px;top:58px;width:auto;max-height:46dvh}
+      .ui-shell{padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      .brand-pill{padding:6px 10px;gap:8px}
+      .brand-mark{width:26px;height:26px;border-radius:8px}
+      .brand-title{font-size:12px}
+      .brand-chapter{font-size:9px}
+      .cam-btn{padding:5px 9px;font-size:11px}
+      .pill-group button{padding:4px 8px;font-size:10px}
+      .exit-btn{width:30px;height:30px}
+      .touch-prompt{font-size:10px;padding:5px 11px}
+      .bottom-dock{max-width:calc(100vw - 24px);padding:8px 12px;gap:6px}
+      .zone-pill{padding:4px 9px;font-size:11px}
+      .feature-pill{padding:4px 9px;font-size:10.5px}
+      .scene-btn{padding:4px 8px;font-size:11px}
+      .controls-row{gap:8px;padding-top:6px}
+      .chapter-next-card{padding:5px 6px 5px 10px}
+      .chapter-next-title{max-width:190px;font-size:11.5px}
+      .chapter-next-arrow{width:22px;height:22px}
+    }
+    @media (max-width:380px){
+      .top-controls{gap:4px}
+      .cam-btn{padding:4px 7px;font-size:10.5px}
+      .pill-group button{padding:4px 6px}
+      .brand-chapter{max-width:150px}
+      .chapter-next-title{max-width:140px;font-size:11px}
+      .scene-btn{padding:4px 6px;font-size:10.5px}
+      .zone-pill{padding:4px 7px;font-size:10.5px}
+      .feature-pill{padding:4px 7px;font-size:10.5px}
+      #oceanInfoPanel{max-height:52dvh;padding:12px}
+    }
+    @media (max-width:640px){
+      .cap-panel{width:100%;left:0;right:0;top:auto;height:92dvh;border-left:none;border-top:1px solid var(--tp-border);border-radius:18px 18px 0 0;transform:translateY(104%);box-shadow:0 -25px 60px -18px rgba(0,0,0,.8)}
+      #articleOverlay.open .cap-panel{transform:translateY(0)}
+    }
+    @media (prefers-reduced-motion:reduce){
+      #oceanInfoPanel,.cap-panel,.cap-backdrop,.touch-prompt,.spatial-label,.pulse-dot,#terraToast{transition:none;animation:none}
+    }
+  </style>
+<style id="tpNavStyle">
+    /* ====== TerraPedia NAV: bilah navigasi menjadi sidebar kiri penuh + tombol navbar ====== */
+    :root{--tp-nav-w:min(280px,86vw)}
+    .ui-shell .bottom-dock{
+      position:fixed;top:0;bottom:0;left:0;z-index:30;
+      width:var(--tp-nav-w);max-width:86vw;height:auto;max-height:none;
+      border-width:0 1px 0 0;border-radius:0 18px 18px 0;
+      overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+      padding:20px 14px calc(16px + env(safe-area-inset-bottom,0px));
+      transition:left .34s cubic-bezier(.22,.7,.2,1),visibility .34s;
+    }
+    html.nav-closed .ui-shell .bottom-dock{left:calc(-1 * var(--tp-nav-w));visibility:hidden}
+
+    /* Tombol navbar (handle) menempel di tepi kanan sidebar */
+    .nav-handle{position:fixed;top:50%;left:var(--tp-nav-w);transform:translateY(-50%);margin-left:-1px;z-index:41;width:26px;height:52px;display:inline-flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;color:var(--tp-text-muted);background:var(--surface);border:1px solid var(--tp-border);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 18px -10px rgba(0,0,0,.65);transition:left .34s cubic-bezier(.22,.7,.2,1),color .18s ease,background-color .18s ease}
+    .nav-handle:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .nav-handle svg{width:14px;height:14px;pointer-events:none}
+    .nav-handle .ic-open{display:none}
+    html.nav-closed .nav-handle{left:0}
+    html.nav-closed .nav-handle .ic-close{display:none}
+    html.nav-closed .nav-handle .ic-open{display:block}
+    .nav-handle:focus-visible{outline:2px solid rgba(93,240,168,.7);outline-offset:1px}
+
+    /* Kartu navigasi bab: fixed di ujung kiri & kanan viewport (di luar dock) */
+    .tp-nav-card{position:fixed;bottom:16px;z-index:40;pointer-events:auto;width:auto;max-width:min(330px,38vw)}
+    .tp-nav-card.tp-card-next{right:16px;transition:opacity .25s ease,visibility .25s}
+    .tp-nav-card.tp-card-prev{left:16px}
+
+    /* HUD atas (brand & bar petunjuk) mengambang di atas sidebar — tidak pernah bergeser */
+    .ui-shell .top-bar .brand-pill{position:relative;z-index:45}
+    .ui-shell .touch-prompt{position:relative;z-index:45}
+    /* (b) Ketinggian dock di desktop: isi naik, ruang kosong atas berkurang */
+    @media (min-width:901px){
+      .ui-shell .bottom-dock{padding-top:24px}
+    }
+
+    /* (e) Struktur item navbar seragam: lingkaran warna + nomor + nama */
+    .tp-pill-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-pill-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-text-muted,#94a3b8);flex:none}
+    button.active .tp-pill-num{color:inherit}
+
+    /* (d) Struktur floating text seragam: lingkaran warna + nomor + nama */
+    .tp-f-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-f-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-accent,#5df0a8);flex:none}
+
+    /* Tagline di area atas dock navigasi */
+    .tp-dock-tagline{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--tp-text-body,#cbd5e1);padding:0 2px 2px;white-space:nowrap}
+    .tp-dock-tagline::before{content:'';width:6px;height:6px;border-radius:9999px;background:var(--tp-accent,#5df0a8);box-shadow:0 0 0 3px rgba(93,240,168,.14);flex:none}
+    .tp-dock-tagline::after{content:'';height:1px;flex:1;min-width:12px;background:linear-gradient(90deg,rgba(93,240,168,.28),transparent)}
+
+    /* Mobile: sidebar menjadi drawer overlay */
+    @media (max-width:900px){
+      html:not(.nav-closed) .ui-shell .bottom-dock{box-shadow:18px 0 50px -18px rgba(0,0,0,.78)}
+      html:not(.nav-closed) .tp-card-prev{opacity:0;visibility:hidden;pointer-events:none}
+    }
+    @media (max-width:640px){
+      .tp-nav-card{max-width:calc(50vw - 24px)}
+      /* Judul kartu navigasi harus menyusut mengikuti kartu (anti tabrakan) */
+      .tp-nav-card .chapter-next-text{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden}
+      .tp-nav-card .chapter-next-title{max-width:100%}
+      .tp-nav-card .chapter-next-label{overflow:hidden;text-overflow:ellipsis}
+      .nav-handle{width:24px;height:44px}
+    }
+    @media (max-width:720px){
+      /* Pill brand compact (brand-sub disembunyikan) -> padding atas lebih pendek */
+      .ui-shell .bottom-dock{padding-top:16px}
+    }
+    /* ====== Mobile UX: target sentuh, scrim drawer, keterbacaan ====== */
+    @media (max-width:720px){
+      /* Tap target min 40px (pedoman iOS HIG / Material Design) */
+      #openArticleOverlayBtn{min-height:42px;padding-top:9px;padding-bottom:9px}
+      .cap-close{width:42px !important;height:42px !important;font-size:16px !important}
+      button[id*="lose" i],#exitModuleBtn{min-width:40px;min-height:40px}
+      button[id*="ang" i],button[data-lang]{min-width:42px;min-height:36px}
+      /* Area sentuh handle navigasi diperluas tanpa mengubah tampilan */
+      .nav-handle{overflow:visible}
+      .nav-handle::before{content:'';position:absolute;inset:-12px -14px}
+      /* Item di dalam drawer lebih nyaman disentuh */
+      .ui-shell .bottom-dock button{min-height:38px}
+      /* Judul & padding overlay artikel di layar sempit */
+      .cap-title{font-size:16px}
+      .cap-body{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+      /* Perluas area sentuh pin/label 3D (posisi visual tidak berubah) */
+      #tp3dLabels .tp-layer-label::before,
+      #labelsOverlayContainer .tp-3d-label::before,
+      #floatingPinsContainer .biome-3d-pin::before,
+      #hudPinsContainer .hud-pin::before,
+      #hotspotLayer .hotspot-pin::before{content:'';position:absolute;inset:-9px}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .ui-shell .bottom-dock,.nav-handle,.tp-nav-card{transition:none}
+    }
+  </style>
+</head>
+<body>
+  <!-- Panggung samudra full-screen (pola BAB 01): kanvas Three.js + label spasial terproyeksi -->
+  <div id="viewportContainer">
+    <!-- Three.js WebGL Canvas -->
+    <canvas id="oceanCanvas"></canvas>
+
+    <!-- 3D Projected Spatial Labels Overlay Container -->
+    <div id="spatialLabelsContainer"></div>
+  </div>
+
+  <!-- PANEL TELEMETRI ZONA (popup samping kanan, pola info-popup BAB 01–05):
+       tersembunyi sampai zona/fitur diklik -->
+  <div id="oceanInfoPanel" class="terra-glass">
+    <div class="flex items-start justify-between gap-2 mb-3">
+      <span class="text-[11px] font-mono text-[#5df0a8]/90" id="activeZoneCodeBadge">
+        ZONA 01 / 05
+      </span>
+      <button id="oceanInfoCloseBtn" type="button" title="Tutup panel telemetri zona" aria-label="Tutup panel telemetri zona">✕</button>
+    </div>
+
+    <!-- Selected Zone Header Banner -->
+    <div class="relative rounded-2xl p-4 bg-slate-900/80 border border-[#5df0a8]/30 overflow-hidden">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <span id="zoneTagPill" class="px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-[#5df0a8]/10 text-[#5df0a8] border border-[#5df0a8]/30">
+              Zona fotik (Sunlight Zone)
+            </span>
+            <span id="zoneDepthBadge" class="text-xs font-mono text-sky-300 font-medium">
+              0 – 200 m
+            </span>
+          </div>
+          <h2 id="zoneTitleHeading" class="text-lg sm:text-xl font-semibold text-white">
+            Zona Epipelagik (Permukaan &amp; Terumbu Karang)
+          </h2>
+        </div>
+      </div>
+
+      <p id="zoneSummaryText" class="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
+        Lapisan permukaan samudra yang ditembus cahaya matahari penuh (zona fotik), memungkinkan fotosintesis fitoplankton dan pertumbuhan ekosistem terumbu karang di paparan benua.
+      </p>
+
+      <!-- 4 Key Physical Parameter Cards (Depth, Temp, Pressure, Light) -->
+      <div class="grid grid-cols-2 gap-2.5 mt-4">
+        <!-- Depth -->
+        <div class="p-2.5 rounded-xl bg-slate-950/65 border border-white/10">
+          <div class="text-[10px] font-mono text-slate-400" data-i18n="metricDepth">Kedalaman</div>
+          <div id="metricDepthVal" class="text-sm sm:text-base font-mono font-medium text-[#5df0a8] mt-0.5">0 – 200 m</div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+            <div id="barDepth" class="h-full bg-[#5df0a8] rounded-full transition-[width] duration-500" style="width: 12%"></div>
+          </div>
+        </div>
+
+        <!-- Temperature -->
+        <div class="p-2.5 rounded-xl bg-slate-950/65 border border-white/10">
+          <div class="text-[10px] font-mono text-slate-400" data-i18n="metricTemp">Suhu Air</div>
+          <div id="metricTempVal" class="text-sm sm:text-base font-mono font-medium text-amber-300 mt-0.5">18°C – 30°C</div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+            <div id="barTemp" class="h-full bg-amber-400 rounded-full transition-[width] duration-500" style="width: 88%"></div>
+          </div>
+        </div>
+
+        <!-- Hydrostatic Pressure -->
+        <div class="p-2.5 rounded-xl bg-slate-950/65 border border-white/10">
+          <div class="text-[10px] font-mono text-slate-400" data-i18n="metricPressure">Tekanan Hidrostatik</div>
+          <div id="metricPressureVal" class="text-sm sm:text-base font-mono font-medium text-sky-300 mt-0.5">1 – 21 atm</div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+            <div id="barPressure" class="h-full bg-sky-400 rounded-full transition-[width] duration-500" style="width: 8%"></div>
+          </div>
+        </div>
+
+        <!-- Light Intensity -->
+        <div class="p-2.5 rounded-xl bg-slate-950/65 border border-white/10">
+          <div class="text-[10px] font-mono text-slate-400" data-i18n="metricLight">Intensitas Cahaya</div>
+          <div id="metricLightVal" class="text-sm sm:text-base font-mono font-medium text-yellow-200 mt-0.5">100% – 1% (Fotik)</div>
+          <div class="w-full h-1.5 bg-slate-800 rounded-full mt-1.5 overflow-hidden">
+            <div id="barLight" class="h-full bg-yellow-300 rounded-full transition-[width] duration-500" style="width: 95%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Characteristics of Life & Geology in Selected Zone -->
+      <div class="mt-3.5 pt-3 border-t border-white/10 space-y-2">
+        <div>
+          <span class="text-[11px] font-mono text-[#5df0a8] font-medium" data-i18n="labelLifeChar">
+            Karakteristik Kehidupan &amp; Organisme:
+          </span>
+          <p id="zoneLifeText" class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+            Terumbu karang (Scleractinia), fitoplankton, penyu hijau, pari manta, ikan karang tropis, dan mamalia laut.
+          </p>
+        </div>
+        <div>
+          <span class="text-[11px] font-mono text-sky-300 font-medium" data-i18n="labelGeoChar">
+            Morfologi &amp; Proses Oseanografi:
+          </span>
+          <p id="zoneGeoText" class="text-xs text-slate-300 mt-0.5 leading-relaxed">
+            Paparan benua (Continental Shelf), pencampuran gelombang permukaan, dan arus hangat permukaan termohalin.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FLOATING HUD OVERLAY (struktur kontainer sama persis dengan BAB 01–05):
+       pointer-events:none di shell, pointer-events:auto hanya pada kartu/tombol interaktif -->
+  <div class="ui-shell">
+    <div>
+      <header class="top-bar">
+        <div class="brand-pill">
+          <span class="brand-mark">▲</span>
+          <div class="brand-col">
+            <span class="brand-title">TerraPedia 3D</span>
+            <span class="brand-chapter" data-i18n="chapterCode">Bab 06 — Hidrosfer &amp; Samudra</span>
+            <span class="brand-sub" data-i18n="modalTitle">Struktur Hidrosfer dan Dinamika Samudra Bumi</span>
+          </div>
+        </div>
+
+        <!-- Pojok kanan atas: tombol artikel, sakelar bahasa (ID/EN), dan ✕ melayang tanpa bar memanjang -->
+        <div class="top-controls">
+          <button id="openArticleOverlayBtn" type="button" class="cam-btn" data-i18n="openArticleBtn">Artikel Ilmiah</button>
+          <div class="pill-group" role="group" aria-label="Language Switcher">
+            <button id="langIdBtn" type="button" class="active">ID</button>
+            <button id="langEnBtn" type="button">EN</button>
+          </div>
+          <a id="exitModuleBtn" href="terrapedia.html" title="Keluar ke TerraPedia" aria-label="Keluar ke halaman utama TerraPedia" class="exit-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </a>
+        </div>
+      </header>
+
+      <!-- Pil petunjuk tepat di bawah kartu judul kiri atas -->
+      <div style="display:flex;justify-content:center">
+        <div class="touch-prompt">
+          <span class="prompt-dot"></span>
+          <span data-i18n="hudPrompt">Klik zona, fitur, atau label 3D untuk inspeksi</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCK MELAYANG TERPUSAT TENGAH BAWAH: pil zona/fitur + probe kedalaman + navigasi bab -->
+    <div class="bottom-dock" id="bottomDock">
+      <div class="tp-dock-tagline">Kenali Bumi Lebih Dalam</div>
+      <!-- Baris 1: 5 Depth Zone Pills (dinamis via JS; klik lagi = sembunyikan telemetri) -->
+      <div class="layer-pills" id="zoneLadderButtons">
+        <!-- Populated dynamically via JS -->
+      </div>
+
+      <!-- Baris 2: Special Geological & Ecological Landmarks Pills (dinamis via JS) -->
+      <div class="layer-pills" id="featureButtons">
+        <!-- Populated dynamically via JS -->
+      </div>
+
+      <!-- Baris 3: Kontrol kamera/label/termohalin + probe kedalaman -->
+      <div class="controls-row">
+        <div class="toggle-row">
+          <button id="btnAutoRotate" type="button" class="scene-btn active">
+            <span class="dot-dot"></span>
+            <span data-i18n="btnRotate">Putar Otomatis</span>
+          </button>
+
+          <button id="btnThermohalineBottom" type="button" class="scene-btn active">
+            <span class="dot-dot"></span>
+            <span data-i18n="btnConveyor">Arus Termohalin</span>
+          </button>
+
+          <button id="btnToggleLabels" type="button" class="scene-btn active">
+            <span class="dot-dot"></span>
+            <span data-i18n="btnLabels">Label 3D</span>
+          </button>
+
+          <button id="btnCrossSectionView" type="button" class="scene-btn scene-btn-neutral">
+            <span data-i18n="btnFrontAngle">Fokus Palung</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tombol navbar: sembunyikan / tampilkan bilah navigasi samping -->
+    <button id="navHandleBtn" type="button" class="nav-handle" aria-expanded="true" aria-controls="bottomDock" aria-label="Sembunyikan navigasi bab" title="Sembunyikan navigasi bab">
+      <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+      <svg class="ic-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button>
+
+    <!-- Kartu navigasi bab — BAB terakhir, hanya sebelumnya: fixed di ujung kiri viewport -->
+    <a class="chapter-next-card is-prev tp-nav-card tp-card-prev" href="terrapedia_bab_05_magnetosfer_perisai_3d_interactive_module.html" title="Buka BAB 05 — Magnetosfer &amp; Perisai" aria-label="Kembali ke BAB 05 — Magnetosfer dan Perisai">
+      <span class="chapter-next-arrow">←</span>
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" data-i18n="prevChapterLabel">Sebelumnya</span>
+        <span class="chapter-next-title" data-i18n="prevChapterTitle">BAB 05 — Magnetosfer &amp; Perisai</span>
+      </span>
+    </a>
+  </div>
+
+  <!-- =========================================================================
+       OVERLAY ARTIKEL (bekas sidebar samping, pola info-popup BAB 01):
+       infobox, artikel ilmiah & katalog biota hanya tampil setelah tombol
+       "Artikel" diklik. Desktop: drawer kanan. Mobile: sheet layar penuh.
+       ========================================================================= -->
+  <div id="articleOverlay" aria-hidden="true">
+    <div class="cap-backdrop" data-overlay-close></div>
+    <section class="cap-panel" role="dialog" aria-modal="true" aria-label="Artikel BAB 06 — Hidrosfer &amp; Samudra">
+      <header class="cap-head">
+        <div class="min-w-0">
+          <span class="cap-eyebrow" data-i18n="capEyebrow">Artikel</span>
+          <h2 class="cap-title" data-i18n="modalTitle">Struktur Hidrosfer dan Dinamika Samudra Bumi</h2>
+        </div>
+        <button id="closeArticleOverlayBtn" type="button" class="cap-close" aria-label="Tutup artikel" title="Tutup artikel (Esc)">✕</button>
+      </header>
+      <div class="cap-body">
+
+        <!-- Sub-Navigation Tabs: disembunyikan (struktur artikel diseragamkan dengan BAB 02) -->
+        <div class="cap-tabs" style="display:none">
+          <button id="tabBtnArticle" type="button" class="active" data-i18n="tabArticle">
+            Artikel Ilmiah
+          </button>
+          <button id="tabBtnBiota" type="button" data-i18n="tabBiota">
+            Biota &amp; Arus
+          </button>
+        </div>
+
+        <!-- SCROLLABLE CONTENT BODY -->
+        <div id="articleScrollArea" class="selectable-text">
+
+          <!-- =================================================================
+                SECTION A: TERRAPEDIA STANDARD INFOBOX TABLE
+               ================================================================= -->
+          <section id="sectionTelemetry" class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+            <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+              <span data-i18n="telemetryTag">01 // INFOBOX GEOSAINS</span>
+              <span class="h-px flex-1 bg-white/10"></span>
+              <span class="text-[10px] font-mono text-slate-400">TERRAPEDIA-DB</span>
+            </div>
+            <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="infoboxHeader">
+              Infobox geosains — Hidrosfer Bumi
+            </h2>
+
+            <div class="rounded-xl bg-white/[0.03] border border-white/10 overflow-hidden">
+              <div class="divide-y divide-white/5 text-xs" id="infoboxTableBody">
+                <!-- Populated dynamically via JS for ID/EN -->
+              </div>
+            </div>
+          </section>
+
+          <!-- =================================================================
+               SECTION B: SCIENTIFIC ARTICLE (PERTAHANKAN ARTIKEL ILMIAH)
+               ================================================================= -->
+          <article id="sectionArticle" class="space-y-8">
+            <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+              <span data-i18n="articleTag">Artikel ensiklopedia ilmiah</span>
+              <span class="h-px flex-1 bg-white/10"></span>
+              <span class="text-[11px] font-mono text-slate-400" data-i18n="readTime">
+                BAB 06 · Oseanografi fisika &amp; biologi
+              </span>
+            </div>
+
+            <div id="scientificArticleContent" class="space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
+              <!-- Populated dynamically in Indonesian or English -->
+            </div>
+          </article>
+
+          <!-- =================================================================
+               SECTION C: MARINE ORGANISMS & THERMOHALINE CIRCULATION GUIDE
+               ================================================================= -->
+          <section id="sectionBiota" class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span data-i18n="biotaTag">06 // BIOTA &amp; ARUS</span>
+                <span class="h-px w-10 bg-white/10"></span>
+              </div>
+              <button id="btnFocusThermohalineCard" type="button"
+                class="text-[11px] font-mono text-sky-300 hover:text-[#5df0a8] underline">
+                <span data-i18n="focusConveyorLink">Sorot Arus 3D</span>
+              </button>
+            </div>
+            <h2 class="text-lg sm:text-2xl font-semibold text-white" data-i18n="biotaSectionHeader">
+              Katalog Organisme &amp; Sirkulasi Termohalin 3D
+            </h2>
+
+            <!-- Interactive Organism Cards that focus camera on click -->
+            <div id="biotaCardsContainer" class="grid grid-cols-1 gap-2">
+              <!-- Populated via JS -->
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Non-intrusive Toast Notification for Chapter Navigation / Interactive Feedback -->
+  <div id="terraToast" class="terra-glass">
+    <span class="toast-dot"></span>
+    <span id="terraToastText">Memfokuskan kamera pada zona...</span>
+  </div>
+  <script>
+    // (c) Roda scroll mouse menggeser bilah navbar horizontal (bukan hanya trackpad)
+    (function () {
+      document.addEventListener('wheel', function (e) {
+        var el = e.target instanceof Element ? e.target : null;
+        while (el && el !== document.documentElement) {
+          var cs = getComputedStyle(el);
+          if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') && el.scrollWidth > el.clientWidth + 1) {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              e.preventDefault();
+              el.scrollLeft += e.deltaY;
+            }
+            return;
+          }
+          el = el.parentElement;
+        }
+      }, { passive: false, capture: true });
+    })();
+  </script>
+</body>
+
+  <!-- =========================================================================
+       3. THREE.JS 0.143.0 MODULE SCRIPT — REALISTIC OCEAN CROSS-SECTION BLOCK
+       ========================================================================= -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* =========================================================================
+       BILINGUAL DATA DICTIONARY (INDONESIAN & ENGLISH)
+       ========================================================================= */
+    const I18N = {
+      id: {
+        chapterCode: 'Bab 06 — Hidrosfer & Samudra',
+        modalTitle: 'Struktur Hidrosfer dan Dinamika Samudra Bumi',
+        depthProbeLabel: 'Probe Kedalaman Samudra:',
+        btnRotate: 'Putar Otomatis',
+        btnConveyor: 'Arus Termohalin',
+        btnLabels: 'Label 3D',
+        btnFrontAngle: 'Fokus Palung',
+        tabArticle: 'Artikel Ilmiah',
+        tabBiota: 'Biota & Arus',
+        openArticleBtn: 'Artikel Ilmiah',
+        capEyebrow: 'Artikel',
+        hudPrompt: 'Klik zona, fitur, atau label 3D untuk inspeksi',
+        metricDepth: 'Kedalaman',
+        metricTemp: 'Suhu Air',
+        metricPressure: 'Tekanan Hidrostatik',
+        metricLight: 'Intensitas Cahaya',
+        labelLifeChar: 'Karakteristik Kehidupan & Organisme:',
+        labelGeoChar: 'Morfologi & Proses Oseanografi:',
+        infoboxHeader: 'Infobox geosains — Hidrosfer Bumi',
+        telemetryTag: '01 // INFOBOX GEOSAINS',
+        biotaTag: '06 // BIOTA & ARUS',
+        articleTag: 'Artikel ensiklopedia ilmiah',
+        readTime: 'BAB 06 · Oseanografi fisika & biologi',
+        biotaSectionHeader: 'Katalog Organisme & Sirkulasi Termohalin 3D',
+        focusConveyorLink: 'Sorot Arus Termohalin 3D',
+        prevChapterLabel: 'Sebelumnya',
+        prevChapterTitle: 'BAB 05 — Magnetosfer & Perisai',
+        infoboxRows: [
+          ['Total Volume Hidrosfer', '1,386 miliar km³ (97,5% air asin samudra)'],
+          ['Luas Permukaan Samudra', '361,1 juta km² (~70,8% permukaan Bumi)'],
+          ['Kedalaman Rata-Rata', '3.688 meter (Zona Batipelagik)'],
+          ['Titik Terdalam Bumi', 'Challenger Deep, Palung Mariana (-10.994 ± 40 m)'],
+          ['Tekanan Dasar Palung', '1.086 bar / ~1.071 atm (108,6 MPa)'],
+          ['Salinitas Rata-Rata', '34,7 PSU (Practical Salinity Units / ‰)'],
+          ['Zona Termal Utama', 'Lapisan Campuran, Termoklin (200–1000 m), Air Dalam'],
+          ['Sirkulasi Global', 'Arus Termohalin (Global Ocean Conveyor Belt)']
+        ],
+        zones: [
+          {
+            id: 'epipelagic',
+            code: 'ZONA 01 / 05',
+            shortName: 'Epipelagik',
+            subLabel: '0 – 200 m',
+            tag: 'Zona fotik (Sunlight Zone)',
+            title: 'Zona Epipelagik (Permukaan & Terumbu Karang)',
+            depth: '0 – 200 m',
+            temp: '18°C – 30°C',
+            pressure: '1 – 21 atm (0,1 – 2,1 MPa)',
+            light: '100% – 1% (Cahaya Penuh)',
+            bars: { depth: 8, temp: 92, pressure: 5, light: 100 },
+            colorHex: '#38bdf8',
+            summary: 'Lapisan paling atas samudra yang menerima penetrasi sinar matahari secara langsung. Zona ini menjadi pusat produksi primer global melalui fotosintesis fitoplankton dan menopang ekosistem terumbu karang di paparan benua.',
+            life: 'Terumbu karang pembentuk batuan (Scleractinia), fitoplankton & diatom, penyu laut (Chelonia mydas), pari manta, hiu karang, dan kawanan ikan pelagis.',
+            geo: 'Meliputi paparan benua (Continental Shelf) yang dangkal, gelombang permukaan akibat angin, penetrasi sinar kaustik, serta cabang hangat permukaan dari Sirkulasi Termohalin.',
+            yCenter: 3.15,
+            camPos: [-11.5, 6.2, 14.5],
+            camTarget: [-1.5, 2.7, 0]
+          },
+          {
+            id: 'mesopelagic',
+            code: 'ZONA 02 / 05',
+            shortName: 'Mesopelagik',
+            subLabel: '200 – 1.000 m',
+            tag: 'Zona senja (Twilight Zone)',
+            title: 'Zona Mesopelagik (Lapisan Senja & Termoklin)',
+            depth: '200 – 1.000 m',
+            temp: '5°C – 18°C (Termoklin)',
+            pressure: '21 – 101 atm (2,1 – 10,1 MPa)',
+            light: '< 1% – 0,0001% (Senja Redup)',
+            bars: { depth: 24, temp: 52, pressure: 18, light: 22 },
+            colorHex: '#0284c7',
+            summary: 'Terletak tepat di bawah zona fotik, zona senja hanya menerima berkas cahaya biru-hijau yang sangat redup dan tidak cukup untuk fotosintesis. Merupakan lokasi lapisan termoklin tempat suhu turun drastis.',
+            life: 'Ubur-ubur bioluminesensi, ikan lentera (Myctophidae) yang melakukan migrasi vertikal harian terbesar di Bumi, cumi-cumi mesopelagik, dan ctenophora.',
+            geo: 'Berbatasan dengan lereng benua (Continental Slope) yang curam. Di zona ini terjadi hujan partikel organik ("salju laut" / marine snow) dari lapisan atas.',
+            yCenter: 1.95,
+            camPos: [-10.5, 4.0, 14.8],
+            camTarget: [-1.2, 1.8, 0]
+          },
+          {
+            id: 'bathypelagic',
+            code: 'ZONA 03 / 05',
+            shortName: 'Batipelagik',
+            subLabel: '1.000 – 4.000 m',
+            tag: 'Zona tengah malam (Midnight Zone)',
+            title: 'Zona Batipelagik (Kegelapan Abadi)',
+            depth: '1.000 – 4.000 m',
+            temp: '2°C – 4°C',
+            pressure: '101 – 401 atm (10 – 40 MPa)',
+            light: '0% (Hanya Bioluminesensi)',
+            bars: { depth: 50, temp: 22, pressure: 42, light: 3 },
+            colorHex: '#1d4ed8',
+            summary: 'Sinar matahari sama sekali tidak mampu menembus kedalaman di bawah 1.000 meter. Satu-satunya cahaya berasal dari reaksi kimia bioluminesensi organisme laut dalam untuk menarik mangsa atau berkomunikasi.',
+            life: 'Ikan sungut ganda (Anglerfish / Melanocetus) dengan antena bercahaya, cumi-cumi raksasa (Architeuthis), paus sperma yang menyelam berburu, dan ikan viper.',
+            geo: 'Mencakup kaki lereng benua (Continental Rise) dan jalur transisi arus dalam (Deep Western Boundary Currents) pada sistem konveyor termohalin.',
+            yCenter: 0.45,
+            camPos: [-10.2, 2.2, 15.0],
+            camTarget: [-1.0, 0.3, 0]
+          },
+          {
+            id: 'abyssopelagic',
+            code: 'ZONA 04 / 05',
+            shortName: 'Abisal',
+            subLabel: '4.000 – 6.000 m',
+            tag: 'Zona abisal (The Abyss)',
+            title: 'Zona Abisal & Dataran Dasar Samudra',
+            depth: '4.000 – 6.000 m',
+            temp: '1°C – 2,5°C',
+            pressure: '401 – 601 atm (40 – 60 MPa)',
+            light: '0% (Afotik Total)',
+            bars: { depth: 75, temp: 12, pressure: 65, light: 0 },
+            colorHex: '#1e3a8a',
+            summary: 'Mencakup lebih dari 50% luas permukaan kerak Bumi berupa Dataran Abisal (Abyssal Plain) yang datar, bersuhu mendekati titik beku, dan memiliki tekanan ratusan atmosfer.',
+            life: 'Gurita Dumbo (Grimpoteuthis), lili laut bertangkai (Crinoidea), ikan tripod (Bathypterois grallator), teripang laut dalam, dan bintang ular.',
+            geo: 'Dataran Dasar Samudra (Abyssal Plain) yang dilapisi sedimen pelagik halus, nodul polimetalik mangan, serta dialiri Arus Dasar Antartika (Antarctic Bottom Water) yang dingin dan padat.',
+            yCenter: -1.15,
+            camPos: [-9.8, 0.7, 14.2],
+            camTarget: [-1.0, -1.2, 0]
+          },
+          {
+            id: 'hadalpelagic',
+            code: 'ZONA 05 / 05',
+            shortName: 'Hadal (Palung)',
+            subLabel: '6.000 – 10.994 m',
+            tag: 'Zona hadal (Mariana Trench)',
+            title: 'Zona Hadal — Palung Mariana & Challenger Deep',
+            depth: '6.000 – 10.994 m',
+            temp: '1,0°C – 4,0°C (hingga 380°C di Vent)',
+            pressure: '601 – 1.086 atm (108,6 MPa)',
+            light: '0% (Pendaran Termal & Biologi)',
+            bars: { depth: 100, temp: 8, pressure: 100, light: 0 },
+            colorHex: '#5df0a8',
+            summary: 'Zona terdalam di Bumi yang terbentuk di ngarai sempit berbentuk V akibat subduksi Lempeng Pasifik ke bawah Lempeng Mariana. Mencakup cekungan Western Pool, Central Pool, dan Eastern Pool pada Challenger Deep.',
+            life: 'Ikan siput Mariana (Pseudoliparis swirei — vertebrata terdalam hingga ~8.300 m), amphipoda raksasa (Hirondellea gigas), foraminifera xenophyophore, dan bakteri kemosintetik ventilasi hidrotermal.',
+            geo: 'Zona subduksi tektonik aktif Lempeng Pasifik & Lempeng Mariana, cekungan Challenger Deep (-10.994 m), serta ventilasi hidrotermal (black smokers) yang memancarkan mineral panas.',
+            yCenter: -3.05,
+            camPos: [-6.8, -0.5, 12.2],
+            camTarget: [1.1, -3.1, 0]
+          }
+        ],
+        features: [
+          {
+            id: 'coral_reef',
+            label: 'Terumbu Karang',
+            zoneId: 'epipelagic',
+            camPos: [-10.2, 5.2, 8.8],
+            camTarget: [-5.2, 2.85, -0.5],
+            toast: 'Fokus 3D: Ekosistem Terumbu Karang (Paparan Benua • 0–50 m)'
+          },
+          {
+            id: 'abyssal_plain',
+            label: 'Dataran Abisal',
+            zoneId: 'abyssopelagic',
+            camPos: [-8.5, 0.8, 11.2],
+            camTarget: [-2.0, -1.25, 0.2],
+            toast: 'Fokus 3D: Dataran Dasar Samudra (Abyssal Plain • 4.000–5.500 m)'
+          },
+          {
+            id: 'mariana_trench',
+            label: 'Palung Mariana',
+            zoneId: 'hadalpelagic',
+            camPos: [-4.5, -0.3, 10.6],
+            camTarget: [1.45, -3.35, 0.0],
+            toast: 'Fokus 3D: Challenger Deep — Western, Central & Eastern Pool (-10.994 m)'
+          },
+          {
+            id: 'thermohaline',
+            label: 'Arus Termohalin',
+            zoneId: 'bathypelagic',
+            camPos: [-12.0, 4.6, 15.8],
+            camTarget: [-0.8, 0.2, 0.0],
+            toast: 'Visualisasi Sirkulasi Termohalin (Sabuk Konveyor Samudra Global)'
+          }
+        ],
+        biotaList: [
+          {
+            name: 'Terumbu Karang & Pari Manta (Epipelagik)',
+            depth: '0 – 120 m',
+            desc: 'Koloni koral bersimbiosis dengan alga zooxanthellae di paparan benua yang hangat dan kaya sinar matahari.',
+            zoneId: 'epipelagic',
+            camPos: [-9.8, 5.0, 8.5],
+            camTarget: [-5.1, 2.85, -0.3]
+          },
+          {
+            name: 'Ubur-Ubur Bioluminesensi & Ikan Lentera (Mesopelagik)',
+            depth: '300 – 900 m',
+            desc: 'Organisme penghuni zona senja yang memancarkan pendaran sian-hijau dan melakukan migrasi vertikal setiap malam.',
+            zoneId: 'mesopelagic',
+            camPos: [-8.2, 3.1, 10.5],
+            camTarget: [-1.8, 1.85, 0.2]
+          },
+          {
+            name: 'Anglerfish & Cumi-Cumi Raksasa (Batipelagik)',
+            depth: '1.200 – 3.500 m',
+            desc: 'Predator zona tengah malam dengan organ esca bercahaya bakteri simbiotik di tengah kegelapan abadi.',
+            zoneId: 'bathypelagic',
+            camPos: [-7.8, 1.5, 10.2],
+            camTarget: [-0.4, 0.35, 0.4]
+          },
+          {
+            name: 'Gurita Dumbo & Lili Laut Crinoid (Abisal)',
+            depth: '4.200 – 5.600 m',
+            desc: 'Berenang lembut menggunakan sirip menyerupai telinga di atas sedimen Dataran Dasar Samudra yang dingin.',
+            zoneId: 'abyssopelagic',
+            camPos: [-7.4, 0.2, 9.8],
+            camTarget: [-1.8, -1.2, 0.3]
+          },
+          {
+            name: 'Ikan Siput Hadal & Ventilasi Hidrotermal (Palung Mariana)',
+            depth: '6.500 – 10.994 m',
+            desc: 'Memiliki tubuh gelatin tanpa kantung renang dan molekul TMAO tinggi untuk menahan tekanan 1.086 atmosfer di Challenger Deep.',
+            zoneId: 'hadalpelagic',
+            camPos: [-4.2, -0.8, 9.5],
+            camTarget: [1.45, -3.3, 0.0]
+          }
+        ],
+        articleHTML: `
+          <div class="space-y-8">
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>02 // STRATIFIKASI VERTIKAL</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Stratifikasi Vertikal Kolom Air Samudra</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Samudra dunia tidak bersifat seragam, melainkan terbagi menjadi lima lapisan vertikal (zona pelagik) berdasarkan penetrasi radiasi matahari, gradien suhu (<strong>termoklin</strong>), dan tekanan hidrostatik. Setiap pertambahan kedalaman <strong>10 meter</strong> meningkatkan tekanan sebesar <strong>1 atmosfer (~1 bar)</strong>.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Di lapisan atas, <strong>Zona Epipelagik (0–200 m)</strong> menyerap spektrum cahaya merah hingga biru untuk fotosintesis. Memasuki <strong>Zona Mesopelagik (200–1.000 m)</strong>, suhu turun tajam pada lapisan termoklin permanen. Di bawah 1.000 meter—meliputi <strong>Batipelagik</strong>, <strong>Abisal</strong>, dan <strong>Hadal</strong>—samudra berada dalam kegelapan abadi (<em>afotik</em>) dengan suhu stabil antara 1°C hingga 4°C.
+              </p>
+            </section>
+
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>03 // TOPOGRAFI DASAR LAUT</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Paparan Benua, Terumbu Karang &amp; Dataran Abisal</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Topografi dasar samudra (<strong>batimetri</strong>) dimulai dari <strong>Paparan Benua (Continental Shelf)</strong> yang landai. Di perairan tropis yang jernih, zona ini menjadi rumah bagi <strong>Terumbu Karang</strong> yang menyimpan 25% keanekaragaman hayati laut meskipun hanya menutupi kurang dari 1% dasar samudra.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Setelah melewati kemiringan curam <strong>Lereng Benua (Continental Slope)</strong>, dasar laut meluas menjadi <strong>Dataran Dasar Samudra (Abyssal Plain)</strong> pada kedalaman 4.000 hingga 6.000 meter. Dataran ini diselimuti endapan sedimen biogenik halus dan nodul polimetalik.
+              </p>
+            </section>
+
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>04 // SUBDUKSI &amp; PALUNG MARIANA</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Subduksi Tektonik &amp; Palung Mariana (Challenger Deep)</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Sebagaimana ditampilkan pada dinding potongan litosfer 3D, <strong>Palung Mariana</strong> terbentuk pada batas konvergen tempat <strong>Lempeng Pasifik (Pacific Plate)</strong> yang tua dan padat menunjam (subduksi) ke bawah <strong>Lempeng Mariana (Mariana Plate)</strong>.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Titik terdalamnya, <strong>Challenger Deep (-10.994 m)</strong>, terbagi menjadi tiga cekungan berurutan di dasar ngarai: <em>Western Pool</em>, <em>Central Pool</em>, dan <em>Eastern Pool</em>. Rekahan kerak di zona ini memicu munculnya <strong>ventilasi hidrotermal</strong> yang menyemburkan fluida kaya mineral sulfida sebagai sumber energi kemosintesis.
+              </p>
+            </section>
+
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>05 // SIRKULASI TERMOHALIN</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Sirkulasi Termohalin (Sabuk Konveyor Global)</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                <strong>Arus Termohalin</strong> (<em>thermo</em> = suhu, <em>haline</em> = salinitas) adalah sistem sirkulasi samudra global yang digerakkan oleh perbedaan densitas air laut. Arus permukaan yang hangat (divisualisasikan dengan partikel jingga-emas) mengalir menuju lintang tinggi, mendingin, dan mengalami peningkatan salinitas saat es laut terbentuk.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Massa air yang menjadi sangat padat ini tenggelam (<em>downwelling</em>) hingga ke dasar samudra (partikel hijau-sian <code>#5df0a8</code>), mengalir menyusuri cekungan batipelagik dan abisal sebelum akhirnya naik kembali (<em>upwelling</em>). Satu siklus penuh sabuk konveyor ini memerlukan waktu sekitar <strong>1.000 tahun</strong> dan berperan vital menjaga stabilitas iklim Bumi.
+              </p>
+            </section>
+          </div>
+        `
+      },
+
+      en: {
+        chapterCode: 'CH 06 — Hydrosphere & Oceans',
+        modalTitle: "Earth's Hydrosphere Structure & Ocean Dynamics",
+        depthProbeLabel: 'Ocean Depth Probe:',
+        btnRotate: 'Auto-Rotate',
+        btnConveyor: 'Thermohaline Flow',
+        btnLabels: '3D Labels',
+        btnFrontAngle: 'Focus Trench',
+        tabArticle: 'Scientific Article',
+        tabBiota: 'Biota & Currents',
+        openArticleBtn: 'Scientific Article',
+        capEyebrow: 'Article',
+        hudPrompt: 'Click a zone, feature, or 3D label to inspect',
+        metricDepth: 'Depth Range',
+        metricTemp: 'Water Temp',
+        metricPressure: 'Hydrostatic Pressure',
+        metricLight: 'Light Intensity',
+        labelLifeChar: 'Biological Characteristics & Marine Life:',
+        labelGeoChar: 'Morphology & Oceanographic Processes:',
+        infoboxHeader: 'Geoscience infobox — Earth hydrosphere',
+        telemetryTag: '01 // GEOSCIENCE INFOBOX',
+        biotaTag: '06 // BIOTA & CURRENTS',
+        articleTag: 'Scientific encyclopedia article',
+        readTime: 'CH 06 · Physical & biological oceanography',
+        biotaSectionHeader: '3D Marine Organisms & Thermohaline Guide',
+        focusConveyorLink: 'Highlight 3D Currents',
+        prevChapterLabel: 'Previous',
+        prevChapterTitle: 'CH 05 — Magnetosphere & Shield',
+        infoboxRows: [
+          ['Total Hydrosphere Volume', '1.386 billion km³ (97.5% saline ocean water)'],
+          ['Ocean Surface Area', '361.1 million km² (~70.8% of Earth surface)'],
+          ['Mean Ocean Depth', '3,688 meters (Bathypelagic Zone)'],
+          ['Deepest Point on Earth', 'Challenger Deep, Mariana Trench (-10,994 ± 40 m)'],
+          ['Trench Bottom Pressure', '1,086 bar / ~1,071 atm (108.6 MPa)'],
+          ['Average Ocean Salinity', '34.7 PSU (Practical Salinity Units / ‰)'],
+          ['Primary Thermal Layers', 'Mixed Surface Layer, Thermocline (200–1000 m), Deep Water'],
+          ['Global Circulation', 'Thermohaline Circulation (Global Ocean Conveyor Belt)']
+        ],
+        zones: [
+          {
+            id: 'epipelagic',
+            code: 'ZONE 01 / 05',
+            shortName: 'Epipelagic',
+            subLabel: '0 – 200 m',
+            tag: 'Sunlight zone (photic)',
+            title: 'Epipelagic Zone (Surface & Coral Reef)',
+            depth: '0 – 200 m',
+            temp: '18°C – 30°C',
+            pressure: '1 – 21 atm (0.1 – 2.1 MPa)',
+            light: '100% – 1% (Full Sunlight)',
+            bars: { depth: 8, temp: 92, pressure: 5, light: 100 },
+            colorHex: '#38bdf8',
+            summary: 'The sunlit uppermost layer of the ocean where solar radiation penetrates directly, driving global primary production via phytoplankton photosynthesis and supporting vibrant coral reef ecosystems along continental shelves.',
+            life: 'Reef-building corals (Scleractinia), phytoplankton & diatoms, green sea turtles (Chelonia mydas), manta rays, reef sharks, and schooling pelagic fish.',
+            geo: 'Encompasses the shallow Continental Shelf, wind-driven surface waves, caustic light rays, and the warm upper limb of the Thermohaline Circulation.',
+            yCenter: 3.15,
+            camPos: [-11.5, 6.2, 14.5],
+            camTarget: [-1.5, 2.7, 0]
+          },
+          {
+            id: 'mesopelagic',
+            code: 'ZONE 02 / 05',
+            shortName: 'Mesopelagic',
+            subLabel: '200 – 1,000 m',
+            tag: 'Twilight zone (disphotic)',
+            title: 'Mesopelagic Zone (Twilight & Thermocline)',
+            depth: '200 – 1,000 m',
+            temp: '5°C – 18°C (Thermocline)',
+            pressure: '21 – 101 atm (2.1 – 10.1 MPa)',
+            light: '< 1% – 0.0001% (Faint Blue)',
+            bars: { depth: 24, temp: 52, pressure: 18, light: 22 },
+            colorHex: '#0284c7',
+            summary: 'Situated directly beneath the photic zone, the twilight zone receives only faint blue-green wavelengths insufficient for photosynthesis. It hosts the permanent thermocline where water temperature drops rapidly with depth.',
+            life: 'Bioluminescent jellyfish, lanternfish (Myctophidae) conducting the largest daily vertical migration on Earth, mesopelagic squid, and comb jellies.',
+            geo: 'Borders the steep Continental Slope. Organic detritus ("marine snow") cascades downward from productive surface waters.',
+            yCenter: 1.95,
+            camPos: [-10.5, 4.0, 14.8],
+            camTarget: [-1.2, 1.8, 0]
+          },
+          {
+            id: 'bathypelagic',
+            code: 'ZONE 03 / 05',
+            shortName: 'Bathypelagic',
+            subLabel: '1,000 – 4,000 m',
+            tag: 'Midnight zone (aphotic)',
+            title: 'Bathypelagic Zone (Eternal Darkness)',
+            depth: '1,000 – 4,000 m',
+            temp: '2°C – 4°C',
+            pressure: '101 – 401 atm (10 – 40 MPa)',
+            light: '0% (Bioluminescence Only)',
+            bars: { depth: 50, temp: 22, pressure: 42, light: 3 },
+            colorHex: '#1d4ed8',
+            summary: 'Sunlight vanishes completely below 1,000 meters. The only illumination in this pitch-black realm is produced by chemical bioluminescence used by deep-sea organisms for predation and signaling.',
+            life: 'Deep-sea Anglerfish (Melanocetus) with glowing bioluminescent lures, giant squid (Architeuthis), deep-diving sperm whales, and viperfish.',
+            geo: 'Spans the lower Continental Slope and Rise, serving as the main conduit for dense Deep Water masses in the global thermohaline conveyor belt.',
+            yCenter: 0.45,
+            camPos: [-10.2, 2.2, 15.0],
+            camTarget: [-1.0, 0.3, 0]
+          },
+          {
+            id: 'abyssopelagic',
+            code: 'ZONE 04 / 05',
+            shortName: 'Abyssal',
+            subLabel: '4,000 – 6,000 m',
+            tag: 'Abyssopelagic (the abyss)',
+            title: 'Abyssal Zone & Deep Ocean Floor Plain',
+            depth: '4,000 – 6,000 m',
+            temp: '1°C – 2.5°C',
+            pressure: '401 – 601 atm (40 – 60 MPa)',
+            light: '0% (Total Darkness)',
+            bars: { depth: 75, temp: 12, pressure: 65, light: 0 },
+            colorHex: '#1e3a8a',
+            summary: 'Covers over 50% of Earth’s crust across vast, flat Abyssal Plains where water temperatures hover near freezing and hydrostatic pressures reach hundreds of atmospheres.',
+            life: 'Dumbo octopus (Grimpoteuthis), stalked sea lilies (Crinoidea), tripod fish (Bathypterois grallator), abyssal sea cucumbers, and brittle stars.',
+            geo: 'Vast Abyssal Plains carpeted in fine pelagic ooze and polymetallic manganese nodules, swept by cold, dense Antarctic Bottom Water.',
+            yCenter: -1.15,
+            camPos: [-9.8, 0.7, 14.2],
+            camTarget: [-1.0, -1.2, 0]
+          },
+          {
+            id: 'hadalpelagic',
+            code: 'ZONE 05 / 05',
+            shortName: 'Hadal (Trench)',
+            subLabel: '6,000 – 10,994 m',
+            tag: 'Hadal zone (Mariana Trench)',
+            title: 'Hadal Zone — Mariana Trench & Challenger Deep',
+            depth: '6,000 – 10,994 m',
+            temp: '1.0°C – 4.0°C (up to 380°C at Vents)',
+            pressure: '601 – 1,086 atm (108.6 MPa)',
+            light: '0% (Thermal & Bio Glow)',
+            bars: { depth: 100, temp: 8, pressure: 100, light: 0 },
+            colorHex: '#5df0a8',
+            summary: 'The deepest realm on Earth, confined to V-shaped subduction trenches where the Pacific Plate plunges beneath the Mariana Plate. Includes the Western Pool, Central Pool, and Eastern Pool depressions of Challenger Deep.',
+            life: 'Mariana snailfish (Pseudoliparis swirei — deepest vertebrate up to ~8,300 m), supergiant amphipods (Hirondellea gigas), xenophyophores, and chemosynthetic vent microbes.',
+            geo: 'Active tectonic subduction zone of the Pacific & Mariana Plates, Challenger Deep (-10,994 m), and hydrothermal black smoker vents releasing superheated mineral plumes.',
+            yCenter: -3.05,
+            camPos: [-6.8, -0.5, 12.2],
+            camTarget: [1.1, -3.1, 0]
+          }
+        ],
+        features: [
+          {
+            id: 'coral_reef',
+            label: 'Coral Reef',
+            zoneId: 'epipelagic',
+            camPos: [-10.2, 5.2, 8.8],
+            camTarget: [-5.2, 2.85, -0.5],
+            toast: '3D Focus: Coral Reef Ecosystem (Continental Shelf • 0–50 m)'
+          },
+          {
+            id: 'abyssal_plain',
+            label: 'Abyssal Plain',
+            zoneId: 'abyssopelagic',
+            camPos: [-8.5, 0.8, 11.2],
+            camTarget: [-2.0, -1.25, 0.2],
+            toast: '3D Focus: Abyssal Plain Ocean Floor (4,000–5,500 m)'
+          },
+          {
+            id: 'mariana_trench',
+            label: 'Mariana Trench',
+            zoneId: 'hadalpelagic',
+            camPos: [-4.5, -0.3, 10.6],
+            camTarget: [1.45, -3.35, 0.0],
+            toast: '3D Focus: Challenger Deep — Western, Central & Eastern Pools (-10,994 m)'
+          },
+          {
+            id: 'thermohaline',
+            label: 'Thermohaline',
+            zoneId: 'bathypelagic',
+            camPos: [-12.0, 4.6, 15.8],
+            camTarget: [-0.8, 0.2, 0.0],
+            toast: 'Visualizing Global Thermohaline Circulation (Ocean Conveyor Belt)'
+          }
+        ],
+        biotaList: [
+          {
+            name: 'Coral Reef & Manta Rays (Epipelagic)',
+            depth: '0 – 120 m',
+            desc: 'Calcifying coral colonies in symbiosis with zooxanthellae algae across sunlit continental shelves.',
+            zoneId: 'epipelagic',
+            camPos: [-9.8, 5.0, 8.5],
+            camTarget: [-5.1, 2.85, -0.3]
+          },
+          {
+            name: 'Bioluminescent Jellyfish & Lanternfish (Mesopelagic)',
+            depth: '300 – 900 m',
+            desc: 'Twilight-zone inhabitants emitting cyan-green bioluminescence and performing diel vertical migration.',
+            zoneId: 'mesopelagic',
+            camPos: [-8.2, 3.1, 10.5],
+            camTarget: [-1.8, 1.85, 0.2]
+          },
+          {
+            name: 'Deep-Sea Anglerfish & Giant Squid (Bathypelagic)',
+            depth: '1,200 – 3,500 m',
+            desc: 'Midnight-zone apex predators equipped with symbiotic bacterial glowing lures in pitch-black waters.',
+            zoneId: 'bathypelagic',
+            camPos: [-7.8, 1.5, 10.2],
+            camTarget: [-0.4, 0.35, 0.4]
+          },
+          {
+            name: 'Dumbo Octopus & Stalked Crinoids (Abyssal)',
+            depth: '4,200 – 5,600 m',
+            desc: 'Gracefully flapping ear-like fins above the frigid sediment of the Abyssal Plain.',
+            zoneId: 'abyssopelagic',
+            camPos: [-7.4, 0.2, 9.8],
+            camTarget: [-1.8, -1.2, 0.3]
+          },
+          {
+            name: 'Mariana Snailfish & Hydrothermal Vents (Hadal Trench)',
+            depth: '6,500 – 10,994 m',
+            desc: 'Gelatinous bodies lacking swim bladders and rich in TMAO osmolytes to withstand 1,086 atm pressure.',
+            zoneId: 'hadalpelagic',
+            camPos: [-4.2, -0.8, 9.5],
+            camTarget: [1.45, -3.3, 0.0]
+          }
+        ],
+        articleHTML: `
+          <div class="space-y-8">
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>02 // VERTICAL STRATIFICATION</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Vertical Stratification of the Water Column</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Earth’s global ocean is structured into five distinct vertical pelagic zones defined by solar light attenuation, thermal gradients (<strong>thermocline</strong>), and hydrostatic pressure. Every <strong>10 meters</strong> of descent increases pressure by approximately <strong>1 atmosphere (~1 bar)</strong>.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                In the uppermost <strong>Epipelagic Zone (0–200 m)</strong>, sunlight fuels photosynthesis. Entering the <strong>Mesopelagic Zone (200–1,000 m)</strong>, temperatures plunge rapidly across the permanent thermocline. Below 1,000 meters—spanning the <strong>Bathypelagic</strong>, <strong>Abyssopelagic</strong>, and <strong>Hadalpelagic</strong> zones—the ocean exists in perpetual darkness (<em>aphotic</em>) at near-freezing temperatures of 1°C to 4°C.
+              </p>
+            </section>
+
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>03 // SEAFLOOR TOPOGRAPHY</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Continental Shelf, Coral Reefs &amp; Abyssal Plains</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Seafloor bathymetry transitions from the shallow <strong>Continental Shelf</strong>—where sunlit tropical waters sustain <strong>Coral Reef</strong> ecosystems housing 25% of all marine species—down the steep <strong>Continental Slope</strong>.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                At depths between 4,000 and 6,000 meters, the seabed levels out into vast <strong>Abyssal Plains</strong> blanketed by pelagic marine sediment and polymetallic nodules, supporting specialized benthic fauna such as stalked crinoids and dumbo octopuses.
+              </p>
+            </section>
+
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>04 // SUBDUCTION &amp; MARIANA TRENCH</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Tectonic Subduction &amp; Mariana Trench (Challenger Deep)</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                As illustrated along the 3D lithospheric cross-section walls, the <strong>Mariana Trench</strong> forms at a convergent plate boundary where the dense, ancient <strong>Pacific Plate</strong> subducts beneath the <strong>Mariana Plate</strong>.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                Its deepest point, <strong>Challenger Deep (-10,994 m)</strong>, comprises three en-echelon floor depressions: the <em>Western Pool</em>, <em>Central Pool</em>, and <em>Eastern Pool</em>. Tectonic fractures along the trench floor feed <strong>hydrothermal vents</strong> that power chemosynthetic ecosystems completely independent of sunlight.
+              </p>
+            </section>
+
+            <section class="tp-glass-card rounded-2xl p-5 sm:p-7 space-y-4">
+              <div class="flex items-center gap-2 text-xs font-mono text-[#5df0a8]">
+                <span>05 // THERMOHALINE CIRCULATION</span>
+                <span class="h-px flex-1 bg-white/10"></span>
+              </div>
+              <h2 class="text-lg sm:text-2xl font-semibold text-white">Thermohaline Circulation (Global Conveyor Belt)</h2>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                <strong>Thermohaline Circulation</strong> (<em>thermo</em> = temperature, <em>haline</em> = salinity) is the global density-driven ocean conveyor belt. Warm surface currents (visualized as glowing amber-gold particle streams) transport heat poleward, where cooling and sea-ice formation increase water density.
+              </p>
+              <p class="text-sm text-slate-300 leading-relaxed">
+                This dense water sinks (<em>downwelling</em>) into the deep ocean (emerald-cyan <code>#5df0a8</code> streamlines), flowing along bathypelagic and abyssal basins before gradually upwelling back toward the surface. A complete global loop takes roughly <strong>1,000 years</strong> and regulates Earth’s climate system.
+              </p>
+            </section>
+          </div>
+        `
+      }
+    };
+
+    /* =========================================================================
+       APPLICATION STATE
+       ========================================================================= */
+    const state = {
+      lang: 'id',
+      selectedZoneIndex: 0, // 0..4 (epipelagic .. hadalpelagic)
+      autoRotate: true,
+      showThermohaline: true,
+      showLabels: true,
+      currentDepthMeters: 100
+    };
+
+    /* =========================================================================
+       BATHYMETRY MATHEMATICAL FUNCTION (MATCHING CHALLENGER DEEP BLOCK)
+       Dimensions of the 3D Ocean Diorama Block:
+       X: -6.5 (Left Continental Shelf / Mariana Plate) to +6.5 (Right Subducting Pacific Plate)
+       Z: -4.2 (Back face) to +4.2 (Front cutaway face)
+       Y: +3.5 (Sea Surface = 0m) down to -4.6 (Lithosphere base)
+       Seafloor Y ranges from +2.75 (Shallow Coral Shelf) down to -3.65 (Challenger Deep -10,994m)
+       ========================================================================= */
+    const BLOCK_X_MIN = -6.5;
+    const BLOCK_X_MAX = 6.5;
+    const BLOCK_Z_MIN = -4.2;
+    const BLOCK_Z_MAX = 4.2;
+    const SURFACE_Y = 3.5;
+    const LITHOSPHERE_BASE_Y = -4.75;
+
+    // Zone Y Boundaries in 3D space (mapped non-linearly so upper zones & deep trench are all clearly visible & clickable)
+    // Surface = +3.50 (0 m)
+    // Epipelagic:   +3.50 to +2.65 (0 – 200 m)
+    // Mesopelagic:  +2.65 to +1.35 (200 – 1,000 m)
+    // Bathypelagic: +1.35 to -0.35 (1,000 – 4,000 m)
+    // Abyssal:      -0.35 to -1.95 (4,000 – 6,000 m)
+    // Hadal Trench: -1.95 to -3.70 (6,000 – 10,994 m)
+    const ZONE_BOUNDS_Y = [
+      { id: 'epipelagic',    yTop: 3.50,  yBot: 2.65,  dMin: 0,    dMax: 200,   color: 0x22d3ee, sideOpacity: 0.34 },
+      { id: 'mesopelagic',   yTop: 2.65,  yBot: 1.35,  dMin: 200,  dMax: 1000,  color: 0x0284c7, sideOpacity: 0.38 },
+      { id: 'bathypelagic',  yTop: 1.35,  yBot: -0.35, dMin: 1000, dMax: 4000,  color: 0x1d4ed8, sideOpacity: 0.42 },
+      { id: 'abyssopelagic', yTop: -0.35, yBot: -1.95, dMin: 4000, dMax: 6000,  color: 0x1e3a8a, sideOpacity: 0.48 },
+      { id: 'hadalpelagic',  yTop: -1.95, yBot: -3.72, dMin: 6000, dMax: 10994, color: 0x0f172a, sideOpacity: 0.56 }
+    ];
+
+    function depthMetersToY(meters) {
+      const m = Math.max(0, Math.min(10994, meters));
+      for (const zb of ZONE_BOUNDS_Y) {
+        if (m >= zb.dMin && m <= zb.dMax) {
+          const t = (m - zb.dMin) / (zb.dMax - zb.dMin);
+          return THREE.MathUtils.lerp(zb.yTop, zb.yBot, t);
+        }
+      }
+      return -3.65;
+    }
+
+    // Pseudo-noise helper for natural rocky crags and ridges
+    function fractSin(n) {
+      return Math.sin(n) * 43758.5453123 - Math.floor(Math.sin(n) * 43758.5453123);
+    }
+    function smoothNoise2D(x, z) {
+      const ix = Math.floor(x);
+      const iz = Math.floor(z);
+      const fx = x - ix;
+      const fz = z - iz;
+      const u = fx * fx * (3.0 - 2.0 * fx);
+      const v = fz * fz * (3.0 - 2.0 * fz);
+      const a = fractSin(ix + iz * 57.0);
+      const b = fractSin(ix + 1.0 + iz * 57.0);
+      const c = fractSin(ix + (iz + 1.0) * 57.0);
+      const d = fractSin(ix + 1.0 + (iz + 1.0) * 57.0);
+      return THREE.MathUtils.lerp(
+        THREE.MathUtils.lerp(a, b, u),
+        THREE.MathUtils.lerp(c, d, u),
+        v
+      );
+    }
+    function fbm(x, z) {
+      let val = 0.0;
+      let amp = 0.5;
+      let freq = 1.0;
+      for (let i = 0; i < 4; i++) {
+        val += amp * smoothNoise2D(x * freq, z * freq);
+        freq *= 2.05;
+        amp *= 0.5;
+      }
+      return val;
+    }
+
+    /**
+     * Computes realistic 3D Seafloor Bathymetry Y for any (x, z) coordinate
+     * Combines:
+     * - Left Continental Shelf (-6.5 to -4.4): Shallow shelf for Coral Reef (y ~ +2.68 to +2.85)
+     * - Steep Continental Slope (-4.4 to -2.7): Drops from +2.68 down to -1.15
+     * - Abyssal Plain (-2.7 to -0.3): Flat deep seafloor around y ~ -1.25 to -1.55 with subtle abyssal hills
+     * - Mariana Trench / Challenger Deep V-Canyon (-0.3 to +3.3): Plunges to y = -3.65 around x = +1.45
+     *   Includes diagonal canyon strike and 3 distinct pool depressions (Western, Central, Eastern Pool)
+     * - Subducting Pacific Plate Outer Rise (+3.3 to +6.5): Rises up to y ~ -0.75 on the right wall
+     */
+    function getBathymetryY(x, z) {
+      // Slight diagonal strike for the trench axis (like the Challenger Deep block image)
+      const trenchAxisX = 1.45 + z * 0.14;
+      const dxTrench = x - trenchAxisX;
+
+      let baseProfileY;
+
+      if (x < -4.5) {
+        // Shallow Continental Shelf (Coral Reef terrace)
+        const shelfT = (x - BLOCK_X_MIN) / (-4.5 - BLOCK_X_MIN);
+        baseProfileY = THREE.MathUtils.lerp(2.88, 2.68, shelfT);
+      } else if (x < -2.55) {
+        // Steep Continental Slope & Mariana Forearc Ridge
+        const slopeT = (x - (-4.5)) / (-2.55 - (-4.5));
+        const smoothT = slopeT * slopeT * (3 - 2 * slopeT);
+        baseProfileY = THREE.MathUtils.lerp(2.68, -1.22, smoothT);
+        // Add rugged forearc ridge bump like the reference image's blue ridge
+        baseProfileY += Math.sin(slopeT * Math.PI) * 0.35 * (0.6 + 0.4 * Math.cos(z * 0.5));
+      } else if (x < -0.25) {
+        // Abyssal Plain (Dataran Dasar Samudra)
+        const abyssT = (x - (-2.55)) / (-0.25 - (-2.55));
+        baseProfileY = THREE.MathUtils.lerp(-1.22, -1.58, abyssT);
+      } else {
+        // Mariana Trench V-Canyon & Subducting Pacific Plate Slope
+        if (dxTrench <= 0) {
+          // Plunging down the inner trench wall into Challenger Deep axis
+          const dist = Math.abs(dxTrench);
+          const norm = Math.min(1.0, dist / 1.85);
+          const curve = Math.pow(norm, 1.45);
+          baseProfileY = THREE.MathUtils.lerp(-3.52, -1.58, curve);
+        } else {
+          // Rising up the outer trench slope (Pacific Plate subducting slab)
+          const norm = Math.min(1.0, dxTrench / (BLOCK_X_MAX - trenchAxisX));
+          const curve = 1.0 - Math.pow(1.0 - norm, 1.65);
+          baseProfileY = THREE.MathUtils.lerp(-3.52, -0.78, curve);
+        }
+      }
+
+      // Add the 3 Challenger Deep Pools along the trench axis (Western, Central, Eastern Pool)
+      const pools = [
+        { px: 1.18, pz: 1.25, depth: 0.20 }, // Western Pool
+        { px: 1.45, pz: 0.05, depth: 0.22 }, // Central Pool
+        { px: 1.72, pz: -1.15, depth: 0.25 } // Eastern Pool (Deepest -10,994m)
+      ];
+      for (const p of pools) {
+        const d2 = (x - p.px) * (x - p.px) * 3.5 + (z - p.pz) * (z - p.pz) * 1.8;
+        baseProfileY -= p.depth * Math.exp(-d2 * 2.2);
+      }
+
+      // Add multi-octave rocky bathymetric detail
+      const n1 = fbm((x + 8.0) * 0.85, (z + 8.0) * 0.85) - 0.5;
+      const n2 = fbm((x + 3.0) * 2.1, (z + 5.0) * 2.1) - 0.5;
+      // Reduce roughness slightly on the flat Abyssal Plain and Coral Shelf, emphasize on slopes
+      const isAbyssalPlain = (x > -2.5 && x < -0.4);
+      const roughnessScale = isAbyssalPlain ? 0.14 : 0.42;
+
+      let finalY = baseProfileY + (n1 * 0.55 + n2 * 0.22) * roughnessScale;
+      return Math.max(LITHOSPHERE_BASE_Y + 0.55, Math.min(SURFACE_Y - 0.32, finalY));
+    }
+
+    /* =========================================================================
+       THREE.JS SCENE, CAMERA, RENDERER & ORBITCONTROLS INITIALIZATION
+       ========================================================================= */
+    const canvas = document.getElementById('oceanCanvas');
+    const viewportContainer = document.getElementById('viewportContainer');
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      40,
+      viewportContainer.clientWidth / viewportContainer.clientHeight,
+      0.1,
+      200
+    );
+    camera.position.set(-11.2, 4.8, 15.6);
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(viewportContainer.clientWidth, viewportContainer.clientHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.62;
+    controls.minPolarAngle = 0.15;
+    controls.minDistance = 6.0;
+    controls.maxDistance = 28.0;
+    controls.target.set(-0.6, -0.35, 0);
+    controls.autoRotate = state.autoRotate;
+    controls.autoRotateSpeed = 0.85;
+
+    // Master Group for the Ocean Block Diorama
+    const dioramaGroup = new THREE.Group();
+    scene.add(dioramaGroup);
+
+    /* =========================================================================
+       LIGHTING SETUP
+       ========================================================================= */
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.62);
+    scene.add(ambientLight);
+
+    // Sunlight from above right-front
+    const sunLight = new THREE.DirectionalLight(0xffffff, 1.25);
+    sunLight.position.set(-6, 18, 10);
+    scene.add(sunLight);
+
+    // Warm tectonic rim light for the earthy brown rock cutaway walls
+    const rockWarmLight = new THREE.DirectionalLight(0xf59e0b, 0.68);
+    rockWarmLight.position.set(-12, -6, 14);
+    scene.add(rockWarmLight);
+
+    // Cool cyan fill light from the back-right water column
+    const waterFillLight = new THREE.DirectionalLight(0x38bdf8, 0.75);
+    waterFillLight.position.set(14, 6, -10);
+    scene.add(waterFillLight);
+
+    // Abyssal / Hadal Trench bioluminescent & hydrothermal glow light
+    const trenchPointLight = new THREE.PointLight(0x5df0a8, 1.35, 9.5);
+    trenchPointLight.position.set(1.45, -3.1, 0.2);
+    dioramaGroup.add(trenchPointLight);
+
+    // DEEP-SPACE STARFIELD (pola BAB 01): bintang berkelip di latar belakang samudra
+    const starCount = 1800, starGeo = new THREE.BufferGeometry(), starPos = new Float32Array(starCount * 3), starSeed = new Float32Array(starCount);
+    for (let i = 0; i < starCount; i++) {
+      const r = 50 + Math.random() * 80, th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1);
+      starPos[i * 3] = Math.sin(ph) * Math.cos(th) * r; starPos[i * 3 + 1] = Math.cos(ph) * r; starPos[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * r;
+      starSeed[i] = Math.random() * 100;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    starGeo.setAttribute('aSeed', new THREE.BufferAttribute(starSeed, 1));
+
+    const starMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uTime: { value: 0 }, uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) } },
+      vertexShader: `attribute float aSeed; uniform float uTime; uniform float uDpr; varying float vTw; varying float vTint; void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vTw=0.45+0.55*sin(uTime*(1.2+fract(aSeed)*1.8)+aSeed);vTint=fract(aSeed*3.17);gl_PointSize=(1.4+1.8*fract(aSeed*7.1))*(85.0/max(-mv.z,1.0))*uDpr;gl_Position=projectionMatrix*mv;}`,
+      fragmentShader: `varying float vTw; varying float vTint; void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;vec3 col=mix(vec3(0.80,0.88,1.0),vec3(0.45,0.96,0.72),step(0.82,vTint));gl_FragColor=vec4(col,pow(1.0-d,2.2)*vTw);}`
+    });
+    const starPoints = new THREE.Points(starGeo, starMat);
+    scene.add(starPoints);
+
+    /* =========================================================================
+       1. BUILD TEKTONIK & BATHYMETRIC SEABED BLOCK (LIKE CHALLENGER DEEP REF)
+       - Top surface: Vivid Submarine Bathymetry (Turquoise shelf -> Azure slope -> Deep Blue Abyss -> Navy Trench)
+       - 4 Vertical Cutaway Walls + Bottom: Earthy Basalt/Ochre/Sienna Rock Cross-Section
+         with a visible Subduction Fault Plane between Pacific Plate & Mariana Plate!
+       ========================================================================= */
+    const GRID_X = 128;
+    const GRID_Z = 84;
+
+    function buildBathymetryAndRockBlock() {
+      const group = new THREE.Group();
+
+      // 1A. Top Bathymetric Seafloor Surface Mesh
+      const topGeo = new THREE.PlaneGeometry(
+        BLOCK_X_MAX - BLOCK_X_MIN,
+        BLOCK_Z_MAX - BLOCK_Z_MIN,
+        GRID_X,
+        GRID_Z
+      );
+      topGeo.rotateX(-Math.PI / 2);
+
+      const posAttr = topGeo.attributes.position;
+      const colors = new Float32Array(posAttr.count * 3);
+      const cTmp = new THREE.Color();
+
+      for (let i = 0; i < posAttr.count; i++) {
+        const vx = posAttr.getX(i);
+        const vz = posAttr.getZ(i);
+        const vy = getBathymetryY(vx, vz);
+        posAttr.setY(i, vy);
+
+        // Color bathymetry like the Challenger Deep reference image:
+        // High ridge/shelf = bright icy cyan/turquoise, mid slope = vibrant cobalt/azure,
+        // abyssal = rich royal blue, trench floor = deep midnight blue with subtle cyan pool glow
+        const normH = THREE.MathUtils.clamp((vy - (-3.7)) / (2.9 - (-3.7)), 0, 1);
+        const nVal = fbm(vx * 1.8, vz * 1.8);
+
+        if (normH > 0.82) {
+          // Coral Shelf: Sandy turquoise & warm reef tint
+          cTmp.setHSL(0.51, 0.85, 0.55 + (normH - 0.82) * 0.8);
+        } else if (normH > 0.45) {
+          // Upper/Mid Slope: Bright glowing cyan-azure (like Challenger Deep upper ridge)
+          cTmp.setHSL(0.55 - (normH - 0.45) * 0.08, 0.92, 0.30 + (normH - 0.45) * 0.68);
+        } else if (normH > 0.18) {
+          // Abyssal Plain & Lower Slope: Deep vivid ocean blue
+          cTmp.setHSL(0.59, 0.90, 0.16 + (normH - 0.18) * 0.52);
+        } else {
+          // Hadal Trench floor: Midnight navy-indigo
+          cTmp.setHSL(0.61, 0.88, 0.08 + normH * 0.42);
+        }
+
+        // Slight ridge highlighting
+        cTmp.offsetHSL(0, 0, (nVal - 0.5) * 0.06);
+        colors[i * 3] = cTmp.r;
+        colors[i * 3 + 1] = cTmp.g;
+        colors[i * 3 + 2] = cTmp.b;
+      }
+
+      topGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      topGeo.computeVertexNormals();
+
+      const topMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.72,
+        metalness: 0.08,
+        side: THREE.DoubleSide
+      });
+
+      const seafloorMesh = new THREE.Mesh(topGeo, topMat);
+      seafloorMesh.name = 'seafloorBathymetry';
+      group.add(seafloorMesh);
+
+      // 1B. Function to build each of the 4 Cutaway Lithosphere Rock Walls
+      // Front Wall (z = BLOCK_Z_MAX), Back Wall (z = BLOCK_Z_MIN),
+      // Left Wall (x = BLOCK_X_MIN), Right Wall (x = BLOCK_X_MAX)
+      function createRockWall(axis, fixedCoord, segmentsHoriz, flipNormal) {
+        const segY = 34;
+        const geo = new THREE.BufferGeometry();
+        const vertices = [];
+        const vertColors = [];
+        const indices = [];
+
+        const colTemp = new THREE.Color();
+
+        for (let iy = 0; iy <= segY; iy++) {
+          const v = iy / segY; // 0 = top (seafloor), 1 = bottom (LITHOSPHERE_BASE_Y)
+          for (let ix = 0; ix <= segmentsHoriz; ix++) {
+            const u = ix / segmentsHoriz;
+
+            let x, z;
+            if (axis === 'x') {
+              x = THREE.MathUtils.lerp(BLOCK_X_MIN, BLOCK_X_MAX, u);
+              z = fixedCoord;
+            } else {
+              x = fixedCoord;
+              z = THREE.MathUtils.lerp(BLOCK_Z_MIN, BLOCK_Z_MAX, u);
+            }
+
+            const topY = getBathymetryY(x, z);
+            const y = THREE.MathUtils.lerp(topY, LITHOSPHERE_BASE_Y, v);
+
+            // Add subtle 3D rock surface relief on the cutaway wall
+            const rockRelief = (fbm(x * 2.6 + y * 2.2, z * 2.6 - y * 1.9) - 0.5) * 0.08 * Math.sin(v * Math.PI);
+            if (axis === 'x') {
+              vertices.push(x, y, z + (flipNormal ? rockRelief : -rockRelief));
+            } else {
+              vertices.push(x + (flipNormal ? rockRelief : -rockRelief), y, z);
+            }
+
+            // Color the Lithosphere Cross-Section in warm earthy basalt, sienna, and ochre layers
+            // exactly like the Challenger Deep reference diagram!
+            const strataNoise = fbm(x * 1.5, y * 3.8 + z * 1.2);
+            const fineGrain = fbm(x * 5.2, y * 6.5);
+
+            // Subduction Fault Line dipping from Trench Axis (x ~ 1.45, y ~ -3.5) down-left toward x ~ -1.8, y ~ -4.75
+            const trenchAxisX = 1.45 + z * 0.14;
+            const faultY = -3.48 + (x - trenchAxisX) * 0.42;
+            const distToFault = Math.abs(y - faultY);
+
+            if (v < 0.06) {
+              // Dark basaltic crust rim directly under the seabed
+              colTemp.setRGB(0.24, 0.16, 0.12);
+            } else if (distToFault < 0.11 && x < trenchAxisX + 0.3 && x > -2.5) {
+              // Dark tectonic subduction fault shear zone
+              colTemp.setRGB(0.16, 0.11, 0.09);
+            } else {
+              // Warm ochre / burnt sienna / umber gradient (lighter warm ochre near bottom-center, darker brown near top)
+              const warmth = THREE.MathUtils.clamp((v - 0.08) * 1.15, 0, 1);
+              const r = THREE.MathUtils.lerp(0.38, 0.76, warmth) + (strataNoise - 0.5) * 0.14 + (fineGrain - 0.5) * 0.06;
+              const g = THREE.MathUtils.lerp(0.23, 0.46, warmth) + (strataNoise - 0.5) * 0.10 + (fineGrain - 0.5) * 0.04;
+              const b = THREE.MathUtils.lerp(0.15, 0.24, warmth) + (strataNoise - 0.5) * 0.06;
+              colTemp.setRGB(
+                THREE.MathUtils.clamp(r, 0.12, 0.88),
+                THREE.MathUtils.clamp(g, 0.08, 0.62),
+                THREE.MathUtils.clamp(b, 0.05, 0.38)
+              );
+            }
+
+            vertColors.push(colTemp.r, colTemp.g, colTemp.b);
+          }
+        }
+
+        for (let iy = 0; iy < segY; iy++) {
+          for (let ix = 0; ix < segmentsHoriz; ix++) {
+            const a = iy * (segmentsHoriz + 1) + ix;
+            const b = a + 1;
+            const c = (iy + 1) * (segmentsHoriz + 1) + ix;
+            const d = c + 1;
+
+            if (flipNormal) {
+              indices.push(a, c, b);
+              indices.push(b, c, d);
+            } else {
+              indices.push(a, b, c);
+              indices.push(b, d, c);
+            }
+          }
+        }
+
+        geo.setIndex(indices);
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(vertColors, 3));
+        geo.computeVertexNormals();
+
+        const mat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.86,
+          metalness: 0.06,
+          side: THREE.DoubleSide
+        });
+
+        return new THREE.Mesh(geo, mat);
+      }
+
+      // Front wall (z = +4.2), Back wall (z = -4.2), Left wall (x = -6.5), Right wall (x = +6.5)
+      group.add(createRockWall('x', BLOCK_Z_MAX, GRID_X, true));
+      group.add(createRockWall('x', BLOCK_Z_MIN, GRID_X, false));
+      group.add(createRockWall('z', BLOCK_X_MIN, GRID_Z, false));
+      group.add(createRockWall('z', BLOCK_X_MAX, GRID_Z, true));
+
+      // Bottom cap of the lithosphere block
+      const botGeo = new THREE.PlaneGeometry(BLOCK_X_MAX - BLOCK_X_MIN, BLOCK_Z_MAX - BLOCK_Z_MIN);
+      botGeo.rotateX(Math.PI / 2);
+      botGeo.translate(0, LITHOSPHERE_BASE_Y, 0);
+      const botMat = new THREE.MeshBasicMaterial({ color: 0x1c110a });
+      group.add(new THREE.Mesh(botGeo, botMat));
+
+      return { group, seafloorMesh };
+    }
+
+    const { group: rockBlockGroup, seafloorMesh } = buildBathymetryAndRockBlock();
+    dioramaGroup.add(rockBlockGroup);
+
+    /* =========================================================================
+       2. BUILD 5 SELECTABLE WATER COLUMN ZONE VOLUMES (CONFORMING TO SEAFLOOR)
+       Each zone is a 3D translucent water volume whose bottom is clamped to the
+       bathymetric seafloor so water never pokes through the rock walls!
+       Also includes glowing horizontal depth boundary lines on the right corner
+       inspired by the Challenger Deep reference image.
+       ========================================================================= */
+    const waterZoneMeshes = [];
+    const zoneHighlightOutlines = [];
+
+    function createConformingWaterZoneMesh(zoneIndex) {
+      const zb = ZONE_BOUNDS_Y[zoneIndex];
+      const segX = 72;
+      const segZ = 48;
+
+      // Build the 4 vertical translucent cutaway side walls of this water zone
+      // (Front, Back, Left, Right) clipped between [max(seafloorY, zb.yBot), max(seafloorY, zb.yTop)]
+      const sideGeo = new THREE.BufferGeometry();
+      const positions = [];
+      const indices = [];
+      let vertOffset = 0;
+
+      function addWaterWallStrip(axis, fixedCoord, segments, flip) {
+        const startVertex = vertOffset;
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const x = axis === 'x' ? THREE.MathUtils.lerp(BLOCK_X_MIN, BLOCK_X_MAX, t) : fixedCoord;
+          const z = axis === 'z' ? THREE.MathUtils.lerp(BLOCK_Z_MIN, BLOCK_Z_MAX, t) : fixedCoord;
+
+          const bathyY = getBathymetryY(x, z);
+          const yTopClamped = Math.max(bathyY, zb.yTop);
+          const yBotClamped = Math.max(bathyY, zb.yBot);
+
+          positions.push(x, yTopClamped, z);
+          positions.push(x, yBotClamped, z);
+          vertOffset += 2;
+        }
+
+        for (let i = 0; i < segments; i++) {
+          const a = startVertex + i * 2;
+          const b = a + 1;
+          const c = a + 2;
+          const d = a + 3;
+          if (flip) {
+            indices.push(a, b, c);
+            indices.push(b, d, c);
+          } else {
+            indices.push(a, c, b);
+            indices.push(b, c, d);
+          }
+        }
+      }
+
+      // Slightly inset by 0.015 so water walls sit cleanly flush with rock edges
+      addWaterWallStrip('x', BLOCK_Z_MAX - 0.01, segX, true);
+      addWaterWallStrip('x', BLOCK_Z_MIN + 0.01, segX, false);
+      addWaterWallStrip('z', BLOCK_X_MIN + 0.01, segZ, false);
+      addWaterWallStrip('z', BLOCK_X_MAX - 0.01, segZ, true);
+
+      sideGeo.setIndex(indices);
+      sideGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      sideGeo.computeVertexNormals();
+
+      const sideMat = new THREE.MeshPhysicalMaterial({
+        color: zb.color,
+        transparent: true,
+        opacity: zb.sideOpacity,
+        roughness: 0.15,
+        metalness: 0.05,
+        transmission: 0.35,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      });
+
+      const waterMesh = new THREE.Mesh(sideGeo, sideMat);
+      waterMesh.userData = { zoneIndex, zoneId: zb.id };
+      dioramaGroup.add(waterMesh);
+      waterZoneMeshes.push(waterMesh);
+
+      // Glowing Horizontal Boundary Line along the Front & Right Walls (like reference photo!)
+      const linePts = [];
+      for (let i = 0; i <= segX; i++) {
+        const x = THREE.MathUtils.lerp(BLOCK_X_MIN, BLOCK_X_MAX, i / segX);
+        const z = BLOCK_Z_MAX + 0.02;
+        const bathyY = getBathymetryY(x, z);
+        if (zb.yBot > bathyY) {
+          linePts.push(new THREE.Vector3(x, zb.yBot, z));
+        }
+      }
+      for (let i = 0; i <= segZ; i++) {
+        const x = BLOCK_X_MAX + 0.02;
+        const z = THREE.MathUtils.lerp(BLOCK_Z_MAX, BLOCK_Z_MIN, i / segZ);
+        const bathyY = getBathymetryY(x, z);
+        if (zb.yBot > bathyY) {
+          linePts.push(new THREE.Vector3(x, zb.yBot, z));
+        }
+      }
+
+      const lineGeo = new THREE.BufferGeometry().setFromPoints(linePts);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0x7dd3fc,
+        transparent: true,
+        opacity: 0.45
+      });
+      const boundaryLine = new THREE.Line(lineGeo, lineMat);
+      dioramaGroup.add(boundaryLine);
+      zoneHighlightOutlines.push({ line: boundaryLine, mat: lineMat, zoneIndex });
+    }
+
+    for (let i = 0; i < ZONE_BOUNDS_Y.length; i++) {
+      createConformingWaterZoneMesh(i);
+    }
+
+    /* =========================================================================
+       3. ANIMATED TOP OCEAN SURFACE MESH + SUNLIGHT CAUSTIC RAYS
+       ========================================================================= */
+    const surfSegX = 96;
+    const surfSegZ = 64;
+    const oceanSurfaceGeo = new THREE.PlaneGeometry(
+      BLOCK_X_MAX - BLOCK_X_MIN,
+      BLOCK_Z_MAX - BLOCK_Z_MIN,
+      surfSegX,
+      surfSegZ
+    );
+    oceanSurfaceGeo.rotateX(-Math.PI / 2);
+
+    const oceanSurfaceMat = new THREE.MeshPhysicalMaterial({
+      color: 0x0ea5e9,
+      emissive: 0x0369a1,
+      emissiveIntensity: 0.28,
+      roughness: 0.14,
+      metalness: 0.12,
+      transmission: 0.55,
+      transparent: true,
+      opacity: 0.86,
+      side: THREE.DoubleSide
+    });
+
+    const oceanSurfaceMesh = new THREE.Mesh(oceanSurfaceGeo, oceanSurfaceMat);
+    oceanSurfaceMesh.position.y = SURFACE_Y;
+    oceanSurfaceMesh.userData = { zoneIndex: 0, zoneId: 'epipelagic' };
+    dioramaGroup.add(oceanSurfaceMesh);
+
+    // Volumetric Sunbeams / Caustic Light Rays penetrating Epipelagic & Mesopelagic zones
+    const sunRaysGroup = new THREE.Group();
+    for (let i = 0; i < 11; i++) {
+      const rayWidth = 0.35 + Math.random() * 0.55;
+      const rayLen = 1.6 + Math.random() * 1.4;
+      const rayGeo = new THREE.ConeGeometry(rayWidth, rayLen, 16, 1, true);
+      const rayMat = new THREE.MeshBasicMaterial({
+        color: 0xbae6fd,
+        transparent: true,
+        opacity: 0.065 + Math.random() * 0.04,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const ray = new THREE.Mesh(rayGeo, rayMat);
+      ray.position.set(
+        THREE.MathUtils.lerp(-5.4, 4.8, i / 10) + (Math.random() - 0.5) * 0.6,
+        SURFACE_Y - rayLen * 0.48,
+        (Math.random() - 0.5) * 5.8
+      );
+      ray.rotation.z = -0.18;
+      ray.rotation.x = 0.08;
+      ray.userData = { baseOpacity: rayMat.opacity, phase: Math.random() * Math.PI * 2 };
+      sunRaysGroup.add(ray);
+    }
+    dioramaGroup.add(sunRaysGroup);
+
+    /* =========================================================================
+       4. CHALLENGER DEEP POOLS VERTICAL PIN INDICATORS (LIKE REFERENCE PHOTO)
+       Western Pool, Central Pool, Eastern Pool glowing pins on the trench floor
+       ========================================================================= */
+    const trenchPinsGroup = new THREE.Group();
+    const poolCoords = [
+      { id: 'western_pool', name: 'WESTERN POOL', x: 1.18, z: 1.25, h: 0.95 },
+      { id: 'central_pool', name: 'CENTRAL POOL', x: 1.45, z: 0.05, h: 1.15 },
+      { id: 'eastern_pool', name: 'EASTERN POOL (-10.994m)', x: 1.72, z: -1.15, h: 1.35 }
+    ];
+
+    poolCoords.forEach((p) => {
+      const floorY = getBathymetryY(p.x, p.z);
+      // Glowing dot on the seafloor
+      const dotGeo = new THREE.SphereGeometry(0.065, 16, 16);
+      const dotMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.position.set(p.x, floorY + 0.04, p.z);
+      trenchPinsGroup.add(dot);
+
+      // Vertical thin white-cyan stem line
+      const stemGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(p.x, floorY + 0.04, p.z),
+        new THREE.Vector3(p.x, floorY + p.h, p.z)
+      ]);
+      const stemMat = new THREE.LineBasicMaterial({
+        color: 0xe0f2fe,
+        transparent: true,
+        opacity: 0.8
+      });
+      trenchPinsGroup.add(new THREE.Line(stemGeo, stemMat));
+    });
+    dioramaGroup.add(trenchPinsGroup);
+
+    /* =========================================================================
+       5. CORAL REEF ECOSYSTEM (TERUMBU KARANG ON CONTINENTAL SHELF)
+       Vibrant coral colonies: Brain corals, staghorn branching corals, sea fans,
+       and tube sponges on the upper-left shelf (x: -6.2 to -4.5)
+       ========================================================================= */
+    const coralReefGroup = new THREE.Group();
+    coralReefGroup.name = 'coralReefGroup';
+
+    const coralPalette = [0xfb7185, 0xfbbf24, 0x5df0a8, 0xc084fc, 0x38bdf8, 0xf97316];
+
+    for (let i = 0; i < 48; i++) {
+      const cx = THREE.MathUtils.randFloat(-6.25, -4.55);
+      const cz = THREE.MathUtils.randFloat(-3.75, 3.75);
+      const cy = getBathymetryY(cx, cz);
+      const color = coralPalette[i % coralPalette.length];
+
+      const type = i % 3;
+      if (type === 0) {
+        // Brain / Boulder Coral
+        const r = THREE.MathUtils.randFloat(0.08, 0.19);
+        const geo = new THREE.IcosahedronGeometry(r, 1);
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.6,
+          emissive: color,
+          emissiveIntensity: 0.15
+        });
+        const m = new THREE.Mesh(geo, mat);
+        m.scale.y = 0.72;
+        m.position.set(cx, cy + r * 0.45, cz);
+        coralReefGroup.add(m);
+      } else if (type === 1) {
+        // Branching Staghorn / Tube Coral Cluster
+        const cluster = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.5,
+          emissive: color,
+          emissiveIntensity: 0.18
+        });
+        for (let b = 0; b < 4; b++) {
+          const h = THREE.MathUtils.randFloat(0.16, 0.34);
+          const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, h, 7), mat);
+          cyl.position.set((Math.random() - 0.5) * 0.08, h * 0.45, (Math.random() - 0.5) * 0.08);
+          cyl.rotation.z = (Math.random() - 0.5) * 0.55;
+          cyl.rotation.x = (Math.random() - 0.5) * 0.55;
+          cluster.add(cyl);
+        }
+        cluster.position.set(cx, cy, cz);
+        coralReefGroup.add(cluster);
+      } else {
+        // Gorgonian Sea Fan / Table Coral
+        const geo = new THREE.TorusGeometry(0.11, 0.022, 6, 12);
+        const mat = new THREE.MeshStandardMaterial({
+          color,
+          roughness: 0.55,
+          emissive: color,
+          emissiveIntensity: 0.18
+        });
+        const fan = new THREE.Mesh(geo, mat);
+        fan.position.set(cx, cy + 0.11, cz);
+        fan.rotation.y = Math.random() * Math.PI;
+        coralReefGroup.add(fan);
+      }
+    }
+    dioramaGroup.add(coralReefGroup);
+
+    /* =========================================================================
+       6. ABYSSAL PLAIN FEATURES & HADAL HYDROTHERMAL VENTS (BLACK SMOKERS)
+       ========================================================================= */
+    const benthicFeaturesGroup = new THREE.Group();
+
+    // 6A. Abyssal Plain Stalked Sea Lilies (Crinoids) & Polymetallic Nodules
+    for (let i = 0; i < 16; i++) {
+      const ax = THREE.MathUtils.randFloat(-2.5, -0.45);
+      const az = THREE.MathUtils.randFloat(-3.5, 3.5);
+      const ay = getBathymetryY(ax, az);
+
+      if (i % 2 === 0) {
+        // Stalked Sea Lily (Crinoid)
+        const crinoid = new THREE.Group();
+        const stemH = 0.22 + Math.random() * 0.14;
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.012, stemH, 6),
+          new THREE.MeshBasicMaterial({ color: 0xe2e8f0 })
+        );
+        stem.position.y = stemH * 0.5;
+        crinoid.add(stem);
+
+        const crown = new THREE.Mesh(
+          new THREE.ConeGeometry(0.075, 0.09, 7, 1, true),
+          new THREE.MeshBasicMaterial({ color: 0xfde047, side: THREE.DoubleSide })
+        );
+        crown.position.y = stemH + 0.03;
+        crown.rotation.x = Math.PI;
+        crinoid.add(crown);
+
+        crinoid.position.set(ax, ay, az);
+        benthicFeaturesGroup.add(crinoid);
+      } else {
+        // Manganese nodule rock on abyssal plain
+        const nod = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(0.055, 0),
+          new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 })
+        );
+        nod.scale.y = 0.5;
+        nod.position.set(ax, ay + 0.02, az);
+        benthicFeaturesGroup.add(nod);
+      }
+    }
+
+    // 6B. Hydrothermal Vents (Black Smokers) in the Hadal Mariana Trench
+    const ventPositions = [
+      { x: 1.05, z: 1.85 },
+      { x: 1.38, z: -0.55 },
+      { x: 1.68, z: -2.05 }
+    ];
+    const ventSmokeParticles = [];
+
+    ventPositions.forEach((vp) => {
+      const vy = getBathymetryY(vp.x, vp.z);
+      const chimneyH = 0.34;
+      const chimneyGeo = new THREE.ConeGeometry(0.11, chimneyH, 9);
+      const chimneyMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        emissive: 0xf97316,
+        emissiveIntensity: 0.38,
+        roughness: 0.9
+      });
+      const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
+      chimney.position.set(vp.x, vy + chimneyH * 0.45, vp.z);
+      benthicFeaturesGroup.add(chimney);
+
+      // Rising hydrothermal plume particles for each chimney
+      for (let p = 0; p < 18; p++) {
+        const pGeo = new THREE.SphereGeometry(0.028 + Math.random() * 0.03, 8, 8);
+        const pMat = new THREE.MeshBasicMaterial({
+          color: p % 3 === 0 ? 0x5df0a8 : 0x94a3b8,
+          transparent: true,
+          opacity: 0.55
+        });
+        const puff = new THREE.Mesh(pGeo, pMat);
+        const offsetH = Math.random() * 0.95;
+        puff.position.set(vp.x, vy + chimneyH + offsetH, vp.z);
+        puff.userData = {
+          baseX: vp.x,
+          baseY: vy + chimneyH,
+          baseZ: vp.z,
+          progress: Math.random(),
+          speed: 0.28 + Math.random() * 0.25
+        };
+        benthicFeaturesGroup.add(puff);
+        ventSmokeParticles.push(puff);
+      }
+    });
+
+    dioramaGroup.add(benthicFeaturesGroup);
+
+    /* =========================================================================
+       7. ANIMATED 3D MARINE ORGANISMS ACROSS ALL 5 DEPTH ZONES
+       - Epipelagic: Tropical reef fish schools, Sea Turtle, Manta Ray
+       - Mesopelagic: Pulsing Bioluminescent Jellyfish, Lanternfish school
+       - Bathypelagic: Deep-Sea Anglerfish with glowing lure, Giant Squid / Whale
+       - Abyssal: Dumbo Octopus flapping ear-like fins, Tripod Fish
+       - Hadal: Mariana Snailfish (Pseudoliparis swirei) & Amphipods in Trench
+       ========================================================================= */
+    const organismsGroup = new THREE.Group();
+    const animatedOrganisms = [];
+
+    // 7A. Epipelagic Reef Fish School & Manta Ray & Sea Turtle
+    function createEpipelagicLife() {
+      // School of tropical fish near the Coral Reef & Upper Water
+      const fishColors = [0xfbbf24, 0x38bdf8, 0xfb7185, 0x5df0a8];
+      for (let i = 0; i < 24; i++) {
+        const fGroup = new THREE.Group();
+        const col = fishColors[i % fishColors.length];
+        const body = new THREE.Mesh(
+          new THREE.ConeGeometry(0.042, 0.16, 6),
+          new THREE.MeshBasicMaterial({ color: col })
+        );
+        body.rotation.z = -Math.PI / 2;
+        fGroup.add(body);
+
+        const tail = new THREE.Mesh(
+          new THREE.ConeGeometry(0.038, 0.06, 3),
+          new THREE.MeshBasicMaterial({ color: col })
+        );
+        tail.rotation.z = Math.PI / 2;
+        tail.position.x = -0.09;
+        fGroup.add(tail);
+
+        const radius = 0.7 + Math.random() * 1.4;
+        const centerX = i < 14 ? -5.1 : -2.2;
+        const centerY = i < 14 ? 3.05 : 3.12;
+        const centerZ = (Math.random() - 0.5) * 4.5;
+
+        dioramaGroup.add(fGroup);
+        animatedOrganisms.push({
+          type: 'fish',
+          mesh: fGroup,
+          tail,
+          centerX,
+          centerY,
+          centerZ,
+          radius,
+          angle: Math.random() * Math.PI * 2,
+          speed: 0.7 + Math.random() * 0.6,
+          bobPhase: Math.random() * Math.PI * 2
+        });
+      }
+
+      // Gliding Manta Ray in Epipelagic Zone
+      const manta = new THREE.Group();
+      const mantaMat = new THREE.MeshStandardMaterial({
+        color: 0x0f172a,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.35,
+        side: THREE.DoubleSide
+      });
+      const leftWing = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.45, 4), mantaMat);
+      leftWing.rotation.x = Math.PI / 2;
+      leftWing.scale.y = 0.15;
+      leftWing.position.z = 0.18;
+
+      const rightWing = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.45, 4), mantaMat);
+      rightWing.rotation.x = -Math.PI / 2;
+      rightWing.scale.y = 0.15;
+      rightWing.position.z = -0.18;
+
+      manta.add(leftWing, rightWing);
+      manta.position.set(-2.8, 3.18, 0.8);
+      organismsGroup.add(manta);
+      animatedOrganisms.push({
+        type: 'manta',
+        mesh: manta,
+        leftWing,
+        rightWing,
+        baseX: -2.4,
+        baseY: 3.16,
+        baseZ: 0.5,
+        phase: 0
+      });
+    }
+
+    // 7B. Mesopelagic Pulsing Bioluminescent Jellyfish (Ubur-ubur)
+    function createMesopelagicLife() {
+      const jellyCoords = [
+        { x: -1.8, y: 2.05, z: 1.4, col: 0x38bdf8 },
+        { x: 0.6,  y: 1.85, z: -0.8, col: 0x5df0a8 },
+        { x: 2.8,  y: 2.15, z: 1.1, col: 0xe879f9 },
+        { x: -0.4, y: 1.65, z: -1.9, col: 0x38bdf8 },
+        { x: 4.1,  y: 1.95, z: -0.2, col: 0x5df0a8 }
+      ];
+
+      jellyCoords.forEach((jc, idx) => {
+        const jGroup = new THREE.Group();
+        const bellGeo = new THREE.SphereGeometry(0.14, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.62);
+        const bellMat = new THREE.MeshBasicMaterial({
+          color: jc.col,
+          transparent: true,
+          opacity: 0.72,
+          side: THREE.DoubleSide
+        });
+        const bell = new THREE.Mesh(bellGeo, bellMat);
+        jGroup.add(bell);
+
+        // Glowing tentacles
+        for (let t = 0; t < 5; t++) {
+          const tGeo = new THREE.CylinderGeometry(0.005, 0.002, 0.26, 5);
+          const tMesh = new THREE.Mesh(tGeo, bellMat);
+          const ang = (t / 5) * Math.PI * 2;
+          tMesh.position.set(Math.cos(ang) * 0.05, -0.12, Math.sin(ang) * 0.05);
+          jGroup.add(tMesh);
+        }
+
+        jGroup.position.set(jc.x, jc.y, jc.z);
+        organismsGroup.add(jGroup);
+        animatedOrganisms.push({
+          type: 'jellyfish',
+          mesh: jGroup,
+          bell,
+          baseY: jc.y,
+          phase: idx * 1.3
+        });
+      });
+    }
+
+    // 7C. Bathypelagic Deep-Sea Anglerfish (with glowing lure) & Giant Squid
+    function createBathypelagicLife() {
+      const anglerCoords = [
+        { x: -0.5, y: 0.45, z: 1.2 },
+        { x: 2.2,  y: 0.15, z: -0.9 }
+      ];
+
+      anglerCoords.forEach((ac, idx) => {
+        const angler = new THREE.Group();
+        const body = new THREE.Mesh(
+          new THREE.SphereGeometry(0.14, 14, 12),
+          new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.7 })
+        );
+        body.scale.set(1.35, 0.95, 0.85);
+        angler.add(body);
+
+        // Glowing bioluminescent esca lure in front of head
+        const lure = new THREE.Mesh(
+          new THREE.SphereGeometry(0.038, 12, 12),
+          new THREE.MeshBasicMaterial({ color: 0x5df0a8 })
+        );
+        lure.position.set(0.24, 0.12, 0);
+        angler.add(lure);
+
+        const stalkGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0.08, 0.08, 0),
+          new THREE.Vector3(0.18, 0.18, 0),
+          new THREE.Vector3(0.24, 0.12, 0)
+        ]);
+        angler.add(new THREE.Line(stalkGeo, new THREE.LineBasicMaterial({ color: 0x5df0a8 })));
+
+        angler.position.set(ac.x, ac.y, ac.z);
+        organismsGroup.add(angler);
+        animatedOrganisms.push({
+          type: 'anglerfish',
+          mesh: angler,
+          lure,
+          baseX: ac.x,
+          baseY: ac.y,
+          baseZ: ac.z,
+          phase: idx * 2.1
+        });
+      });
+
+      // Giant Squid in Bathypelagic Zone
+      const squid = new THREE.Group();
+      const mantle = new THREE.Mesh(
+        new THREE.ConeGeometry(0.09, 0.42, 10),
+        new THREE.MeshStandardMaterial({
+          color: 0x9f1239,
+          emissive: 0xbe123c,
+          emissiveIntensity: 0.28
+        })
+      );
+      mantle.rotation.z = -Math.PI / 2;
+      squid.add(mantle);
+      squid.position.set(0.8, 0.75, 0.2);
+      organismsGroup.add(squid);
+      animatedOrganisms.push({
+        type: 'squid',
+        mesh: squid,
+        baseX: 0.8,
+        baseY: 0.75,
+        baseZ: 0.2,
+        phase: 0.5
+      });
+    }
+
+    // 7D. Abyssal Dumbo Octopus & Hadal Mariana Snailfish
+    function createAbyssalAndHadalLife() {
+      // Dumbo Octopus hovering over the Abyssal Plain
+      const dumbo = new THREE.Group();
+      const dMat = new THREE.MeshStandardMaterial({
+        color: 0xfda4af,
+        emissive: 0xf43f5e,
+        emissiveIntensity: 0.25
+      });
+      const dHead = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 12), dMat);
+      dHead.scale.y = 1.2;
+      dumbo.add(dHead);
+
+      const earL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.02), dMat);
+      earL.position.set(0, 0.05, 0.11);
+      const earR = earL.clone();
+      earR.position.z = -0.11;
+      dumbo.add(earL, earR);
+
+      dumbo.position.set(-1.65, -0.95, 0.6);
+      organismsGroup.add(dumbo);
+      animatedOrganisms.push({
+        type: 'dumbo',
+        mesh: dumbo,
+        earL,
+        earR,
+        baseY: -0.95,
+        phase: 1.1
+      });
+
+      // Hadal Mariana Snailfish (Pseudoliparis swirei) swimming inside Challenger Deep V-Trench
+      const snailfishCoords = [
+        { x: 1.35, y: -2.65, z: 0.8 },
+        { x: 1.55, y: -3.05, z: -0.4 },
+        { x: 1.22, y: -2.35, z: -1.1 }
+      ];
+
+      snailfishCoords.forEach((sc, idx) => {
+        const sf = new THREE.Group();
+        const sfMat = new THREE.MeshBasicMaterial({
+          color: 0xfce7f3,
+          transparent: true,
+          opacity: 0.82
+        });
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), sfMat);
+        head.scale.set(1.3, 0.85, 0.8);
+        sf.add(head);
+
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.18, 8), sfMat);
+        tail.rotation.z = Math.PI / 2;
+        tail.position.x = -0.10;
+        sf.add(tail);
+
+        sf.position.set(sc.x, sc.y, sc.z);
+        organismsGroup.add(sf);
+        animatedOrganisms.push({
+          type: 'snailfish',
+          mesh: sf,
+          tail,
+          centerX: sc.x,
+          centerY: sc.y,
+          centerZ: sc.z,
+          phase: idx * 2.0
+        });
+      });
+    }
+
+    createEpipelagicLife();
+    createMesopelagicLife();
+    createBathypelagicLife();
+    createAbyssalAndHadalLife();
+    dioramaGroup.add(organismsGroup);
+
+    /* =========================================================================
+       8. THERMOHALINE CIRCULATION (ARUS TERMOHALIN — 3D STREAMLINES & PARTICLES)
+       Visualizes:
+       - Warm Surface Current (Amber/Coral-Red glowing stream) flowing across
+         the upper water column and cooling/downwelling into the deep ocean.
+       - Cold Deep/Bottom Current (TerraPedia Green #5df0a8 & Cyan stream)
+         sinking down the slope and sweeping across the Bathypelagic/Abyssal floor.
+       ========================================================================= */
+    const thermohalineGroup = new THREE.Group();
+    const thermohalineParticles = [];
+
+    function buildThermohalineCirculation() {
+      // Curve 1: Warm Surface Current & High-Latitude Cooling Downwelling
+      const warmCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-5.8, 3.15, -2.2),
+        new THREE.Vector3(-3.2, 3.10, -1.1),
+        new THREE.Vector3(-0.2, 3.05, 0.4),
+        new THREE.Vector3(2.8, 2.95, 1.4),
+        new THREE.Vector3(5.1, 2.55, 1.1),
+        new THREE.Vector3(5.3, 1.25, -0.4),
+        new THREE.Vector3(4.2, -0.15, -1.6)
+      ]);
+
+      // Curve 2: Cold Deep & Bottom Current (Antarctic / North Atlantic Deep Water)
+      const coldCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(4.2, -0.15, -1.6),
+        new THREE.Vector3(2.6, -1.35, -1.2),
+        new THREE.Vector3(0.4, -1.55, -0.2),
+        new THREE.Vector3(-1.2, -1.18, 0.8),
+        new THREE.Vector3(-2.3, -0.95, 1.5),
+        new THREE.Vector3(-3.6, 0.65, 0.5),
+        new THREE.Vector3(-5.0, 2.45, -1.2),
+        new THREE.Vector3(-5.8, 3.15, -2.2)
+      ]);
+
+      // Glowing Streamline Tubes
+      const warmTubeGeo = new THREE.TubeGeometry(warmCurve, 90, 0.042, 8, false);
+      const warmTubeMat = new THREE.MeshBasicMaterial({
+        color: 0xfbbf24,
+        transparent: true,
+        opacity: 0.48
+      });
+      thermohalineGroup.add(new THREE.Mesh(warmTubeGeo, warmTubeMat));
+
+      const coldTubeGeo = new THREE.TubeGeometry(coldCurve, 90, 0.046, 8, false);
+      const coldTubeMat = new THREE.MeshBasicMaterial({
+        color: 0x5df0a8,
+        transparent: true,
+        opacity: 0.56
+      });
+      thermohalineGroup.add(new THREE.Mesh(coldTubeGeo, coldTubeMat));
+
+      // Animated Flowing Stream Particles with directional cone heads
+      const numParticlesPerBranch = 42;
+      for (let i = 0; i < numParticlesPerBranch; i++) {
+        // Warm particle
+        const wpGeo = new THREE.ConeGeometry(0.075, 0.22, 6);
+        wpGeo.rotateX(Math.PI / 2);
+        const wpMat = new THREE.MeshBasicMaterial({ color: 0xfb923c });
+        const wpMesh = new THREE.Mesh(wpGeo, wpMat);
+        thermohalineGroup.add(wpMesh);
+        thermohalineParticles.push({
+          mesh: wpMesh,
+          curve: warmCurve,
+          t: i / numParticlesPerBranch,
+          speed: 0.075
+        });
+
+        // Cold deep particle (#5df0a8)
+        const cpGeo = new THREE.ConeGeometry(0.078, 0.24, 6);
+        cpGeo.rotateX(Math.PI / 2);
+        const cpMat = new THREE.MeshBasicMaterial({ color: 0x5df0a8 });
+        const cpMesh = new THREE.Mesh(cpGeo, cpMat);
+        thermohalineGroup.add(cpMesh);
+        thermohalineParticles.push({
+          mesh: cpMesh,
+          curve: coldCurve,
+          t: i / numParticlesPerBranch,
+          speed: 0.068
+        });
+      }
+    }
+
+    buildThermohalineCirculation();
+    dioramaGroup.add(thermohalineGroup);
+
+    /* =========================================================================
+       9. AMBIENT MARINE SNOW & BIOLUMINESCENT PLANKTON PARTICLES
+       ========================================================================= */
+    const snowCount = 320;
+    const snowGeo = new THREE.BufferGeometry();
+    const snowPos = new Float32Array(snowCount * 3);
+    const snowCol = new Float32Array(snowCount * 3);
+
+    for (let i = 0; i < snowCount; i++) {
+      const sx = THREE.MathUtils.randFloat(BLOCK_X_MIN + 0.3, BLOCK_X_MAX - 0.3);
+      const sz = THREE.MathUtils.randFloat(BLOCK_Z_MIN + 0.3, BLOCK_Z_MAX - 0.3);
+      const minY = getBathymetryY(sx, sz) + 0.15;
+      const sy = THREE.MathUtils.randFloat(minY, SURFACE_Y - 0.15);
+
+      snowPos[i * 3] = sx;
+      snowPos[i * 3 + 1] = sy;
+      snowPos[i * 3 + 2] = sz;
+
+      // Cyan / emerald bioluminescent specks
+      if (i % 3 === 0) {
+        snowCol[i * 3] = 0.36;
+        snowCol[i * 3 + 1] = 0.94;
+        snowCol[i * 3 + 2] = 0.66;
+      } else {
+        snowCol[i * 3] = 0.55;
+        snowCol[i * 3 + 1] = 0.85;
+        snowCol[i * 3 + 2] = 0.98;
+      }
+    }
+
+    snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+    snowGeo.setAttribute('color', new THREE.BufferAttribute(snowCol, 3));
+
+    const snowMat = new THREE.PointsMaterial({
+      size: 0.055,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.65,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const marineSnowPoints = new THREE.Points(snowGeo, snowMat);
+    dioramaGroup.add(marineSnowPoints);
+
+    /* =========================================================================
+       10. DEPTH PROBE INDICATOR RING IN 3D SPACE
+       Moves vertically as user scrubs the Depth Slider (0 m to -10,994 m)
+       ========================================================================= */
+    const probeLinePts = [
+      new THREE.Vector3(BLOCK_X_MIN - 0.06, 0, BLOCK_Z_MAX + 0.06),
+      new THREE.Vector3(BLOCK_X_MAX + 0.06, 0, BLOCK_Z_MAX + 0.06),
+      new THREE.Vector3(BLOCK_X_MAX + 0.06, 0, BLOCK_Z_MIN - 0.06)
+    ];
+    const depthProbeLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(probeLinePts),
+      new THREE.LineBasicMaterial({ color: 0x5df0a8, transparent: true, opacity: 0.9 })
+    );
+    depthProbeLine.position.y = depthMetersToY(100);
+    dioramaGroup.add(depthProbeLine);
+
+    /* =========================================================================
+       11. 3D SPATIAL LABELS (MATCHING CHALLENGER DEEP BLOCK + INTERACTIVE PINS)
+       ========================================================================= */
+    const spatialLabelsContainer = document.getElementById('spatialLabelsContainer');
+    const spatialLabelConfigs = [
+      // Tectonic & Geomorphic Labels (Directly inspired by reference image)
+      {
+        id: 'lbl_challenger',
+        pos: new THREE.Vector3(-1.3, 0.35, 2.2),
+        type: 'geology_banner',
+        textId: 'CHALLENGER DEEP',
+        textEn: 'CHALLENGER DEEP'
+      },
+      {
+        id: 'lbl_mariana_plate',
+        pos: new THREE.Vector3(-4.2, -2.55, BLOCK_Z_MAX + 0.15),
+        type: 'plate',
+        textId: 'LEMPENG MARIANA (MARIANA PLATE)',
+        textEn: 'MARIANA PLATE'
+      },
+      {
+        id: 'lbl_pacific_plate',
+        pos: new THREE.Vector3(3.6, -3.55, BLOCK_Z_MAX + 0.15),
+        type: 'plate',
+        textId: 'LEMPENG PASIFIK (PACIFIC PLATE)',
+        textEn: 'PACIFIC PLATE'
+      },
+      // 3 Challenger Deep Pools
+      {
+        id: 'lbl_western_pool',
+        pos: new THREE.Vector3(1.18, getBathymetryY(1.18, 1.25) + 1.05, 1.25),
+        type: 'pool',
+        textId: 'WESTERN POOL',
+        textEn: 'WESTERN POOL',
+        zoneIdx: 4
+      },
+      {
+        id: 'lbl_central_pool',
+        pos: new THREE.Vector3(1.45, getBathymetryY(1.45, 0.05) + 1.25, 0.05),
+        type: 'pool',
+        textId: 'CENTRAL POOL',
+        textEn: 'CENTRAL POOL',
+        zoneIdx: 4
+      },
+      {
+        id: 'lbl_eastern_pool',
+        pos: new THREE.Vector3(1.72, getBathymetryY(1.72, -1.15) + 1.45, -1.15),
+        type: 'pool',
+        textId: 'EASTERN POOL (-10.994m)',
+        textEn: 'EASTERN POOL (-10,994m)',
+        zoneIdx: 4
+      },
+      // Interactive Right-Corner Depth Zone Callouts (like the reference image's right edge)
+      {
+        id: 'lbl_zone_0',
+        pos: new THREE.Vector3(BLOCK_X_MAX + 0.15, 3.12, BLOCK_Z_MAX),
+        type: 'zone_pin',
+        zoneIdx: 0,
+        textId: 'Epipelagik · 0–200m',
+        textEn: 'Sunlight · 0–200m'
+      },
+      {
+        id: 'lbl_zone_1',
+        pos: new THREE.Vector3(BLOCK_X_MAX + 0.15, 2.0, BLOCK_Z_MAX),
+        type: 'zone_pin',
+        zoneIdx: 1,
+        textId: 'Mesopelagik · 200–1.000m',
+        textEn: 'Twilight · 200–1,000m'
+      },
+      {
+        id: 'lbl_zone_2',
+        pos: new THREE.Vector3(BLOCK_X_MAX + 0.15, 0.5, BLOCK_Z_MAX),
+        type: 'zone_pin',
+        zoneIdx: 2,
+        textId: 'Batipelagik · 1.000–4.000m',
+        textEn: 'Midnight · 1,000–4,000m'
+      },
+      {
+        id: 'lbl_zone_3',
+        pos: new THREE.Vector3(BLOCK_X_MAX + 0.15, -1.15, BLOCK_Z_MAX),
+        type: 'zone_pin',
+        zoneIdx: 3,
+        textId: 'Abisal · 4.000–6.000m',
+        textEn: 'Abyss · 4,000–6,000m'
+      },
+      {
+        id: 'lbl_zone_4',
+        pos: new THREE.Vector3(1.7, -3.25, BLOCK_Z_MAX + 0.1),
+        type: 'zone_pin',
+        zoneIdx: 4,
+        textId: 'Hadal (Palung) · 6.000–10.994m',
+        textEn: 'Trenches (Hadal) · 6,000–10,994m'
+      },
+      // Coral Reef & Abyssal Plain Callouts
+      {
+        id: 'lbl_coral',
+        pos: new THREE.Vector3(-5.35, 3.05, 0.8),
+        type: 'feature_pin',
+        zoneIdx: 0,
+        featureId: 'coral_reef',
+        textId: 'Terumbu Karang',
+        textEn: 'Coral Reef'
+      },
+      {
+        id: 'lbl_abyssal_plain',
+        pos: new THREE.Vector3(-1.55, -1.25, 1.4),
+        type: 'feature_pin',
+        zoneIdx: 3,
+        featureId: 'abyssal_plain',
+        textId: 'Dataran Dasar Samudra',
+        textEn: 'Abyssal Plain'
+      }
+    ];
+
+    const spatialLabelDOMs = [];
+
+    function initSpatialLabels() {
+      spatialLabelsContainer.innerHTML = '';
+      spatialLabelDOMs.length = 0;
+
+      spatialLabelConfigs.forEach((cfg) => {
+        const el = document.createElement('div');
+        el.className = 'spatial-label';
+
+        if (cfg.type === 'geology_banner') {
+          el.className += ' spatial-label-geology text-[11px] sm:text-sm font-light text-sky-100/75 select-none hidden sm:block';
+        } else if (cfg.type === 'plate') {
+          el.className += ' spatial-label-geology text-[10px] sm:text-xs font-semibold text-amber-100/80 select-none';
+        } else if (cfg.type === 'pool') {
+          el.className += ' px-1.5 py-0.5 rounded bg-slate-950/75 border border-sky-400/40 text-[9px] font-mono text-sky-200 tracking-wider shadow';
+          el.addEventListener('click', () => toggleZone(cfg.zoneIdx));
+        } else if (cfg.type === 'zone_pin') {
+          el.className += ' px-2 py-0.5 rounded-md terra-glass-subtle border border-white/10 hover:border-[#5df0a8]/40 text-[10px] font-mono text-slate-200 flex items-center gap-1.5';
+          // (d) Struktur seragam BAB 02–06: lingkaran warna + nomor + nama lapisan + kedalaman
+          const z = I18N[state.lang].zones[cfg.zoneIdx];
+          el.innerHTML = `
+            <span class="tp-f-dot" style="background:${z.colorHex}"></span>
+            <span class="tp-f-num">${String(cfg.zoneIdx + 1).padStart(2, '0')}</span>
+            <span style="color:#e2e8f0">${z.shortName}</span>
+            <span style="opacity:.7">${z.subLabel}</span>
+          `;
+          el.addEventListener('click', () => toggleZone(cfg.zoneIdx));
+          spatialLabelsContainer.appendChild(el);
+          spatialLabelDOMs.push({ cfg, el });
+          return;
+        } else if (cfg.type === 'feature_pin') {
+          el.className += ' px-2 py-0.5 rounded-full bg-[#5df0a8]/10 border border-[#5df0a8]/40 text-[10px] font-mono font-medium text-[#5df0a8]';
+          el.addEventListener('click', () => focusFeature(cfg.featureId));
+        }
+
+        el.textContent = state.lang === 'id' ? cfg.textId : cfg.textEn;
+        spatialLabelsContainer.appendChild(el);
+        spatialLabelDOMs.push({ cfg, el });
+      });
+    }
+
+    function updateSpatialLabelsProjection() {
+      if (!state.showLabels) {
+        spatialLabelsContainer.style.display = 'none';
+        return;
+      }
+      spatialLabelsContainer.style.display = 'block';
+
+      const width = viewportContainer.clientWidth;
+      const height = viewportContainer.clientHeight;
+      const projVec = new THREE.Vector3();
+
+      spatialLabelDOMs.forEach(({ cfg, el }) => {
+        projVec.copy(cfg.pos);
+        dioramaGroup.localToWorld(projVec);
+        projVec.project(camera);
+
+        if (projVec.z > 1.0 || projVec.z < -1.0) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+          return;
+        }
+
+        const x = (projVec.x * 0.5 + 0.5) * width;
+        const y = (-(projVec.y * 0.5) + 0.5) * height;
+
+        // Hide labels that drift too close to the edges
+        if (x < 30 || x > width - 30 || y < 24 || y > height - 24) {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+        } else {
+          el.style.left = `${x}px`;
+          el.style.top = `${y}px`;
+          el.style.opacity = cfg.zoneIdx === state.selectedZoneIndex ? '1' : '0.84';
+          el.style.pointerEvents = (cfg.type === 'geology_banner' || cfg.type === 'plate') ? 'none' : 'auto';
+
+          if (cfg.type === 'zone_pin') {
+            if (cfg.zoneIdx === state.selectedZoneIndex) {
+              el.classList.add('terra-accent-border', 'text-[#5df0a8]');
+            } else {
+              el.classList.remove('terra-accent-border', 'text-[#5df0a8]');
+            }
+          }
+        }
+      });
+    }
+
+    /* =========================================================================
+       12. SMOOTH CAMERA TRANSITION & RAYCASTING INTERACTION
+       ========================================================================= */
+    const camAnim = {
+      active: false,
+      startPos: new THREE.Vector3(),
+      endPos: new THREE.Vector3(),
+      startTarget: new THREE.Vector3(),
+      endTarget: new THREE.Vector3(),
+      progress: 0
+    };
+
+    function animateCameraTo(posArr, targetArr) {
+      camAnim.active = true;
+      camAnim.progress = 0;
+      camAnim.startPos.copy(camera.position);
+      camAnim.endPos.set(posArr[0], posArr[1], posArr[2]);
+      camAnim.startTarget.copy(controls.target);
+      camAnim.endTarget.set(targetArr[0], targetArr[1], targetArr[2]);
+    }
+
+    controls.addEventListener('start', () => {
+      camAnim.active = false;
+    });
+
+    // Raycasting on 3D Canvas Click
+    const raycaster = new THREE.Raycaster();
+    const pointerDownPos = new THREE.Vector2();
+    const pointerUpPos = new THREE.Vector2();
+
+    canvas.addEventListener('pointerdown', (e) => {
+      pointerDownPos.set(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('pointerup', (e) => {
+      pointerUpPos.set(e.clientX, e.clientY);
+      if (pointerDownPos.distanceTo(pointerUpPos) > 6) return; // Ignore drags
+
+      const rect = canvas.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      raycaster.setFromCamera(mouse, camera);
+      const interactiveTargets = [...waterZoneMeshes, oceanSurfaceMesh, seafloorMesh];
+      const intersects = raycaster.intersectObjects(interactiveTargets, true);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0];
+        const localPt = dioramaGroup.worldToLocal(hit.point.clone());
+
+        // Determine which depth zone corresponds to the clicked 3D Y coordinate
+        let matchedIdx = 0;
+        for (let i = 0; i < ZONE_BOUNDS_Y.length; i++) {
+          if (localPt.y <= ZONE_BOUNDS_Y[i].yTop + 0.1 && localPt.y >= ZONE_BOUNDS_Y[i].yBot - 0.1) {
+            matchedIdx = i;
+            break;
+          }
+        }
+        toggleZone(matchedIdx);
+      }
+    });
+
+    /* =========================================================================
+       13. UI RENDERING, TELEMETRY UPDATES & BILINGUAL TRANSLATION
+       ========================================================================= */
+    let toastTimeout = null;
+    function showToast(msg) {
+      const toast = document.getElementById('terraToast');
+      const text = document.getElementById('terraToastText');
+      text.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2800);
+    }
+
+    function update3DZoneHighlighting() {
+      waterZoneMeshes.forEach((mesh, idx) => {
+        const baseOp = ZONE_BOUNDS_Y[idx].sideOpacity;
+        if (idx === state.selectedZoneIndex) {
+          mesh.material.opacity = Math.min(0.75, baseOp + 0.22);
+          mesh.material.emissive = new THREE.Color(0x5df0a8);
+          mesh.material.emissiveIntensity = 0.18;
+        } else {
+          mesh.material.opacity = baseOp * 0.78;
+          mesh.material.emissive = new THREE.Color(0x000000);
+          mesh.material.emissiveIntensity = 0;
+        }
+      });
+
+      zoneHighlightOutlines.forEach((item) => {
+        if (item.zoneIndex === state.selectedZoneIndex) {
+          item.mat.color.setHex(0x5df0a8);
+          item.mat.opacity = 0.95;
+        } else {
+          item.mat.color.setHex(0x7dd3fc);
+          item.mat.opacity = 0.35;
+        }
+      });
+    }
+
+    function selectZone(zoneIdx, moveCamera = true, syncSlider = true) {
+      const dict = I18N[state.lang];
+      const zData = dict.zones[zoneIdx];
+      if (!zData) return; // guard: selectedZoneIndex null (setelah deselect)
+      state.selectedZoneIndex = zoneIdx;
+
+      // Update Telemetry Card
+      document.getElementById('activeZoneCodeBadge').textContent = zData.code;
+      document.getElementById('zoneTagPill').textContent = zData.tag;
+      document.getElementById('zoneDepthBadge').textContent = zData.depth;
+      document.getElementById('zoneTitleHeading').textContent = zData.title;
+      document.getElementById('zoneSummaryText').textContent = zData.summary;
+
+      document.getElementById('metricDepthVal').textContent = zData.depth;
+      document.getElementById('metricTempVal').textContent = zData.temp;
+      document.getElementById('metricPressureVal').textContent = zData.pressure;
+      document.getElementById('metricLightVal').textContent = zData.light;
+
+      document.getElementById('barDepth').style.width = `${zData.bars.depth}%`;
+      document.getElementById('barTemp').style.width = `${zData.bars.temp}%`;
+      document.getElementById('barPressure').style.width = `${zData.bars.pressure}%`;
+      document.getElementById('barLight').style.width = `${zData.bars.light}%`;
+
+      document.getElementById('zoneLifeText').textContent = zData.life;
+      document.getElementById('zoneGeoText').textContent = zData.geo;
+
+      // Sync garis probe kedalaman 3D saat dipicu dari klik zona
+      if (syncSlider) {
+        const zb = ZONE_BOUNDS_Y[zoneIdx];
+        const midDepth = Math.round((zb.dMin + zb.dMax) * 0.5);
+        state.currentDepthMeters = midDepth;
+        depthProbeLine.position.y = depthMetersToY(midDepth);
+      }
+
+      // Highlight Zone Ladder Buttons
+      renderZoneLadderButtons();
+      update3DZoneHighlighting();
+
+      if (moveCamera) {
+        animateCameraTo(zData.camPos, zData.camTarget);
+        showToast(`${zData.code}: ${zData.title}`);
+        showInfoPanel();
+      }
+    }
+
+    // Toggle seleksi zona: klik zona yang sama saat panel terbuka = sembunyikan (pola BAB 03/04)
+    function toggleZone(zoneIdx) {
+      const infoPanel = document.getElementById('oceanInfoPanel');
+      if (state.selectedZoneIndex === zoneIdx && infoPanel.classList.contains('open')) {
+        deselectZone();
+      } else {
+        // Kamera sudah di zona ini bila memang terpilih — jangan terbang ulang
+        selectZone(zoneIdx, state.selectedZoneIndex !== zoneIdx, true);
+      }
+    }
+
+    function deselectZone() {
+      state.selectedZoneIndex = null;
+
+      // Ladder & highlight 3D kembali netral (loop else-branch mereset mesh)
+      renderZoneLadderButtons();
+      update3DZoneHighlighting();
+
+      hideInfoPanel();
+      animateCameraTo([-11.2, 4.8, 15.6], [-0.6, -0.35, 0]);
+    }
+
+    function showInfoPanel() {
+      const infoPanel = document.getElementById('oceanInfoPanel');
+      if (infoPanel) infoPanel.classList.add('open');
+    }
+
+    function hideInfoPanel() {
+      const infoPanel = document.getElementById('oceanInfoPanel');
+      if (infoPanel) infoPanel.classList.remove('open');
+    }
+
+    function focusFeature(featureId) {
+      const dict = I18N[state.lang];
+      const feat = dict.features.find((f) => f.id === featureId);
+      if (!feat) return;
+
+      if (featureId === 'thermohaline') {
+        state.showThermohaline = true;
+        thermohalineGroup.visible = true;
+        updateToolbarButtonsUI();
+      }
+
+      const targetZoneIdx = dict.zones.findIndex((z) => z.id === feat.zoneId);
+      if (targetZoneIdx !== -1) {
+        selectZone(targetZoneIdx, false);
+      }
+      animateCameraTo(feat.camPos, feat.camTarget);
+      showToast(feat.toast);
+      showInfoPanel();
+    }
+
+    function renderZoneLadderButtons() {
+      const dict = I18N[state.lang];
+      const container = document.getElementById('zoneLadderButtons');
+      container.innerHTML = '';
+
+      dict.zones.forEach((z, idx) => {
+        const isSelected = idx === state.selectedZoneIndex;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `zone-pill ${isSelected ? 'active' : ''}`;
+
+        btn.innerHTML = `
+          <span class="zone-dot" style="background-color: ${z.colorHex}"></span>
+          <span class="tp-pill-num">${String(idx + 1).padStart(2, '0')}</span>
+          <span>${z.shortName}</span>
+          <span class="zone-depth">${z.subLabel}</span>
+        `;
+
+        btn.addEventListener('click', () => toggleZone(idx));
+        container.appendChild(btn);
+      });
+    }
+
+    function renderFeatureButtons() {
+      const dict = I18N[state.lang];
+      const container = document.getElementById('featureButtons');
+      container.innerHTML = '';
+
+      dict.features.forEach((feat) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'feature-pill';
+        btn.textContent = feat.label;
+        btn.addEventListener('click', () => focusFeature(feat.id));
+        container.appendChild(btn);
+      });
+    }
+
+    function renderInfoboxAndArticle() {
+      const dict = I18N[state.lang];
+
+      // Infobox Table
+      const infoboxBody = document.getElementById('infoboxTableBody');
+      infoboxBody.innerHTML = dict.infoboxRows
+        .map(
+          ([k, v]) => `
+          <div class="px-4 py-2 flex items-center justify-between gap-3 hover:bg-white/[0.02]">
+            <span class="text-slate-400 font-medium">${k}</span>
+            <span class="text-right font-mono text-slate-200 font-semibold">${v}</span>
+          </div>
+        `
+        )
+        .join('');
+
+      // Scientific Article
+      document.getElementById('scientificArticleContent').innerHTML = dict.articleHTML;
+
+      // Biota Cards
+      const biotaContainer = document.getElementById('biotaCardsContainer');
+      biotaContainer.innerHTML = '';
+      dict.biotaList.forEach((b) => {
+        const card = document.createElement('div');
+        card.className = 'p-3 rounded-xl bg-slate-900/75 hover:bg-slate-900 border border-white/10 hover:border-[#5df0a8]/40 transition cursor-pointer group';
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <h4 class="text-xs font-semibold text-white group-hover:text-[#5df0a8] transition-colors">${b.name}</h4>
+            <span class="px-2 py-0.5 rounded bg-white/5 font-mono text-[10px] text-sky-300 shrink-0">${b.depth}</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">${b.desc}</p>
+        `;
+        card.addEventListener('click', () => {
+          const zIdx = dict.zones.findIndex((z) => z.id === b.zoneId);
+          if (zIdx !== -1) selectZone(zIdx, false);
+          animateCameraTo(b.camPos, b.camTarget);
+          showToast(b.name);
+          showInfoPanel();
+        });
+        biotaContainer.appendChild(card);
+      });
+    }
+
+    function applyLanguage(lang) {
+      state.lang = lang;
+      document.documentElement.lang = lang;
+      const dict = I18N[lang];
+
+      // Toggle active button style (pola pill-group BAB 01: kelas aktif ditoggle)
+      const idBtn = document.getElementById('langIdBtn');
+      const enBtn = document.getElementById('langEnBtn');
+      idBtn.classList.toggle('active', lang === 'id');
+      enBtn.classList.toggle('active', lang === 'en');
+
+      // Translate static [data-i18n] nodes
+      document.querySelectorAll('[data-i18n]').forEach((el) => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+          el.textContent = dict[key];
+        }
+      });
+
+      renderZoneLadderButtons();
+      renderFeatureButtons();
+      renderInfoboxAndArticle();
+      if (state.selectedZoneIndex !== null) selectZone(state.selectedZoneIndex, false, true);
+      initSpatialLabels();
+      updateToolbarButtonsUI();
+    }
+
+    function updateToolbarButtonsUI() {
+      // Pola scene-btn BAB 01: kelas aktif ditoggle; titik warna diwarnai CSS
+      document.getElementById('btnThermohalineBottom').classList.toggle('active', state.showThermohaline);
+      document.getElementById('btnAutoRotate').classList.toggle('active', state.autoRotate);
+      document.getElementById('btnToggleLabels').classList.toggle('active', state.showLabels);
+    }
+
+    /* =========================================================================
+       14. UI EVENT LISTENERS
+       ========================================================================= */
+    document.getElementById('langIdBtn').addEventListener('click', () => applyLanguage('id'));
+    document.getElementById('langEnBtn').addEventListener('click', () => applyLanguage('en'));
+
+    function toggleThermohaline() {
+      state.showThermohaline = !state.showThermohaline;
+      thermohalineGroup.visible = state.showThermohaline;
+      updateToolbarButtonsUI();
+    }
+    document.getElementById('btnThermohalineBottom').addEventListener('click', toggleThermohaline);
+
+    document.getElementById('btnFocusThermohalineCard').addEventListener('click', () => {
+      focusFeature('thermohaline');
+    });
+
+    document.getElementById('btnAutoRotate').addEventListener('click', () => {
+      state.autoRotate = !state.autoRotate;
+      controls.autoRotate = state.autoRotate;
+      controls.autoRotateSpeed = 0.85;
+      updateToolbarButtonsUI();
+    });
+
+    document.getElementById('btnToggleLabels').addEventListener('click', () => {
+      state.showLabels = !state.showLabels;
+      updateToolbarButtonsUI();
+    });
+
+    document.getElementById('btnCrossSectionView').addEventListener('click', () => {
+      // Focus directly on the Challenger Deep cross-section angle like the reference image
+      animateCameraTo([-6.2, 2.4, 14.2], [0.2, -0.85, 0]);
+      showToast(state.lang === 'id' ? 'Sudut Potongan Melintang Challenger Deep' : 'Challenger Deep Cross-Section Angle');
+    });
+
+    // Panel telemetri zona: Escape menutup overlay artikel dulu, lalu panel (pola BAB 05)
+    document.getElementById('oceanInfoCloseBtn').addEventListener('click', () => {
+      deselectZone();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlayEl = document.getElementById('articleOverlay');
+        if (overlayEl && overlayEl.classList.contains('open')) {
+          setArticleOverlay(false);
+          return;
+        }
+        const infoPanel = document.getElementById('oceanInfoPanel');
+        if (infoPanel && infoPanel.classList.contains('open')) {
+          deselectZone();
+        }
+      }
+    });
+
+    // Sidebar Sub-Navigation Tabs (Artikel | Biota) — kini di dalam overlay artikel
+    const tabBtns = [
+      { btn: 'tabBtnArticle', sec: 'sectionArticle' },
+      { btn: 'tabBtnBiota', sec: 'sectionBiota' }
+    ];
+    tabBtns.forEach(({ btn, sec }) => {
+      document.getElementById(btn).addEventListener('click', () => {
+        // Pola cap-tabs BAB 05: kelas aktif ditoggle, bukan className utuh
+        tabBtns.forEach((t) => {
+          document.getElementById(t.btn).classList.toggle('active', t.btn === btn);
+        });
+        document.getElementById(sec).scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // ===== Mode app-like BAB 01: overlay artikel (bekas sidebar samping) =====
+    const articleOverlayEl = document.getElementById('articleOverlay');
+
+    function setArticleOverlay(open) {
+      articleOverlayEl.classList.toggle('open', open);
+      articleOverlayEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+      document.body.classList.toggle('article-overlay-open', open);
+    }
+
+    document.getElementById('openArticleOverlayBtn').addEventListener('click', () => setArticleOverlay(true));
+    document.getElementById('closeArticleOverlayBtn').addEventListener('click', () => setArticleOverlay(false));
+    articleOverlayEl.querySelector('.cap-backdrop').addEventListener('click', () => setArticleOverlay(false));
+
+    /* =========================================================================
+       15. RESPONSIVE RESIZE HANDLER
+       ========================================================================= */
+    function handleResize() {
+      const w = viewportContainer.clientWidth;
+      const h = viewportContainer.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      if (w > 900) {
+        // Offset X positif menggeser fokus render ke kiri — kompensasi popup
+        // telemetri zona di kanan-atas agar pusat diorama tetap terlihat (pola BAB 04).
+        camera.setViewOffset(w, h, Math.round(w * 0.12), 0, w, h);
+      } else {
+        camera.clearViewOffset();
+      }
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', handleResize);
+
+    /* =========================================================================
+       16. MAIN ANIMATION LOOP (WAVES, ORGANISMS, THERMOHALINE, HYDROTHERMAL)
+       ========================================================================= */
+    const clock = new THREE.Clock();
+    const dummyTarget = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+      const delta = Math.min(clock.getDelta(), 0.1);
+
+      // Starfield twinkle (pola BAB 01)
+      starMat.uniforms.uTime.value = elapsed;
+
+      // 1. Animate Top Ocean Surface Waves
+      const surfPos = oceanSurfaceGeo.attributes.position;
+      for (let i = 0; i < surfPos.count; i++) {
+        const vx = surfPos.getX(i);
+        const vz = surfPos.getZ(i);
+        const wave1 = Math.sin(vx * 1.35 + elapsed * 1.8) * 0.055;
+        const wave2 = Math.cos(vz * 1.65 - elapsed * 1.45) * 0.045;
+        const wave3 = Math.sin((vx + vz) * 2.4 + elapsed * 2.6) * 0.022;
+        surfPos.setY(i, wave1 + wave2 + wave3);
+      }
+      surfPos.needsUpdate = true;
+      oceanSurfaceGeo.computeVertexNormals();
+
+      // 2. Shimmer Sunbeams / Caustic Light Rays
+      sunRaysGroup.children.forEach((ray) => {
+        ray.material.opacity = ray.userData.baseOpacity * (0.75 + 0.25 * Math.sin(elapsed * 1.7 + ray.userData.phase));
+      });
+
+      // 3. Animate Marine Organisms across all 5 depth zones
+      animatedOrganisms.forEach((org) => {
+        if (org.type === 'fish') {
+          org.angle += org.speed * 0.012;
+          const nx = org.centerX + Math.cos(org.angle) * org.radius;
+          const nz = org.centerZ + Math.sin(org.angle) * (org.radius * 0.65);
+          const ny = org.centerY + Math.sin(elapsed * 2.2 + org.bobPhase) * 0.05;
+          org.mesh.position.set(nx, ny, nz);
+          org.mesh.rotation.y = -org.angle + Math.PI / 2;
+          org.tail.rotation.y = Math.sin(elapsed * 12 + org.bobPhase) * 0.35;
+        } else if (org.type === 'manta') {
+          org.mesh.position.x = org.baseX + Math.sin(elapsed * 0.45) * 1.35;
+          org.mesh.position.z = org.baseZ + Math.cos(elapsed * 0.45) * 0.85;
+          org.mesh.position.y = org.baseY + Math.sin(elapsed * 1.2) * 0.06;
+          const flap = Math.sin(elapsed * 3.2) * 0.28;
+          org.leftWing.rotation.z = flap;
+          org.rightWing.rotation.z = -flap;
+        } else if (org.type === 'jellyfish') {
+          const pulse = Math.sin(elapsed * 2.4 + org.phase);
+          org.mesh.position.y = org.baseY + pulse * 0.12;
+          org.bell.scale.set(1 - pulse * 0.12, 1 + pulse * 0.16, 1 - pulse * 0.12);
+        } else if (org.type === 'anglerfish') {
+          org.mesh.position.x = org.baseX + Math.sin(elapsed * 0.55 + org.phase) * 0.35;
+          org.mesh.position.y = org.baseY + Math.cos(elapsed * 0.8 + org.phase) * 0.08;
+          org.lure.scale.setScalar(0.85 + 0.35 * Math.sin(elapsed * 5.0 + org.phase));
+        } else if (org.type === 'squid') {
+          org.mesh.position.x = org.baseX + Math.cos(elapsed * 0.65) * 0.55;
+          org.mesh.position.y = org.baseY + Math.sin(elapsed * 1.1) * 0.09;
+        } else if (org.type === 'dumbo') {
+          org.mesh.position.y = org.baseY + Math.sin(elapsed * 1.8 + org.phase) * 0.09;
+          const earFlap = Math.sin(elapsed * 4.2) * 0.45;
+          org.earL.rotation.x = earFlap;
+          org.earR.rotation.x = -earFlap;
+        } else if (org.type === 'snailfish') {
+          const ang = elapsed * 0.65 + org.phase;
+          org.mesh.position.x = org.centerX + Math.cos(ang) * 0.26;
+          org.mesh.position.z = org.centerZ + Math.sin(ang) * 0.38;
+          org.mesh.rotation.y = -ang + Math.PI / 2;
+          org.tail.rotation.y = Math.sin(elapsed * 8.0 + org.phase) * 0.3;
+        }
+      });
+
+      // 4. Animate Hydrothermal Vent Black Smoker Plumes in Mariana Trench
+      ventSmokeParticles.forEach((puff) => {
+        puff.userData.progress += puff.userData.speed * 0.012;
+        if (puff.userData.progress > 1.0) puff.userData.progress = 0.0;
+        const p = puff.userData.progress;
+        puff.position.y = puff.userData.baseY + p * 1.05;
+        puff.position.x = puff.userData.baseX + Math.sin(elapsed * 2.0 + p * 6.0) * 0.06 * p;
+        puff.scale.setScalar(0.7 + p * 1.6);
+        puff.material.opacity = (1.0 - p) * 0.58;
+      });
+
+      // 5. Animate Thermohaline Circulation Stream Particles
+      if (state.showThermohaline) {
+        thermohalineParticles.forEach((tp) => {
+          tp.t = (tp.t + tp.speed * 0.0028) % 1.0;
+          const pt = tp.curve.getPointAt(tp.t);
+          const tangent = tp.curve.getTangentAt(tp.t);
+          tp.mesh.position.copy(pt);
+          dummyTarget.copy(pt).add(tangent);
+          tp.mesh.lookAt(dummyTarget);
+        });
+      }
+
+      // 6. Gentle drift of Marine Snow
+      marineSnowPoints.rotation.y = Math.sin(elapsed * 0.08) * 0.04;
+
+      // 7. Smooth Camera Fly-To Interpolation
+      if (camAnim.active) {
+        camAnim.progress += 0.045;
+        if (camAnim.progress >= 1.0) {
+          camAnim.progress = 1.0;
+          camAnim.active = false;
+        }
+        const ease = 1 - Math.pow(1 - camAnim.progress, 3);
+        camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, ease);
+        controls.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, ease);
+      }
+
+      controls.update();
+      updateSpatialLabelsProjection();
+      renderer.render(scene, camera);
+    }
+
+    // Initialize UI & Start 3D Simulation on Window Load
+    window.onload = function () {
+      applyLanguage('id');
+      handleResize();
+      animate();
+    };
+  </script>
+
+  <script>
+    // Toggle bilah navigasi samping (sidebar) — sembunyikan / tampilkan
+    (function () {
+      var btn = document.getElementById('navHandleBtn');
+      if (!btn) return;
+      var root = document.documentElement;
+      function apply(closed) {
+        root.classList.toggle('nav-closed', closed);
+        btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+        btn.setAttribute('aria-label', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        btn.setAttribute('title', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+      }
+      var stored = null;
+      try { stored = localStorage.getItem('tpNavClosed'); } catch (e) { }
+      // Mobile (≤900px): drawer selalu mulai tertutup agar 3D terlihat penuh
+      var isMobileNav = window.matchMedia('(max-width:900px)').matches;
+      if (isMobileNav || stored === '1') apply(true);
+      btn.addEventListener('click', function () {
+        var closed = !root.classList.contains('nav-closed');
+        apply(closed);
+        try { localStorage.setItem('tpNavClosed', closed ? '1' : '0'); } catch (e) { }
+      });
+    })();
+  </script>
+</body>
+</html>

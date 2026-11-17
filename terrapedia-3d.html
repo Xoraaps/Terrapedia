@@ -1,0 +1,2808 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="description" content="TerraPedia — Modul ensiklopedia interaktif 3D: ekosistem prasejarah & lapisan interior Bumi dengan visualisasi WebGL." />
+  <title>TerraPedia — Ekosistem Prasejarah &amp; Lapisan Interior Bumi (Modul 3D)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* TerraPedia BAB 01 — arah: observatorium malam + atlas ilmiah.
+       Chrome tenang: permukaan gelap bersih, hairline, satu aksen aurora.
+       Kekayaan warna hanya hidup di diorama 3D. Signature: kelompeng skala. */
+    :root{
+      --tp-bg-deep:#050811;
+      --surface:rgba(12,18,30,.92);
+      --surface-2:rgba(17,24,40,.94);
+      --tp-accent:#5df0a8;
+      --tp-border:rgba(255,255,255,.08);
+      --tp-border-strong:rgba(255,255,255,.16);
+      --tp-text-main:#f1f5f9;
+      --tp-text-body:#cbd5e1;
+      --tp-text-muted:#94a3b8;
+      --amber:#fbbf24;
+      --shadow-float:0 12px 32px rgba(0,0,0,.38);
+      --radius-lg:16px;
+      --radius-md:12px;
+      --radius-sm:8px;
+      --font:'Inter',system-ui,sans-serif;
+      --font-mono:'JetBrains Mono',monospace;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.16) transparent;-webkit-tap-highlight-color:transparent}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.24)}
+    html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);color:var(--tp-text-main);background-color:var(--tp-bg-deep);-webkit-font-smoothing:antialiased;user-select:none}
+    ::selection{background:rgba(93,240,168,.22);color:#fff}
+    button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+
+    #canvas3d{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;display:block;cursor:grab;z-index:1;touch-action:none}
+    #canvas3d.hover-target{cursor:pointer}
+    #canvas3d:active{cursor:grabbing}
+
+    .ui-shell{position:fixed;inset:0;pointer-events:none;z-index:10;display:flex;flex-direction:column;justify-content:space-between;padding:16px}
+    .top-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+    .brand-pill{pointer-events:auto;display:inline-flex;align-items:center;gap:12px;padding:8px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);box-shadow:var(--shadow-float)}
+    .brand-mark{width:30px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--tp-accent);font-size:12px;background:rgba(93,240,168,.1);border:1px solid rgba(93,240,168,.35);flex:none}
+    .brand-col{display:flex;flex-direction:column;gap:4px;min-width:0}
+    .brand-title{font-weight:600;font-size:13px;letter-spacing:-.01em;color:#fff;white-space:nowrap}
+    .brand-sub{font-family:var(--font-mono);font-size:10px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .brand-chapter{font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .top-controls{pointer-events:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .cam-btn{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:var(--surface-2);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cam-btn:hover{color:#fff;background:rgba(255,255,255,.1);border-color:var(--tp-border-strong)}
+    .cam-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .pill-group{display:inline-flex;gap:2px;padding:4px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border)}
+    .pill-group button{padding:4px 10px;border-radius:6px;font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--tp-text-muted);border:1px solid transparent;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .pill-group button:hover{color:#fff}
+    .pill-group button.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    .exit-btn{width:32px;height:32px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;flex:none;background:var(--surface-2);border:1px solid var(--tp-border);color:var(--tp-text-muted);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .exit-btn:hover{color:#fda4af;background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35)}
+    .exit-btn svg{width:15px;height:15px;display:block}
+
+    .chapter-nav-row{display:flex;justify-content:flex-end;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .chapter-next-card{display:inline-flex;align-items:center;gap:10px;max-width:100%;padding:6px 8px 6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.04);border:1px solid var(--tp-border);text-decoration:none;transition:border-color .18s ease,background-color .18s ease}
+    .chapter-next-card:hover{border-color:rgba(93,240,168,.4);background:rgba(93,240,168,.06)}
+    .chapter-next-text{display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+    .chapter-next-label{font-family:var(--font-mono);font-size:9px;font-weight:400;color:var(--tp-text-muted);white-space:nowrap}
+    .chapter-next-title{font-size:12px;font-weight:500;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .18s ease}
+    .chapter-next-card:hover .chapter-next-title{color:var(--tp-accent)}
+    .chapter-next-arrow{width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;line-height:1;color:var(--tp-text-muted);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .chapter-next-card:hover .chapter-next-arrow{color:var(--tp-accent);background:rgba(93,240,168,.14);border-color:rgba(93,240,168,.4)}
+
+    .touch-prompt{align-self:center;margin-top:26px;padding:6px 14px;border-radius:var(--radius-md);background:var(--surface);border:1px solid var(--tp-border);font-family:var(--font-mono);font-size:11px;font-weight:400;color:var(--tp-text-body);transition:opacity .3s ease,transform .3s ease,visibility .3s}
+    .touch-prompt.hidden{opacity:0;transform:translateY(-6px);visibility:hidden}
+
+    .info-popup{position:fixed;right:16px;top:96px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 200px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;background:var(--surface-2);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:16px;padding-left:24px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-float);z-index:25;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(14px);transition:opacity .26s ease,transform .26s ease,visibility .26s;user-select:text}
+    /* Signature: kelompeng skala di tepi kiri panel inspeksi */
+    .info-popup::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border-strong) 0 1px,transparent 1px 8px)}
+    .info-popup.open{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+    .info-popup.dino-mode{border-color:rgba(251,191,36,.35)}
+
+    .info-header{display:flex;align-items:flex-start;gap:12px}
+    .info-badge{width:40px;height:40px;border-radius:var(--radius-md);display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:14px;font-weight:500;background:rgba(93,240,168,.12);border:1px solid rgba(93,240,168,.4);color:var(--tp-accent);flex:none}
+    .info-head-col{flex:1;min-width:0}
+    .info-eyebrow{display:block;font-family:var(--font-mono);font-size:10px;color:var(--tp-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .info-title{font-size:17px;font-weight:600;line-height:1.25;letter-spacing:-.01em;color:#fff;margin-top:4px}
+    .info-close{width:30px;height:30px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .info-close:hover{background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35);color:#fda4af}
+    .info-desc{font-size:12.5px;line-height:1.6;color:var(--tp-text-body)}
+
+    .metrics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+    .metric-card{padding:10px 12px;border-radius:var(--radius-md);background:rgba(255,255,255,.03);border:1px solid var(--tp-border)}
+    .metric-lbl{font-family:var(--font-mono);font-size:9.5px;color:var(--tp-text-muted)}
+    .metric-val{font-family:var(--font-mono);font-size:12.5px;font-weight:500;color:var(--tp-text-main);margin-top:4px}
+
+    .sublayer-box{display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .panel-heading{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10px;color:var(--tp-text-muted)}
+    .panel-heading::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.08)}
+    .sublayer-item{padding:12px;border-radius:var(--radius-md);background:rgba(255,255,255,.03);border:1px solid var(--tp-border);transition:border-color .18s ease,background-color .18s ease}
+    .sublayer-item:hover{border-color:var(--tp-border-strong);background:rgba(255,255,255,.05)}
+    .sublayer-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;font-weight:500;color:#fff;margin-bottom:4px}
+    .sublayer-top span:last-child{font-family:var(--font-mono);font-size:10px;color:var(--tp-text-muted);text-align:right;white-space:nowrap;flex:none}
+    .sublayer-p{font-size:11.5px;line-height:1.55;color:var(--tp-text-body)}
+    .info-dismiss-hint{font-family:var(--font-mono);font-size:10px;color:var(--tp-text-muted);text-align:center;padding-top:8px;border-top:1px solid var(--tp-border)}
+
+    .dino-mode .info-badge{color:var(--amber);background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4)}
+    .dino-mode .info-popup{background:var(--surface-2)}
+
+    .bottom-dock{pointer-events:auto;align-self:center;width:min(840px,100%);min-width:0;max-width:100%;overflow:hidden;background:var(--surface);border:1px solid var(--tp-border);border-radius:var(--radius-lg);padding:12px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow-float)}
+    .layer-pills{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;width:100%;max-width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;touch-action:pan-x;overscroll-behavior-x:contain;scrollbar-width:none;-ms-overflow-style:none;padding:2px 2px 3px;cursor:grab}
+    .layer-pills.dragging{cursor:grabbing}
+    .layer-pills::-webkit-scrollbar{display:none;width:0;height:0}
+
+    .layer-btn{flex:0 0 auto;touch-action:pan-x;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:var(--radius-sm);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);white-space:nowrap;font-size:12px;font-weight:500;color:var(--tp-text-body);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .layer-btn:hover{color:#fff;background:rgba(255,255,255,.08);border-color:var(--tp-border-strong)}
+    .layer-btn.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+    .layer-btn.dino-pill.active{color:var(--amber);background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.4)}
+    .swatch{width:8px;height:8px;border-radius:9999px;flex-shrink:0}
+
+    .controls-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--tp-border)}
+    .slider-wrap{display:flex;align-items:center;gap:10px;flex:1;min-width:160px}
+    .slider-col{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+    .tick-row{height:5px;background-image:repeating-linear-gradient(to right,rgba(255,255,255,.16) 0 1px,transparent 1px 8px);background-size:calc(100% - 1px) 100%;background-repeat:no-repeat}
+    .slider-lbl{font-family:var(--font-mono);font-size:10px;color:var(--tp-text-muted);white-space:nowrap}
+    .slider-val{font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--tp-accent);min-width:32px;text-align:right}
+    .range-input{-webkit-appearance:none;appearance:none;flex:1;height:4px;border-radius:9999px;background:rgba(255,255,255,.08);outline:none;touch-action:pan-x}
+    .range-input::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:9999px;background:var(--tp-accent);border:2px solid var(--tp-bg-deep);cursor:pointer}
+    .range-input::-moz-range-thumb{width:14px;height:14px;border-radius:9999px;background:var(--tp-accent);border:2px solid var(--tp-bg-deep);cursor:pointer}
+
+    .toggle-row{display:flex;gap:6px}
+    .mini-toggle{padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;color:var(--tp-text-body);background:rgba(255,255,255,.05);border:1px solid var(--tp-border);transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .mini-toggle:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .mini-toggle.active{color:var(--tp-accent);background:rgba(93,240,168,.12);border-color:rgba(93,240,168,.4)}
+
+    @media (max-width:720px){
+      .brand-sub{display:none}
+      .info-popup{left:12px;right:12px;top:58px;width:auto;max-height:46vh;padding-left:20px}
+      .info-popup::before{left:6px}
+      /* Shell & safe-area (perangkat berponi/notch) */
+      .ui-shell{padding:12px;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+      /* Bilah atas lebih ramping */
+      .brand-pill{padding:6px 10px;gap:8px}
+      .brand-mark{width:26px;height:26px;border-radius:8px}
+      .brand-title{font-size:12px}
+      .brand-chapter{font-size:9px}
+      .cam-btn{padding:5px 9px;font-size:11px}
+      .pill-group button{padding:4px 8px;font-size:10px}
+      .exit-btn{width:30px;height:30px}
+      .touch-prompt{font-size:10px;padding:5px 11px}
+      /* Dock bawah lebih ringkas */
+      .bottom-dock{padding:8px 12px;gap:6px}
+      .layer-btn{padding:4px 9px;font-size:11px}
+      .mini-toggle{padding:4px 8px;font-size:11px}
+      .slider-wrap{min-width:120px;gap:8px}
+      .slider-lbl{font-size:9px}
+      .controls-row{gap:8px;padding-top:6px}
+      .chapter-next-card{padding:5px 6px 5px 10px}
+      .chapter-next-title{max-width:190px;font-size:11.5px}
+      .chapter-next-arrow{width:22px;height:22px}
+    }
+    @media (max-width:380px){
+      .top-controls{gap:4px}
+      .cam-btn{padding:4px 7px;font-size:10.5px}
+      .pill-group button{padding:4px 6px}
+      .brand-chapter{max-width:150px}
+      .chapter-next-title{max-width:140px;font-size:11px}
+      .mini-toggle{padding:4px 6px;font-size:10.5px}
+      .layer-btn{padding:4px 7px;font-size:10.5px}
+      .info-popup{max-height:52vh;padding:12px;padding-left:20px}
+      .info-popup::before{left:5px}
+      .info-title{font-size:15.5px}
+      .metric-card{padding:8px 10px}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .info-popup,.touch-prompt,.chapter-next-title{transition:none}
+    }
+  </style>
+<style id="tpNavStyle">
+    /* ====== TerraPedia NAV: bilah navigasi menjadi sidebar kiri penuh + tombol navbar ====== */
+    :root{--tp-nav-w:min(280px,86vw)}
+    .ui-shell .bottom-dock{
+      position:fixed;top:0;bottom:0;left:0;z-index:30;
+      width:var(--tp-nav-w);max-width:86vw;height:auto;max-height:none;
+      border-width:0 1px 0 0;border-radius:0 18px 18px 0;
+      overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+      padding:20px 14px calc(16px + env(safe-area-inset-bottom,0px));
+      transition:left .34s cubic-bezier(.22,.7,.2,1),visibility .34s;
+    }
+    html.nav-closed .ui-shell .bottom-dock{left:calc(-1 * var(--tp-nav-w));visibility:hidden}
+
+    /* Tombol navbar (handle) menempel di tepi kanan sidebar */
+    .nav-handle{position:fixed;top:50%;left:var(--tp-nav-w);transform:translateY(-50%);margin-left:-1px;z-index:41;width:26px;height:52px;display:inline-flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;color:var(--tp-text-muted);background:var(--surface);border:1px solid var(--tp-border);border-left:none;border-radius:0 12px 12px 0;box-shadow:6px 0 18px -10px rgba(0,0,0,.65);transition:left .34s cubic-bezier(.22,.7,.2,1),color .18s ease,background-color .18s ease}
+    .nav-handle:hover{color:#fff;background:rgba(255,255,255,.1)}
+    .nav-handle svg{width:14px;height:14px;pointer-events:none}
+    .nav-handle .ic-open{display:none}
+    html.nav-closed .nav-handle{left:0}
+    html.nav-closed .nav-handle .ic-close{display:none}
+    html.nav-closed .nav-handle .ic-open{display:block}
+    .nav-handle:focus-visible{outline:2px solid rgba(93,240,168,.7);outline-offset:1px}
+
+    /* Kartu navigasi bab: fixed di ujung kiri & kanan viewport (di luar dock) */
+    .tp-nav-card{position:fixed;bottom:16px;z-index:40;pointer-events:auto;width:auto;max-width:min(330px,38vw)}
+    .tp-nav-card.tp-card-next{right:16px;transition:opacity .25s ease,visibility .25s}
+    .tp-nav-card.tp-card-prev{left:16px}
+
+    /* HUD atas (brand & bar petunjuk) mengambang di atas sidebar — tidak pernah bergeser */
+    .ui-shell .top-bar .brand-pill{position:relative;z-index:45}
+    .ui-shell .touch-prompt{position:relative;z-index:45}
+    /* (a) Label mengambang lapisan 3D (pola BAB 02) */
+    #tp3dLabels{position:fixed;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+    .tp-layer-label{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:500;color:#f8fafc;background:rgba(8,14,26,.92);border:1px solid rgba(255,255,255,.16);box-shadow:var(--shadow-float);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);white-space:nowrap;transform:translate(-50%,-50%);transition:border-color .18s ease,background-color .18s ease,color .18s ease}
+    .tp-layer-label .tp-dot{width:8px;height:8px;border-radius:9999px;flex:none}
+    .tp-layer-label .tp-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-accent);flex:none}
+    .tp-layer-label:hover{border-color:rgba(255,255,255,.35)}
+    .tp-layer-label.active{color:var(--tp-accent);border-color:rgba(93,240,168,.5);background:rgba(93,240,168,.12)}
+
+    /* (b) Ketinggian dock di desktop: isi naik, ruang kosong atas berkurang */
+    @media (min-width:901px){
+      .ui-shell .bottom-dock{padding-top:24px}
+    }
+
+    /* (e) Struktur item navbar seragam: lingkaran warna + nomor + nama */
+    .tp-pill-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-pill-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-text-muted,#94a3b8);flex:none}
+    button.active .tp-pill-num{color:inherit}
+
+    /* (d) Struktur floating text seragam: lingkaran warna + nomor + nama */
+    .tp-f-dot{width:8px;height:8px;border-radius:9999px;flex:none;display:inline-block}
+    .tp-f-num{font-family:var(--font-mono);font-size:10px;font-weight:600;color:var(--tp-accent,#5df0a8);flex:none}
+
+    /* Tagline di area atas dock navigasi */
+    .tp-dock-tagline{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--tp-text-body,#cbd5e1);padding:0 2px 2px;white-space:nowrap}
+    .tp-dock-tagline::before{content:'';width:6px;height:6px;border-radius:9999px;background:var(--tp-accent,#5df0a8);box-shadow:0 0 0 3px rgba(93,240,168,.14);flex:none}
+    .tp-dock-tagline::after{content:'';height:1px;flex:1;min-width:12px;background:linear-gradient(90deg,rgba(93,240,168,.28),transparent)}
+
+    /* Mobile: sidebar menjadi drawer overlay */
+    @media (max-width:900px){
+      html:not(.nav-closed) .ui-shell .bottom-dock{box-shadow:18px 0 50px -18px rgba(0,0,0,.78)}
+      html:not(.nav-closed) .tp-card-prev{opacity:0;visibility:hidden;pointer-events:none}
+    }
+    @media (max-width:640px){
+      .tp-nav-card{max-width:calc(50vw - 24px)}
+      /* Judul kartu navigasi harus menyusut mengikuti kartu (anti tabrakan) */
+      .tp-nav-card .chapter-next-text{flex:1 1 0;min-width:0;max-width:100%;overflow:hidden}
+      .tp-nav-card .chapter-next-title{max-width:100%}
+      .tp-nav-card .chapter-next-label{overflow:hidden;text-overflow:ellipsis}
+      .nav-handle{width:24px;height:44px}
+    }
+    @media (max-width:720px){
+      /* Pill brand compact (brand-sub disembunyikan) -> padding atas lebih pendek */
+      .ui-shell .bottom-dock{padding-top:16px}
+    }
+    /* ====== Mobile UX: target sentuh, scrim drawer, keterbacaan ====== */
+    @media (max-width:720px){
+      /* Tap target min 40px (pedoman iOS HIG / Material Design) */
+      #openArticleOverlayBtn{min-height:42px;padding-top:9px;padding-bottom:9px}
+      .cap-close{width:42px !important;height:42px !important;font-size:16px !important}
+      button[id*="lose" i],#exitModuleBtn{min-width:40px;min-height:40px}
+      button[id*="ang" i],button[data-lang]{min-width:42px;min-height:36px}
+      /* Area sentuh handle navigasi diperluas tanpa mengubah tampilan */
+      .nav-handle{overflow:visible}
+      .nav-handle::before{content:'';position:absolute;inset:-12px -14px}
+      /* Item di dalam drawer lebih nyaman disentuh */
+      .ui-shell .bottom-dock button{min-height:38px}
+      /* Judul & padding overlay artikel di layar sempit */
+      .cap-title{font-size:16px}
+      .cap-body{padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+      /* Perluas area sentuh pin/label 3D (posisi visual tidak berubah) */
+      #tp3dLabels .tp-layer-label::before,
+      #labelsOverlayContainer .tp-3d-label::before,
+      #floatingPinsContainer .biome-3d-pin::before,
+      #hudPinsContainer .hud-pin::before,
+      #hotspotLayer .hotspot-pin::before{content:'';position:absolute;inset:-9px}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .ui-shell .bottom-dock,.nav-handle,.tp-nav-card{transition:none}
+    }
+
+    /* ====== Overlay artikel ilmiah (pola BAB 02): drawer kanan desktop, sheet penuh mobile ====== */
+    #articleOverlay{position:fixed;inset:0;z-index:60;pointer-events:none}
+    #articleOverlay.open{pointer-events:auto}
+    .cap-backdrop{position:absolute;inset:0;background:rgba(3,6,12,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);opacity:0;transition:opacity .3s ease}
+    #articleOverlay.open .cap-backdrop{opacity:1}
+    .cap-panel{position:absolute;top:0;right:0;bottom:0;width:min(760px,52vw);display:flex;flex-direction:column;background:var(--surface-2);border-left:1px solid var(--tp-border);box-shadow:-25px 0 60px -18px rgba(0,0,0,.8);transform:translateX(103%);visibility:hidden;transition:transform .34s cubic-bezier(.16,1,.3,1),visibility .34s}
+    .cap-panel::before{content:'';position:absolute;left:10px;top:16px;bottom:16px;width:5px;background-image:repeating-linear-gradient(to bottom,var(--tp-border) 0 1px,transparent 1px 8px);pointer-events:none;z-index:5}
+    #articleOverlay.open .cap-panel{transform:translateX(0);visibility:visible}
+    .cap-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid var(--tp-border);background:rgba(7,12,24,.9)}
+    .cap-head .min-w-0{min-width:0}
+    .cap-eyebrow{display:block;font-family:var(--font-mono);font-size:10px;font-weight:500;color:var(--tp-text-muted);white-space:nowrap}
+    .cap-title{font-size:13px;font-weight:600;color:#fff;margin-top:6px;line-height:1.35}
+    .cap-close{width:32px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--tp-border);color:var(--tp-text-muted);display:inline-flex;align-items:center;justify-content:center;font-size:16px;flex:none;transition:color .18s ease,background-color .18s ease,border-color .18s ease}
+    .cap-close:hover{background:rgba(244,63,94,.2);border-color:rgba(251,113,133,.4);color:#fda4af}
+    .cap-body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:18px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:1.25rem}
+
+    /* Konten artikel BAB 01 dirender dari data ilmiah (LAYER_DATA & DINO_DATA) */
+    .tp-art-group{font-family:var(--font-mono);font-size:11px;font-weight:600;color:#fff;letter-spacing:.06em;border-bottom:1px solid var(--tp-border);padding-bottom:6px;margin-top:4px}
+    .tp-art-sec{border:1px solid var(--tp-border);border-radius:16px;background:var(--surface-2,rgba(13,25,43,.72));padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+    .tp-art-tag{display:flex;align-items:center;gap:8px;font-family:var(--font-mono);font-size:10.5px;color:var(--tp-accent)}
+    .tp-art-tag::after{content:'';height:1px;flex:1;background:rgba(255,255,255,.1)}
+    .tp-art-eyebrow{font-family:var(--font-mono);font-size:9.5px;color:var(--tp-text-muted);letter-spacing:.05em;text-transform:uppercase}
+    .tp-art-title{font-size:clamp(17px,2.2vw,22px);font-weight:600;color:#fff;line-height:1.35;letter-spacing:-.01em}
+    .tp-art-desc{font-size:13.5px;color:#cbd5e1;line-height:1.7}
+    .tp-art-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .tp-art-metric{border:1px solid var(--tp-border);border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}
+    .tp-art-metric .l{font-family:var(--font-mono);font-size:9.5px;color:var(--tp-text-muted);text-transform:uppercase;letter-spacing:.04em}
+    .tp-art-metric .v{font-size:12px;color:#fff;font-weight:500;margin-top:2px}
+    .tp-art-subhead{font-size:11px;font-weight:600;color:#fff}
+    .tp-art-sub{border-top:1px dashed var(--tp-border);padding-top:8px}
+    .tp-art-sub .n{font-size:12px;font-weight:600;color:var(--tp-text-body)}
+    .tp-art-sub .m{font-family:var(--font-mono);font-size:10px;color:var(--tp-accent);margin-top:1px}
+    .tp-art-sub .d{font-size:12px;color:var(--tp-text-body);line-height:1.6;margin-top:4px}
+
+    @media (max-width:640px){
+      .cap-panel{width:100%;left:0;right:0;top:auto;height:92dvh;border-left:none;border-top:1px solid var(--tp-border);border-radius:18px 18px 0 0;transform:translateY(104%);box-shadow:0 -25px 60px -18px rgba(0,0,0,.8)}
+      #articleOverlay.open .cap-panel{transform:translateY(0)}
+      .cap-body{padding:14px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))}
+    }
+    @media (prefers-reduced-motion:reduce){
+      .cap-panel,.cap-backdrop{transition:none}
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas3d"></canvas>
+
+  <aside class="info-popup" id="infoPanel" aria-hidden="true">
+    <div class="info-header">
+      <div class="info-badge" id="infoBadge" aria-hidden="true">01</div>
+      <div class="info-head-col">
+        <span class="info-eyebrow" id="infoEyebrow"></span>
+        <h2 class="info-title" id="infoTitle"></h2>
+      </div>
+      <button type="button" class="info-close" id="infoCloseBtn" title="Tutup &amp; Zoom Out">×</button>
+    </div>
+    <p class="info-desc" id="infoDesc"></p>
+    <div class="metrics-grid" id="infoMetrics"></div>
+    <div class="sublayer-box">
+      <div class="panel-heading" id="infoSubHeading"></div>
+      <div id="infoSubList" style="display:flex;flex-direction:column;gap:7px"></div>
+    </div>
+    <div class="info-dismiss-hint" id="infoDismissHint"></div>
+  </aside>
+
+  <div class="ui-shell">
+    <div>
+      <header class="top-bar">
+        <div class="brand-pill">
+          <span class="brand-mark">▲</span>
+          <div class="brand-col">
+            <span class="brand-title">TerraPedia 3D</span>
+            <span class="brand-chapter" id="uiChapter">Bab 01 — Geosfer &amp; Tektonik</span>
+            <span class="brand-sub" id="uiSubtitle">Ekosistem Prasejarah &amp; Lapisan Interior Bumi</span>
+          </div>
+        </div>
+        <div class="top-controls">
+          <button id="openArticleOverlayBtn" type="button" class="cam-btn">Artikel Ilmiah</button>
+          <div class="pill-group">
+            <button type="button" class="active" data-lang="id">ID</button>
+            <button type="button" data-lang="en">EN</button>
+          </div>
+          <a id="exitModuleBtn" href="terrapedia.html" class="exit-btn" title="Keluar ke TerraPedia" aria-label="Keluar ke halaman utama TerraPedia">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </a>
+        </div>
+      </header>
+      <div style="display:flex;justify-content:center">
+        <div class="touch-prompt" id="touchPrompt">Klik untuk memulai</div>
+      </div>
+    </div>
+
+    <div class="bottom-dock" id="bottomDock">
+      <div class="tp-dock-tagline">Kenali Bumi Lebih Dalam</div>
+      <div class="layer-pills" id="dinoNav"></div>
+      <div class="layer-pills" id="layerNav"></div>
+      <div class="controls-row">
+        <div class="slider-wrap">
+          <span class="slider-lbl" id="uiExplodeLbl">Urai Lapisan:</span>
+          <div class="slider-col">
+            <div class="tick-row"></div>
+            <input type="range" class="range-input" id="explodeSlider" min="0" max="100" value="0" />
+          </div>
+          <span class="slider-val" id="explodeVal">0%</span>
+        </div>
+        <div class="toggle-row">
+          <button type="button" class="mini-toggle active" id="autoSpinBtn">Putar Otomatis</button>
+          <button type="button" class="mini-toggle" id="resetViewBtn">Reset</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tombol navbar: sembunyikan / tampilkan bilah navigasi samping -->
+    <button id="navHandleBtn" type="button" class="nav-handle" aria-expanded="true" aria-controls="bottomDock" aria-label="Sembunyikan navigasi bab" title="Sembunyikan navigasi bab">
+      <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+      <svg class="ic-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button>
+
+    <!-- Kartu navigasi bab: fixed di ujung kanan viewport -->
+    <a class="chapter-next-card tp-nav-card tp-card-next" href="terrapedia_bab_02_visualisasi_3d_atmosfer_iklim.html" title="Buka BAB 02 — Atmosfer &amp; Iklim" aria-label="Lanjut ke BAB 02 — Atmosfer dan Iklim">
+      <span class="chapter-next-text">
+        <span class="chapter-next-label" id="uiNavNextLabel">Berikutnya</span>
+        <span class="chapter-next-title" id="uiNavNextTitle">BAB 02 — Atmosfer &amp; Iklim</span>
+      </span>
+      <span class="chapter-next-arrow">→</span>
+    </a>
+  </div>
+
+  <!-- =========================================================================
+       OVERLAY ARTIKEL ILMIAH (pola BAB 02):
+       konten artikel hanya tampil setelah tombol "Artikel Ilmiah" diklik.
+       Dirender oleh script utama dari data ilmiah (LAYER_DATA & DINO_DATA).
+       Desktop: drawer kanan. Mobile (≤640px): sheet layar penuh.
+       ========================================================================= -->
+  <div id="articleOverlay" aria-hidden="true">
+    <div class="cap-backdrop" data-overlay-close></div>
+    <section class="cap-panel" role="dialog" aria-modal="true" aria-label="Artikel Ilmiah BAB 01 — Geosfer &amp; Tektonik">
+      <header class="cap-head">
+        <div class="min-w-0">
+          <span class="cap-eyebrow" id="tpArtEyebrow">Artikel Ilmiah</span>
+          <h2 class="cap-title" id="tpArtTitle">Ekosistem Prasejarah &amp; Lapisan Interior Bumi</h2>
+        </div>
+        <button id="closeArticleOverlayBtn" type="button" class="cap-close" aria-label="Tutup artikel" title="Tutup artikel (Esc)">✕</button>
+      </header>
+      <div class="cap-body" id="tpArtBody"><!-- Dirender oleh script utama --></div>
+    </section>
+  </div>
+
+  <!-- Multi-CDN Three.js Loader (Automatic fallback across cdnjs -> unpkg -> jsdelivr) -->
+  <script>
+    (function loadThreeWithFallback() {
+      const cdnUrls = [
+        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r143/three.min.js',
+        'https://unpkg.com/three@0.143.0/build/three.min.js',
+        'https://cdn.jsdelivr.net/npm/three@0.143.0/build/three.min.js'
+      ];
+      let idx = 0;
+      function tryNext() {
+        if (window.THREE) {
+          window.initTerraPedia3D();
+          return;
+        }
+        if (idx >= cdnUrls.length) return;
+        const s = document.createElement('script');
+        s.src = cdnUrls[idx++];
+        s.onload = () => {
+          if (window.THREE) window.initTerraPedia3D();
+          else tryNext();
+        };
+        s.onerror = tryNext;
+        document.head.appendChild(s);
+      }
+      tryNext();
+    })();
+  </script>
+
+  <script>
+    window.initTerraPedia3D = function () {
+      const THREE = window.THREE;
+      if (!THREE) return;
+
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+      const smoothstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+      const wrapAngle = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+      const hash2 = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453123; return s - Math.floor(s); };
+      function valueNoise(x, y) {
+        const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+        const u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+        return lerp(lerp(hash2(ix, iy), hash2(ix + 1, iy), u), lerp(hash2(ix, iy + 1), hash2(ix + 1, iy + 1), u), v) * 2 - 1;
+      }
+      function fbm2(x, y, oct = 4) {
+        let val = 0, amp = 0.5, freq = 1;
+        for (let i = 0; i < oct; i++) { val += amp * valueNoise(x * freq, y * freq); freq *= 2.04; amp *= 0.5; }
+        return val;
+      }
+      function ridgedNoise(x, y) {
+        let val = 0, amp = 0.5, freq = 1;
+        for (let i = 0; i < 4; i++) { const n = 1 - Math.abs(valueNoise(x * freq, y * freq)); val += amp * n * n; freq *= 2.1; amp *= 0.5; }
+        return val;
+      }
+      function fbm(x, y, z) {
+        let v = 0, amp = 0.5, freq = 1;
+        for (let i = 0; i < 4; i++) { v += amp * (Math.sin(x * freq * 2.1 + Math.cos(z * freq * 1.9)) * Math.cos(y * freq * 2.3 + x * freq)); freq *= 2.08; amp *= 0.5; }
+        return v;
+      }
+      function distToBezier(px, pz, ax, az, bx, bz, cx, cz) {
+        let minD = 1e9, prevX = ax, prevZ = az;
+        for (let i = 1; i <= 18; i++) {
+          const t = i / 18, inv = 1 - t;
+          const qx = inv * inv * ax + 2 * inv * t * bx + t * t * cx;
+          const qz = inv * inv * az + 2 * inv * t * bz + t * t * cz;
+          const vx = qx - prevX, vz = qz - prevZ, wx = px - prevX, wz = pz - prevZ;
+          const u = clamp((wx * vx + wz * vz) / (vx * vx + vz * vz + 1e-8), 0, 1);
+          const d = Math.hypot(px - (prevX + u * vx), pz - (prevZ + u * vz));
+          if (d < minD) minD = d;
+          prevX = qx; prevZ = qz;
+        }
+        return minD;
+      }
+
+      // Built-in Damped 360° Orbit & Touch Pinch Camera Controller (Zero external module dependency)
+      function createOrbitController(cam, domEl) {
+        const target = new THREE.Vector3(0, 0.1, 0);
+        const spherical = new THREE.Spherical();
+        const sphericalDelta = new THREE.Spherical();
+        const offset = new THREE.Vector3();
+        let scale = 1;
+        let isDragging = false;
+        let prevX = 0, prevY = 0, prevPinchDist = 0;
+        const startListeners = [];
+        const activePointers = new Map();
+
+        const ctrl = {
+          target,
+          minDistance: 0.85,
+          maxDistance: 15,
+          dampingFactor: 0.08,
+          addEventListener(type, fn) { if (type === 'start') startListeners.push(fn); },
+          update() {
+            offset.copy(cam.position).sub(target);
+            spherical.setFromVector3(offset);
+            spherical.theta += sphericalDelta.theta;
+            spherical.phi += sphericalDelta.phi;
+            spherical.phi = clamp(spherical.phi, 0.08, Math.PI - 0.08);
+            spherical.radius = clamp(spherical.radius * scale, ctrl.minDistance, ctrl.maxDistance);
+            offset.setFromSpherical(spherical);
+            cam.position.copy(target).add(offset);
+            cam.lookAt(target);
+            sphericalDelta.theta *= (1 - ctrl.dampingFactor);
+            sphericalDelta.phi *= (1 - ctrl.dampingFactor);
+            scale = 1;
+          }
+        };
+
+        const notifyStart = () => startListeners.forEach(fn => fn());
+
+        domEl.addEventListener('pointerdown', (e) => {
+          activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (activePointers.size === 1) {
+            isDragging = true;
+            prevX = e.clientX;
+            prevY = e.clientY;
+          } else if (activePointers.size === 2) {
+            const pts = Array.from(activePointers.values());
+            prevPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+          }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+          if (!activePointers.has(e.pointerId)) return;
+          activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+          if (activePointers.size === 2) {
+            const pts = Array.from(activePointers.values());
+            const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+            if (prevPinchDist > 0 && dist > 0) {
+              notifyStart();
+              scale *= prevPinchDist / dist;
+            }
+            prevPinchDist = dist;
+          } else if (isDragging && activePointers.size === 1) {
+            const dx = e.clientX - prevX;
+            const dy = e.clientY - prevY;
+            if (Math.hypot(dx, dy) > 2) notifyStart();
+            sphericalDelta.theta -= (2 * Math.PI * dx / Math.max(domEl.clientHeight, 300)) * 0.65;
+            sphericalDelta.phi   -= (2 * Math.PI * dy / Math.max(domEl.clientHeight, 300)) * 0.65;
+            prevX = e.clientX;
+            prevY = e.clientY;
+          }
+        });
+
+        const endPointer = (e) => {
+          activePointers.delete(e.pointerId);
+          if (activePointers.size < 2) prevPinchDist = 0;
+          if (activePointers.size === 0) isDragging = false;
+        };
+        window.addEventListener('pointerup', endPointer);
+        window.addEventListener('pointercancel', endPointer);
+
+        domEl.addEventListener('wheel', (e) => {
+          e.preventDefault();
+          notifyStart();
+          scale *= e.deltaY > 0 ? 1.08 : 0.92;
+        }, { passive: false });
+
+        return ctrl;
+      }
+
+      const LAYER_ORDER = ['crust', 'litho', 'mantle', 'outerCore', 'innerCore'];
+      const DINO_ORDER  = ['trex', 'brachio', 'trice', 'stego', 'mosa', 'ptero'];
+
+      const LAYER_FOCUS_CFG = {
+        crust:     { baseY:  1.78, dist: 3.95, elev: 0.82 },
+        litho:     { baseY:  1.24, dist: 3.85, elev: 0.20 },
+        mantle:    { baseY:  0.28, dist: 4.20, elev: 0.14 },
+        outerCore: { baseY: -1.06, dist: 3.35, elev: 0.16 },
+        innerCore: { baseY: -2.09, dist: 2.85, elev: 0.20 }
+      };
+
+      const DINO_DATA = {
+        trex: {
+          color: '#ef4444', icon: '🦖',
+          id: {
+            shortName: 'T-Rex', eyebrow: 'Fauna Prasejarah · Theropoda Predator Puncak', title: 'Tyrannosaurus rex',
+            desc: 'Predator darat paling ikonik di pengujung Zaman Kapur yang mendominasi rantai makanan Amerika Utara dengan gigitan penghancur tulang dan indra penciuman tajam.',
+            metrics: [{ l: 'Diet Utama', v: 'Karnivora Puncak' }, { l: 'Periode Hidup', v: 'Kapur Akhir (68 Jtl)' }, { l: 'Panjang & Berat', v: '12,5 m · 8,5 Ton' }, { l: 'Lokasi Fosil', v: 'Amerika Utara' }],
+            subHeading: '6 Profil Lengkap Spesies Dinosaurus',
+            subs: [
+              { n: '1. Nama & Arti Nama', m: 'Tyrannosaurus rex', d: 'Nama ilmiah lengkapnya adalah Tyrannosaurus rex, yang secara harfiah berarti "Raja Kadal Tiran" (Tyranno = tiran, saurus = kadal, rex = raja).' },
+              { n: '2. Jenis Makanan (Diet)', m: 'Karnivora (Pemakan Daging)', d: 'Karnivora puncak pemakan daging yang memburu herbivora besar seperti Triceratops dan Edmontosaurus, sekaligus pemakan bangkai.' },
+              { n: '3. Periode Hidup & Lokasi', m: 'Zaman Kapur Akhir', d: 'Hidup sekitar 68 hingga 66 juta tahun lalu dan fosilnya banyak ditemukan di wilayah benua Amerika Utara bagian barat (AS & Kanada).' },
+              { n: '4. Estimasi Ukuran', m: 'Setara Bus Sekolah', d: 'Panjang tubuh 12–13 meter, tinggi pinggul 3,8 meter, dan berat 8–9 ton—panjangnya setara satu bus sekolah besar dan beratnya menyamai gabungan 6 mobil SUV.' },
+              { n: '5. Ciri Fisik Utama', m: 'Rahang & Gigi Pisang', d: 'Memiliki tengkorak kokoh sepanjang 1,5 meter dengan 60 gigi bergerigi seukuran pisang yang menghasilkan gigitan 35.000+ Newton (mampu meremukkan tulang).' },
+              { n: '6. Satu Fakta Unik', m: 'Otot Lengan Sangat Kuat', d: 'Meski lengannya tampak mungil (hanya ~1 meter), tulang lengan T-Rex sangat tebal dan memiliki otot bisep yang mampu mengangkat beban hampir 200 kg.' }
+            ]
+          },
+          en: {
+            shortName: 'T-Rex', eyebrow: 'Prehistoric Fauna · Apex Theropod Predator', title: 'Tyrannosaurus rex',
+            desc: 'The iconic apex land predator of the Late Cretaceous that dominated North American food webs with bone-crushing jaws and stereoscopic vision.',
+            metrics: [{ l: 'Primary Diet', v: 'Apex Carnivore' }, { l: 'Time Period', v: 'Late Cretaceous' }, { l: 'Length & Mass', v: '12.5 m · 8.5 Tons' }, { l: 'Fossil Location', v: 'North America' }],
+            subHeading: '6 Complete Dinosaur Profile Facts',
+            subs: [
+              { n: '1. Name & Meaning', m: 'Tyrannosaurus rex', d: 'Its full scientific name is Tyrannosaurus rex, literally translating to "Tyrant Lizard King" (Greek tyrannos + sauros, and Latin rex).' },
+              { n: '2. Diet', m: 'Carnivore (Meat-Eater)', d: 'An apex carnivore that actively hunted large herbivores such as Triceratops and Edmontosaurus while also scavenging carcasses.' },
+              { n: '3. Period & Location', m: 'Late Cretaceous', d: 'Lived 68 to 66 million years ago across western North America (most famously in the Hell Creek Formation of the US and Canada).' },
+              { n: '4. Estimated Size', m: 'School Bus Length', d: 'Measured 12–13 m long, 3.8 m tall at the hips, and weighed 8–9 tons—roughly the length of a full-sized school bus.' },
+              { n: '5. Key Physical Features', m: 'Bone-Crushing Jaws', d: 'Armed with a 1.5-meter skull and banana-sized serrated teeth delivering over 35,000 Newtons of bite force—the strongest of any land animal.' },
+              { n: '6. Unique Fun Fact', m: 'Strong Forelimbs', d: 'Although its arms were only 1 meter long, they had thick cortical bone and biceps capable of curling nearly 200 kg (430 lbs) at close range.' }
+            ]
+          }
+        },
+        brachio: {
+          color: '#34d399', icon: '🦕',
+          id: {
+            shortName: 'Brachiosaurus', eyebrow: 'Fauna Prasejarah · Sauropoda Leher Panjang Raksasa', title: 'Brachiosaurus',
+            desc: 'Herbivora darat berukuran raksasa dengan leher menjulang tegak seperti derek yang memanen pucuk pepohonan tinggi di hutan Zaman Jura.',
+            metrics: [{ l: 'Diet Utama', v: 'Herbivora Kanopi' }, { l: 'Periode Hidup', v: 'Jura Akhir (154 Jtl)' }, { l: 'Tinggi & Berat', v: '13 m · 45 Ton' }, { l: 'Lokasi Fosil', v: 'Amerika Utara' }],
+            subHeading: '6 Profil Lengkap Spesies Dinosaurus',
+            subs: [
+              { n: '1. Nama & Arti Nama', m: 'Brachiosaurus altithorax', d: 'Nama ilmiahnya Brachiosaurus altithorax yang berarti "Kadal Berlengan dengan Dada yang Tinggi", karena kaki depannya lebih panjang dari kaki belakangnya.' },
+              { n: '2. Jenis Makanan (Diet)', m: 'Herbivora (Pemakan Tumbuhan)', d: 'Herbivora murni pemakan dedaunan tinggi seperti pohon konifer, ginkgo, dan pakis pohon hingga ketinggian 9–12 meter dari tanah.' },
+              { n: '3. Periode Hidup & Lokasi', m: 'Zaman Jura Akhir', d: 'Hidup sekitar 154 hingga 150 juta tahun lalu; fosil utamanya banyak ditemukan di Formasi Morrison, benua Amerika Utara (Colorado & Utah).' },
+              { n: '4. Estimasi Ukuran', m: 'Setara Gedung 4 Lantai', d: 'Panjang 22–26 meter, tinggi kepala 12–13 meter, dan berat 35–50 ton—tingginya setara gedung 4 lantai (2x lipat jerapah) dan seberat 7 gajah Afrika.' },
+              { n: '5. Ciri Fisik Utama', m: 'Leher Derek & Kaki Pilar', d: 'Leher panjang yang miring ke atas secara alami berkat bahu depan yang tinggi serta empat kaki menyerupai pilar bangunan.' },
+              { n: '6. Satu Fakta Unik', m: 'Jantung Bertekanan Tinggi', d: 'Untuk memompa darah naik melewati leher sepanjang 9 meter ke otaknya, jantung Brachiosaurus berbobot ~200 kg dengan tekanan darah 3–4 kali lipat manusia.' }
+            ]
+          },
+          en: {
+            shortName: 'Brachiosaurus', eyebrow: 'Prehistoric Fauna · Giant Long-Necked Sauropod', title: 'Brachiosaurus',
+            desc: 'A colossal herbivorous sauropod with a crane-like vertical neck specialized for browsing the highest forest canopies of the Late Jurassic.',
+            metrics: [{ l: 'Primary Diet', v: 'Canopy Herbivore' }, { l: 'Time Period', v: 'Late Jurassic' }, { l: 'Height & Mass', v: '13 m · 45 Tons' }, { l: 'Fossil Location', v: 'North America' }],
+            subHeading: '6 Complete Dinosaur Profile Facts',
+            subs: [
+              { n: '1. Name & Meaning', m: 'Brachiosaurus altithorax', d: 'Its scientific name Brachiosaurus altithorax means "High-Chested Arm Lizard", referring to its forelimbs being longer than its hind legs.' },
+              { n: '2. Diet', m: 'Herbivore (Plant-Eater)', d: 'A high-browsing herbivore that stripped up to 400 kg of conifer needles, ginkgoes, and tree ferns daily from treetops.' },
+              { n: '3. Period & Location', m: 'Late Jurassic', d: 'Lived 154 to 150 million years ago, with major fossils discovered in the Morrison Formation of western North America.' },
+              { n: '4. Estimated Size', m: '4-Story Building Height', d: 'Reached 22–26 m in length, 12–13 m in height, and 35–50 tons—as tall as a 4-story building and as heavy as 7 African elephants.' },
+              { n: '5. Key Physical Features', m: 'Towering Neck & Nasal Crest', d: 'An inclined 9-meter neck supported by pillar-like front legs and a distinctive arched bony nasal crest atop its skull.' },
+              { n: '6. Unique Fun Fact', m: 'Extreme Blood Pressure', d: 'To pump blood 9 meters up to its brain, Brachiosaurus needed a ~200 kg heart generating blood pressure 3 to 4 times higher than a human’s.' }
+            ]
+          }
+        },
+        trice: {
+          color: '#f59e0b', icon: '🦏',
+          id: {
+            shortName: 'Triceratops', eyebrow: 'Fauna Prasejarah · Ceratopsia Bertanduk Tiga', title: 'Triceratops',
+            desc: 'Herbivora penyeruduk berkaki empat yang dilengkapi perisai leher tulang masif dan tiga tanduk tajam untuk menangkis serangan T-Rex.',
+            metrics: [{ l: 'Diet Utama', v: 'Herbivora Rendah' }, { l: 'Periode Hidup', v: 'Kapur Akhir (68 Jtl)' }, { l: 'Panjang & Berat', v: '9 m · 9 Ton' }, { l: 'Lokasi Fosil', v: 'Amerika Utara' }],
+            subHeading: '6 Profil Lengkap Spesies Dinosaurus',
+            subs: [
+              { n: '1. Nama & Arti Nama', m: 'Triceratops horridus', d: 'Nama ilmiahnya Triceratops horridus yang berarti "Wajah Bertanduk Tiga" (Tri = tiga, keras = tanduk, ops = wajah).' },
+              { n: '2. Jenis Makanan (Diet)', m: 'Herbivora (Pemakan Tumbuhan)', d: 'Pemakan tumbuhan bawah yang merobek daun palem purba, pakis keras, dan sikas menggunakan paruh melengkung yang kuat.' },
+              { n: '3. Periode Hidup & Lokasi', m: 'Zaman Kapur Akhir', d: 'Hidup sekitar 68 hingga 66 juta tahun lalu di benua Amerika Utara, berbagi ekosistem yang sama dengan predator utamanya, T-Rex.' },
+              { n: '4. Estimasi Ukuran', m: 'Sebesar Truk Pemadam', d: 'Panjang 8–9 meter, tinggi 3 meter, dan berat 6–10 ton—ukurannya setara dengan satu truk pemadam kebakaran atau gajah Afrika terbesar.' },
+              { n: '5. Ciri Fisik Utama', m: '3 Tanduk & Perisai Leher', d: 'Dua tanduk dahi sepanjang 1 meter, satu tanduk hidung pendek, serta jumbai perisai tulang (frill) padat untuk melindungi leher saat bertarung.' },
+              { n: '6. Satu Fakta Unik', m: 'Tengkorak Darat Terbesar & 800 Gigi', d: 'Tengkoraknya mencapai panjang 2,5 meter (1/3 panjang tubuhnya) dan di dalam rahangnya tersimpan hingga 800 gigi yang terus tumbuh bergantian.' }
+            ]
+          },
+          en: {
+            shortName: 'Triceratops', eyebrow: 'Prehistoric Fauna · Three-Horned Ceratopsian', title: 'Triceratops',
+            desc: 'A heavily built quadrupedal herbivore armed with a solid bony neck frill and three formidable horns to defend against T-Rex.',
+            metrics: [{ l: 'Primary Diet', v: 'Low Herbivore' }, { l: 'Time Period', v: 'Late Cretaceous' }, { l: 'Length & Mass', v: '9 m · 9 Tons' }, { l: 'Fossil Location', v: 'North America' }],
+            subHeading: '6 Complete Dinosaur Profile Facts',
+            subs: [
+              { n: '1. Name & Meaning', m: 'Triceratops horridus', d: 'Its scientific name Triceratops horridus means "Three-Horned Face" from Greek tri (three), keras (horn), and ops (face).' },
+              { n: '2. Diet', m: 'Herbivore (Plant-Eater)', d: 'A low-browsing herbivore that sheared tough fibrous cycads, palms, and ferns using its parrot-like beak.' },
+              { n: '3. Period & Location', m: 'Late Cretaceous', d: 'Lived 68 to 66 million years ago across North America alongside Tyrannosaurus rex.' },
+              { n: '4. Estimated Size', m: 'Fire Truck Proportions', d: 'Measured 8–9 m long, 3 m tall, and weighed 6–10 tons—comparable in bulk to a modern fire truck or the largest bull African elephant.' },
+              { n: '5. Key Physical Features', m: '3 Horns & Bony Neck Frill', d: 'Two 1-meter brow horns, a nasal horn, and a solid bone neck shield (frill) used for defense and species recognition.' },
+              { n: '6. Unique Fun Fact', m: 'Giant Skull & 800 Teeth', d: 'Its skull grew up to 2.5 meters long (nearly a third of its entire body) and housed batteries of up to 800 self-replacing teeth.' }
+            ]
+          }
+        },
+        stego: {
+          color: '#a3e635', icon: '🦎',
+          id: {
+            shortName: 'Stegosaurus', eyebrow: 'Fauna Prasejarah · Thyreophora Berlempeng Punggung', title: 'Stegosaurus',
+            desc: 'Dinosaurus pemakan tumbuhan yang mudah dikenali dari dua baris lempengan tulang besar di punggung dan empat duri tajam di ujung ekornya.',
+            metrics: [{ l: 'Diet Utama', v: 'Herbivora Semak' }, { l: 'Periode Hidup', v: 'Jura Akhir (155 Jtl)' }, { l: 'Panjang & Berat', v: '9 m · 6 Ton' }, { l: 'Lokasi Fosil', v: 'Amerika Utara & Eropa' }],
+            subHeading: '6 Profil Lengkap Spesies Dinosaurus',
+            subs: [
+              { n: '1. Nama & Arti Nama', m: 'Stegosaurus stenops', d: 'Nama ilmiahnya Stegosaurus stenops yang berarti "Kadal Beratap", karena ilmuwan abad ke-19 awalnya mengira lempeng punggungnya rebah seperti genteng atap.' },
+              { n: '2. Jenis Makanan (Diet)', m: 'Herbivora (Pemakan Tumbuhan)', d: 'Herbivora pemakan tumbuhan rendah seperti lumut, paku-pakuan, sikas, dan ekor kuda yang tumbuh dekat permukaan tanah.' },
+              { n: '3. Periode Hidup & Lokasi', m: 'Zaman Jura Akhir', d: 'Hidup sekitar 155 hingga 150 juta tahun lalu; fosilnya ditemukan di Amerika Utara (Formasi Morrison) serta di Eropa (Portugal).' },
+              { n: '4. Estimasi Ukuran', m: 'Sebesar Bus Kota Sedang', d: 'Panjang tubuh 9 meter, tinggi hingga puncak lempeng 4 meter, dan berat 5–7 ton—seukuran bus kota sedang atau 3 ekor badak putih.' },
+              { n: '5. Ciri Fisik Utama', m: '17 Lempeng Punggung & Ekor Berduri', d: 'Memiliki 17 lempengan tulang pipih (dorsal plates) untuk pengatur suhu/pamer visual serta 4 duri ekor tajam (Thagomizer) sepanjang 90 cm untuk menghantam predator.' },
+              { n: '6. Satu Fakta Unik', m: 'Otak Sebesar Buah Jeruk Nipis', d: 'Meskipun tubuhnya sebesar bus dengan berat 6 ton, volume otak Stegosaurus hanya sebesar buah jeruk nipis atau bola tenis (~80 gram)!' }
+            ]
+          },
+          en: {
+            shortName: 'Stegosaurus', eyebrow: 'Prehistoric Fauna · Plated Thyreophoran', title: 'Stegosaurus',
+            desc: 'An unmistakable herbivore famous for its double row of kite-shaped back plates and a deadly four-spiked tail weapon.',
+            metrics: [{ l: 'Primary Diet', v: 'Shrub Herbivore' }, { l: 'Time Period', v: 'Late Jurassic' }, { l: 'Length & Mass', v: '9 m · 6 Tons' }, { l: 'Fossil Location', v: 'North America & Europe' }],
+            subHeading: '6 Complete Dinosaur Profile Facts',
+            subs: [
+              { n: '1. Name & Meaning', m: 'Stegosaurus stenops', d: 'Its scientific name Stegosaurus stenops means "Roofed Lizard", named when 19th-century paleontologists thought its back plates lay flat like roof tiles.' },
+              { n: '2. Diet', m: 'Herbivore (Plant-Eater)', d: 'Browsed low-growing ferns, mosses, horsetails, and cycads within 1 meter of the ground.' },
+              { n: '3. Period & Location', m: 'Late Jurassic', d: 'Lived 155 to 150 million years ago across western North America and parts of Europe (Portugal).' },
+              { n: '4. Estimated Size', m: 'City Bus Proportions', d: 'Measured 9 m long, 4 m tall to the top of its plates, and weighed 5–7 tons—about the size of a transit bus.' },
+              { n: '5. Key Physical Features', m: '17 Back Plates & Thagomizer Spikes', d: 'Equipped with 17 vascularized dorsal plates for display/thermoregulation and 4 lethal 90-cm tail spikes (the "Thagomizer") for defense.' },
+              { n: '6. Unique Fun Fact', m: 'Lime-Sized Brain', d: 'Despite weighing 6 tons, Stegosaurus had one of the smallest brain-to-body ratios of any dinosaur—its brain weighed only ~80 grams (the size of a lime)!' }
+            ]
+          }
+        },
+        mosa: {
+          color: '#38bdf8', icon: '🐊',
+          id: {
+            shortName: 'Mosasaurus', eyebrow: 'Fauna Prasejarah · Reptil Laut Penguasa Samudra', title: 'Mosasaurus',
+            desc: 'Penguasa puncak lautan Zaman Kapur yang berenang menjelajahi perairan samudra menggunakan empat sirip dayung dan ekor bulan sabit serta melompat menyergap mangsa.',
+            metrics: [{ l: 'Diet Utama', v: 'Karnivora Laut' }, { l: 'Periode Hidup', v: 'Kapur Akhir (82–66 Jtl)' }, { l: 'Panjang & Berat', v: '15 m · 14 Ton' }, { l: 'Lokasi Fosil', v: 'Eropa, Amerika & Afrika' }],
+            subHeading: '6 Profil Lengkap Reptil Laut Prasejarah',
+            subs: [
+              { n: '1. Nama & Arti Nama', m: 'Mosasaurus hoffmannii', d: 'Nama ilmiahnya Mosasaurus hoffmannii yang berarti "Kadal dari Sungai Meuse", dinamai dari lokasi penemuan fosil pertamanya di dekat Maastricht, Belanda (1764).' },
+              { n: '2. Jenis Makanan (Diet)', m: 'Karnivora Laut (Pemakan Daging)', d: 'Pemangsa puncak lautan yang memburu ikan besar, hiu purba, penyu raksasa, amonit, burung laut, hingga reptil laut lainnya.' },
+              { n: '3. Periode Hidup & Lokasi', m: 'Zaman Kapur Akhir', d: 'Hidup sekitar 82 hingga 66 juta tahun lalu di Samudra Atlantik purba; fosilnya ditemukan di Eropa Barat, Amerika Utara, dan Afrika Utara.' },
+              { n: '4. Estimasi Ukuran', m: '3x Panjang Hiu Putih Raksasa', d: 'Panjang 13–17 meter dan berat 10–15 ton—lebih panjang dari bus gandeng (TransJakarta) atau hampir 3 kali lipat hiu putih raksasa modern.' },
+              { n: '5. Ciri Fisik Utama', m: 'Sirip Dayung & Ekor Bulan Sabit', d: 'Empat tungkai berbentuk sirip dayung (flippers) untuk manuver tajam serta ekor berotot dengan sirip bulan sabit untuk melesat menyergap mangsa.' },
+              { n: '6. Satu Fakta Unik', m: 'Kerabat Komodo Berbaris Gigi Ganda', d: 'Mosasaurus sebenarnya bukan dinosaurus, melainkan kerabat dekat biawak/komodo & ular modern yang memiliki baris gigi kedua di langit-langit mulutnya agar mangsa licin tak bisa lepas.' }
+            ]
+          },
+          en: {
+            shortName: 'Mosasaurus', eyebrow: 'Prehistoric Fauna · Apex Marine Reptile', title: 'Mosasaurus',
+            desc: 'The apex marine predator of Late Cretaceous seas, patrolling the ocean with four hydrofoil flippers and a crescent tail fluke to ambush prey.',
+            metrics: [{ l: 'Primary Diet', v: 'Marine Carnivore' }, { l: 'Time Period', v: 'Late Cretaceous' }, { l: 'Length & Mass', v: '15 m · 14 Tons' }, { l: 'Fossil Location', v: 'Europe, N. America, Africa' }],
+            subHeading: '6 Complete Marine Reptile Profile Facts',
+            subs: [
+              { n: '1. Name & Meaning', m: 'Mosasaurus hoffmannii', d: 'Its scientific name Mosasaurus hoffmannii means "Lizard of the Meuse River", named after the river near Maastricht, Netherlands, where its first skull was found in 1764.' },
+              { n: '2. Diet', m: 'Carnivore (Meat-Eater)', d: 'An apex marine carnivore preying on sharks, large fish, giant sea turtles, ammonites, and other marine reptiles.' },
+              { n: '3. Period & Location', m: 'Late Cretaceous', d: 'Ruled the oceans 82 to 66 million years ago, with fossils found across Western Europe, North America, and North Africa.' },
+              { n: '4. Estimated Size', m: 'Nearly 3x a Great White Shark', d: 'Grew 13–17 m long and weighed 10–15 tons—longer than an articulated city bus and nearly three times the length of a Great White Shark.' },
+              { n: '5. Key Physical Features', m: '4 Paddle Flippers & Fluked Tail', d: 'Streamlined body with four paddle-like flippers for steering and a powerful shark-like tail fluke for explosive ambush bursts.' },
+              { n: '6. Unique Fun Fact', m: 'Second Inner Row of Teeth', d: 'Not technically a dinosaur, Mosasaurus was a giant marine lizard closely related to monitor lizards and snakes—and had a second set of teeth on the roof of its mouth to ratchet prey down its throat.' }
+            ]
+          }
+        },
+        ptero: {
+          color: '#c084fc', icon: '🦅',
+          id: {
+            shortName: 'Pterodactylus', eyebrow: 'Fauna Prasejarah · Pterosaurus Penjelajah Langit', title: 'Pterodactylus',
+            desc: 'Reptil terbang ikonik dari Zaman Jura Akhir yang mengangkasa mengelilingi pulau dan pesisir purba menggunakan rentang sayap membran kulit yang ditopang jari keempat.',
+            metrics: [{ l: 'Diet Utama', v: 'Karnivora & Piscivora' }, { l: 'Periode Hidup', v: 'Jura Akhir (150 Jtl)' }, { l: 'Rentang Sayap', v: '1,2 – 1,5 Meter' }, { l: 'Lokasi Fosil', v: 'Eropa (Jerman)' }],
+            subHeading: '6 Profil Lengkap Reptil Terbang Prasejarah',
+            subs: [
+              { n: '1. Nama & Arti Nama', m: 'Pterodactylus antiquus', d: 'Nama ilmiah lengkapnya adalah Pterodactylus antiquus, yang secara harfiah berarti "Jari Bersayap Kuno" (Ptero = sayap, daktylos = jari, antiquus = kuno).' },
+              { n: '2. Jenis Makanan (Diet)', m: 'Karnivora / Piscivora', d: 'Karnivora pemakan ikan kecil (piscivora), udang purba, serangga, dan hewan kecil di sepanjang garis pantai, danau, serta muara sungai.' },
+              { n: '3. Periode Hidup & Lokasi', m: 'Zaman Jura Akhir', d: 'Hidup sekitar 150 hingga 148 juta tahun lalu; fosil utamanya banyak ditemukan di lapisan batu gamping Solnhofen, Bavaria (Jerman, benua Eropa).' },
+              { n: '4. Estimasi Ukuran', m: 'Sebesar Burung Elang Laut', d: 'Rentang sayap 1 hingga 1,5 meter, panjang tubuh ~60 cm, dan berat hanya 2–5 kg (berkat tulang berongga)—ukurannya setara dengan burung elang laut atau bangau besar modern.' },
+              { n: '5. Ciri Fisik Utama', m: 'Sayap Jari Keempat & 90 Gigi', d: 'Membran sayap kulit elastis (patagium) yang membentang pada satu jari keempat yang memanjang ekstrem, serta rahang lurus berisi ~90 gigi runcing penangkap ikan.' },
+              { n: '6. Satu Fakta Unik', m: 'Fosil Pertama & Berbulu Pycnofibers', d: 'Pterodactylus adalah reptil terbang prasejarah pertama yang diidentifikasi ilmuwan (tahun 1784), dan tubuhnya diselimuti serabut hangat mirip bulu halus bernama pycnofibers.' }
+            ]
+          },
+          en: {
+            shortName: 'Pterodactylus', eyebrow: 'Prehistoric Fauna · Sky-Soaring Pterosaur', title: 'Pterodactylus',
+            desc: 'The iconic flying reptile of the Late Jurassic that soared above prehistoric islands and lagoons on leathery wing membranes supported by an elongated fourth finger.',
+            metrics: [{ l: 'Primary Diet', v: 'Carnivore / Piscivore' }, { l: 'Time Period', v: 'Late Jurassic (150 Ma)' }, { l: 'Wingspan', v: '1.2 – 1.5 Meters' }, { l: 'Fossil Location', v: 'Europe (Germany)' }],
+            subHeading: '6 Complete Flying Reptile Profile Facts',
+            subs: [
+              { n: '1. Name & Meaning', m: 'Pterodactylus antiquus', d: 'Its full scientific name is Pterodactylus antiquus, literally meaning "Ancient Winged Finger" (Greek pteron = wing, daktylos = finger, Latin antiquus = ancient).' },
+              { n: '2. Diet', m: 'Carnivore / Piscivore', d: 'Fed primarily on small fish, crustaceans, insects, and coastal invertebrates along lagoons and riverbanks.' },
+              { n: '3. Period & Location', m: 'Late Jurassic', d: 'Lived 150 to 148 million years ago, with exquisitely preserved fossils discovered in the Solnhofen limestone of Bavaria, Germany (Europe).' },
+              { n: '4. Estimated Size', m: 'Sea Eagle Proportions', d: 'Had a wingspan of 1 to 1.5 meters, body length of ~60 cm, and weighed only 2–5 kg due to hollow bones—comparable to a modern sea eagle or large heron.' },
+              { n: '5. Key Physical Features', m: 'Fourth-Finger Wing & 90 Teeth', d: 'A leathery wing membrane (patagium) stretched along an hyper-elongated fourth finger, plus long straight jaws lined with ~90 needle-sharp teeth.' },
+              { n: '6. Unique Fun Fact', m: 'First Named Pterosaur & Fuzzy Coat', d: 'Pterodactylus was the very first pterosaur ever identified by science (in 1784), and its body was covered in warm hair-like filaments called pycnofibers.' }
+            ]
+          }
+        }
+      };
+
+      const LAYER_DATA = {
+        crust: {
+          color: '#38bdf8',
+          id: {
+            shortName: '1. Permukaan & Tanah', eyebrow: 'Lapisan 01 · Ekosistem Prasejarah, Tanah & Kerak (0 – 70 km)', title: 'Permukaan, Fauna Prasejarah & Profil Tanah',
+            desc: 'Menampilkan ekosistem pulau prasejarah aktif: T-Rex yang mengejar herbivora (Brachiosaurus, Triceratops, Stegosaurus), Mosasaurus di lautan, Pterodactylus di langit, serta gunung berapi yang dapat diklik untuk melontarkan lahar ke atas.',
+            metrics: [{ l: 'Ketebalan Kerak', v: '5 – 70 km' }, { l: 'Fauna Aktif', v: '6 Spesies (Darat/Laut/Udara)' }, { l: 'Suhu Rata-rata', v: '15 °C – 400 °C' }, { l: 'Batuan Utama', v: 'Granit & Basal' }],
+            subHeading: 'Fauna Prasejarah & Lapisan Tanah (Pedosfer)',
+            subs: [
+              { n: '6 Spesies & Gunung Berapi Interaktif', m: 'Klik & Jelajahi', d: 'Ketuk salah satu dari 6 fauna 3D untuk mengikuti pergerakannya dan membaca 6 profil ilmiahnya, atau ketuk gunung berapi di tengah pulau untuk melontarkan lahar ke atas.' },
+              { n: 'Horizon O, A, E & B (Topsoil & Subsoil)', m: '0 – 120 cm', d: 'Lapisan humus organik dan tanah subur tempat tumbuhnya kanopi hutan konifer dan pakis purba.' },
+              { n: 'Horizon C & R (Regolit & Bedrock)', m: '1,2 m – 70 km', d: 'Batuan induk lapuk hingga fondasi batuan dasar (Bedrock) utuh yang menutup bagian bawah Kerak Bumi.' }
+            ]
+          },
+          en: {
+            shortName: '1. Surface & Soil', eyebrow: 'Layer 01 · Prehistoric Ecosystem, Soil & Crust (0 – 70 km)', title: 'Surface, Prehistoric Fauna & Soil Profile',
+            desc: 'Features an interactive prehistoric island: T-Rex chasing herbivores (Brachiosaurus, Triceratops, Stegosaurus), Mosasaurus in the sea, Pterodactylus soaring in the sky, and an interactive volcano that erupts lava upward when clicked.',
+            metrics: [{ l: 'Crust Thickness', v: '5 – 70 km' }, { l: 'Active Fauna', v: '6 Species (Land/Sea/Sky)' }, { l: 'Temperature', v: '15 °C – 400 °C' }, { l: 'Primary Rock', v: 'Granite & Basalt' }],
+            subHeading: 'Prehistoric Fauna & Soil Horizons (Pedosphere)',
+            subs: [
+              { n: '6 Fauna & Interactive Erupting Volcano', m: 'Click & Explore', d: 'Tap any of the 6 3D creatures to follow its movement and read its 6-point scientific profile, or click the central volcano to launch molten lava upward.' },
+              { n: 'Horizons O, A, E & B (Topsoil & Subsoil)', m: '0 – 120 cm', d: 'Organic litter and fertile mineral soil supporting ancient conifer and fern forests.' },
+              { n: 'Horizons C & R (Regolith & Bedrock)', m: '1.2 m – 70 km', d: 'Weathered parent rock down to solid Bedrock sealing the underside of the Crust.' }
+            ]
+          }
+        },
+        litho: {
+          color: '#d6a87c',
+          id: {
+            shortName: '2. Litosfer & Astenosfer', eyebrow: 'Lapisan 02 · Transisi Mantel Atas (70 – 410 km)', title: 'Sabuk Lipatan Litosfer & Astenosfer',
+            desc: 'Tepat di bawah tebing kerak terdapat lapisan transisi berpola lipatan konsentris bergelombang cokelat muda. Zona ini mewakili batuan mantel atas yang bersifat plastis dan terdeformasi oleh panas.',
+            metrics: [{ l: 'Kedalaman', v: '70 – 410 km' }, { l: 'Suhu Zona', v: '500 – 1.400 °C' }, { l: 'Sifat Fisik', v: 'Plastis / Semi-Cair' }, { l: 'Batas Atas', v: 'Diskontinuitas Moho' }],
+            subHeading: 'Karakteristik Zona Transisi',
+            subs: [
+              { n: 'Batas Mohorovičić (Moho)', m: '~35 – 70 km', d: 'Bidang batas tempat gelombang seismik mengalami lonjakan kecepatan akibat perubahan kerak ke batuan peridotit.' },
+              { n: 'Astenosfer Plastis', m: '100 – 410 km', d: 'Batuan silikat panas yang melunak sehingga lempeng tektonik di atasnya dapat bergeser dan melipat.' }
+            ]
+          },
+          en: {
+            shortName: '2. Lithosphere Belt', eyebrow: 'Layer 02 · Upper Mantle Transition (70 – 410 km)', title: 'Folded Lithosphere & Asthenosphere Belt',
+            desc: 'Directly beneath the rocky crust rim lies the wavy, concentrically folded tan transition belt representing ductile upper-mantle rock deformed by thermal convection.',
+            metrics: [{ l: 'Depth Range', v: '70 – 410 km' }, { l: 'Temperature', v: '500 – 1,400 °C' }, { l: 'Physical State', v: 'Ductile / Plastic' }, { l: 'Upper Boundary', v: 'Moho Discontinuity' }],
+            subHeading: 'Transition Zone Features',
+            subs: [
+              { n: 'Mohorovičić Discontinuity', m: '~35 – 70 km', d: 'Sharp seismic boundary marking the transition from crustal rock to denser peridotite.' },
+              { n: 'Ductile Asthenosphere', m: '100 – 410 km', d: 'Softened silicate rock allowing overlying tectonic plates to drift and fold.' }
+            ]
+          }
+        },
+        mantle: {
+          color: '#9e472a',
+          id: {
+            shortName: '3. Mantel Dalam', eyebrow: 'Lapisan 03 · 84% Volume Planet (410 – 2.890 km)', title: 'Mantel Silikat Bawah (Mesosfer)',
+            desc: 'Bagian badan kerucut berwarna cokelat kemerahan bertekstur batuan berpori kasar ini menyumbang 84% volume Bumi. Arus konveksi termal di dalam mantel menyuplai dapur magma gunung berapi di permukaan.',
+            metrics: [{ l: 'Kedalaman', v: '410 – 2.890 km' }, { l: 'Suhu Mantel', v: '1.400 – 3.700 °C' }, { l: 'Tekanan', v: '14 – 136 GPa' }, { l: 'Komposisi', v: 'Perovskit & Olivin' }],
+            subHeading: 'Dinamika Mantel Dalam',
+            subs: [
+              { n: 'Arus Konveksi Termal', m: '1 – 5 cm/tahun', d: 'Batuan panas dari dekat inti naik perlahan menuju kerak dan mendorong pergerakan benua.' },
+              { n: 'Jalur Plume Magma', m: 'Menuju Gunung Api', d: 'Kolom batuan sangat panas yang menembus kerak dan membentuk gunung berapi aktif di puncak model.' }
+            ]
+          },
+          en: {
+            shortName: '3. Deep Mantle', eyebrow: 'Layer 03 · 84% of Planet Volume (410 – 2,890 km)', title: 'Lower Silicate Mantle (Mesosphere)',
+            desc: 'This rugged, pitted reddish-brown conical body makes up 84% of Earth’s volume. Slow thermal convection currents inside the mantle feed magma chambers for surface volcanoes.',
+            metrics: [{ l: 'Depth Range', v: '410 – 2,890 km' }, { l: 'Temperature', v: '1,400 – 3,700 °C' }, { l: 'Pressure', v: '14 – 136 GPa' }, { l: 'Composition', v: 'Perovskite & Olivine' }],
+            subHeading: 'Deep Mantle Dynamics',
+            subs: [
+              { n: 'Thermal Convection Cells', m: '1 – 5 cm/year', d: 'Hot rock rises slowly toward the crust, driving continental drift above.' },
+              { n: 'Mantle Plume Conduits', m: 'To Surface Volcano', d: 'Upwelling superheated rock columns feeding the central volcano crater at the top.' }
+            ]
+          }
+        },
+        outerCore: {
+          color: '#ff4d00',
+          id: {
+            shortName: '4. Inti Luar Cair', eyebrow: 'Lapisan 04 · Geodinamo Magnetik (2.890 – 5.150 km)', title: 'Inti Luar Logam Cair (Outer Core)',
+            desc: 'Berwarna merah-oranye menyala dengan tetesan lahar kental (lava dropping) dan letupan kecil magma di sepanjang sambungan bertingkatnya. Tersusun dari besi-nikel cair pembangkit medan magnet Bumi.',
+            metrics: [{ l: 'Kedalaman', v: '2.890 – 5.150 km' }, { l: 'Suhu Cairan', v: '4.000 – 5.000 °C' }, { l: 'Tekanan', v: '136 – 329 GPa' }, { l: 'Wujud Fisik', v: 'Logam Fe-Ni Cair' }],
+            subHeading: 'Fenomena Inti Luar',
+            subs: [
+              { n: 'Diskontinuitas Gutenberg & Tetesan Magma', m: 'Kedalaman 2.890 km', d: 'Zona transisi tempat lelehan logam besi-nikel kental bergolak dan menetes di bawah selubung mantel.' },
+              { n: 'Pembangkit Medan Magnet', m: 'Efek Geodinamo', d: 'Aliran turbulen logam cair konduktif yang melindungi atmosfer Bumi dari radiasi angin surya.' }
+            ]
+          },
+          en: {
+            shortName: '4. Outer Core', eyebrow: 'Layer 04 · Magnetic Geodynamo (2,890 – 5,150 km)', title: 'Molten Metallic Outer Core',
+            desc: 'Glowing fiery red-orange with viscous lava drops and subtle magma spatters along its stepped ledges. Composed of churning liquid iron and nickel that generates Earth’s magnetic field.',
+            metrics: [{ l: 'Depth Range', v: '2,890 – 5,150 km' }, { l: 'Temperature', v: '4,000 – 5,000 °C' }, { l: 'Pressure', v: '136 – 329 GPa' }, { l: 'Physical State', v: 'Liquid Fe-Ni Alloy' }],
+            subHeading: 'Outer Core Phenomena',
+            subs: [
+              { n: 'Gutenberg Discontinuity & Magma Drips', m: '2,890 km Depth', d: 'Transition zone where churning molten iron-nickel bubbles and drips beneath the lower mantle.' },
+              { n: 'Geomagnetic Field Generator', m: 'Geodynamo Effect', d: 'Turbulent currents of conductive liquid metal shielding Earth from solar wind.' }
+            ]
+          }
+        },
+        innerCore: {
+          color: '#fff3a1',
+          id: {
+            shortName: '5. Inti Dalam Padat', eyebrow: 'Lapisan 05 · Titik Pusat Bumi (5.150 – 6.371 km)', title: 'Inti Dalam Padat Pijar (Inner Core)',
+            desc: 'Ujung kerucut berfaset paling bawah yang memancarkan cahaya kuning-putih pijar dengan penampang kristal besi panas di atasnya. Tekanan gravitasi ekstrem memaksanya tetap berwujud padat.',
+            metrics: [{ l: 'Kedalaman', v: '5.150 – 6.371 km' }, { l: 'Suhu Inti', v: '5.400 – 6.000 °C' }, { l: 'Tekanan Pusat', v: '330 – 364 GPa' }, { l: 'Densitas', v: '13,0 g/cm³' }],
+            subHeading: 'Fakta Inti Dalam',
+            subs: [
+              { n: 'Batas Lehmann', m: 'Kedalaman 5.150 km', d: 'Cincin transisi tempat besi cair mulai mengkristal menjadi bola padat bertekanan 3,6 juta atmosfer.' },
+              { n: 'Kristal Besi Heksagonal', m: 'Radius 1.220 km', d: 'Menyimpan panas primordial sejak pembentukan Bumi 4,54 miliar tahun silam.' }
+            ]
+          },
+          en: {
+            shortName: '5. Inner Core', eyebrow: 'Layer 05 · Center of the Earth (5,150 – 6,371 km)', title: 'Incandescent Solid Inner Core',
+            desc: 'The sharp, faceted yellow-white apex at the bottom of the cone with a glowing crystalline top cross-section. Crushing gravity locks the superheated iron-nickel alloy into a solid phase.',
+            metrics: [{ l: 'Depth Range', v: '5,150 – 6,371 km' }, { l: 'Core Temp', v: '5,400 – 6,000 °C' }, { l: 'Central Pressure', v: '330 – 364 GPa' }, { l: 'Density', v: '13.0 g/cm³' }],
+            subHeading: 'Inner Core Facts',
+            subs: [
+              { n: 'Lehmann Discontinuity', m: '5,150 km Depth', d: 'The stepped ring where molten iron crystallizes under 3.6 million atmospheres of pressure.' },
+              { n: 'Hexagonal Iron Crystals', m: '1,220 km Radius', d: 'Retains primordial heat from Earth’s accretion 4.54 billion years ago.' }
+            ]
+          }
+        }
+      };
+
+      const UI_STRINGS = {
+        id: { chapter: 'Bab 01 — Geosfer & Tektonik', sub: 'Ekosistem Prasejarah & Lapisan Interior Bumi', articleBtn: 'Artikel Ilmiah', articleIntro: 'Bumi tersusun berlapis: kerak tipis, mantel plastis, inti luar cair, dan inti dalam padat. Setiap lapisan menyimpan rekaman proses geologis yang membentuk permukaan planet dan kehidupan di atasnya.', prompt: 'Klik untuk memulai', explodeLbl: 'Urai Lapisan:', autoSpin: 'Putar Otomatis', resetView: 'Reset', dismissHint: 'Ketuk sekali lagi atau klik area kosong untuk menutup', navNextLabel: 'Berikutnya', navNextTitle: 'BAB 02 — Atmosfer & Iklim' },
+        en: { chapter: 'CH 01 — Geosphere & Tectonics', sub: 'Prehistoric Ecosystem & Earth Interior Layers', articleBtn: 'Scientific Article', articleIntro: 'Earth is built in layers: a thin crust, a plastic mantle, a liquid outer core, and a solid inner core. Each layer preserves a record of the geological processes that shaped the planet\'s surface and the life upon it.', prompt: 'Click to start', explodeLbl: 'Explode Layers:', autoSpin: 'Auto Rotate', resetView: 'Reset', dismissHint: 'Tap again or click empty space to close', navNextLabel: 'Next', navNextTitle: 'CH 02 — Atmosphere & Climate' }
+      };
+
+      let lang = 'id', selectedLayer = null, selectedDino = null, explodeAmount = 0, autoSpin = true;
+
+      const infoPanelEl = document.getElementById('infoPanel');
+      const touchPromptEl = document.getElementById('touchPrompt');
+      const layerNavEl = document.getElementById('layerNav');
+      const dinoNavEl = document.getElementById('dinoNav');
+
+      function setupPillBarScroll(barEl) {
+        let dragActive = false, dragged = false, startX = 0, startScroll = 0;
+        barEl.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          if (e.pointerType === 'mouse') {
+            dragActive = true; dragged = false; startX = e.clientX; startScroll = barEl.scrollLeft;
+            barEl.classList.add('dragging');
+          } else {
+            dragged = false; startX = e.clientX;
+          }
+        });
+        window.addEventListener('pointermove', (e) => {
+          if (!dragActive) return;
+          const dx = e.clientX - startX;
+          if (Math.abs(dx) > 5) dragged = true;
+          barEl.scrollLeft = startScroll - dx;
+        });
+        window.addEventListener('pointerup', () => {
+          if (dragActive) { dragActive = false; barEl.classList.remove('dragging'); }
+        });
+        barEl.addEventListener('wheel', (e) => {
+          e.stopPropagation();
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            barEl.scrollLeft += e.deltaY;
+          }
+        }, { passive: false });
+        return () => { const d = dragged; dragged = false; return d; };
+      }
+
+      const wasLayerDragged = setupPillBarScroll(layerNavEl);
+      const wasDinoDragged  = setupPillBarScroll(dinoNavEl);
+
+      ['pointerdown', 'touchstart', 'touchmove', 'wheel'].forEach(evt => {
+        document.getElementById('bottomDock').addEventListener(evt, e => e.stopPropagation(), { passive: true });
+        infoPanelEl.addEventListener(evt, e => e.stopPropagation(), { passive: true });
+      });
+
+      function renderUI() {
+        const s = UI_STRINGS[lang];
+        document.getElementById('uiChapter').textContent = s.chapter;
+        document.getElementById('uiSubtitle').textContent = s.sub;
+        document.getElementById('openArticleOverlayBtn').textContent = s.articleBtn;
+        touchPromptEl.textContent = s.prompt;
+        document.getElementById('uiExplodeLbl').textContent = s.explodeLbl;
+        document.getElementById('autoSpinBtn').textContent = s.autoSpin;
+        document.getElementById('resetViewBtn').textContent = s.resetView;
+        document.getElementById('infoDismissHint').textContent = s.dismissHint;
+        document.getElementById('uiNavNextLabel').textContent = s.navNextLabel;
+        document.getElementById('uiNavNextTitle').textContent = s.navNextTitle;
+
+        const savedDinoScroll  = dinoNavEl.scrollLeft;
+        const savedLayerScroll = layerNavEl.scrollLeft;
+
+        dinoNavEl.innerHTML = DINO_ORDER.map((dk, di) => `
+          <button type="button" class="layer-btn dino-pill ${dk === selectedDino ? 'active' : ''}" data-dino="${dk}">
+            <span class="swatch" style="background:${DINO_DATA[dk].color};color:${DINO_DATA[dk].color}"></span>
+            <span class="tp-pill-num">${String(di + 1).padStart(2, '0')}</span>
+            <span>${DINO_DATA[dk][lang].shortName}</span>
+          </button>
+        `).join('');
+        dinoNavEl.scrollLeft = savedDinoScroll;
+
+        dinoNavEl.querySelectorAll('.dino-pill').forEach(b => {
+          b.addEventListener('click', (e) => {
+            if (wasDinoDragged()) { e.preventDefault(); return; }
+            toggleDino(b.getAttribute('data-dino'));
+          });
+        });
+
+        layerNavEl.innerHTML = LAYER_ORDER.map((k, li) => `
+          <button type="button" class="layer-btn ${k === selectedLayer ? 'active' : ''}" data-layer="${k}">
+            <span class="swatch" style="background:${LAYER_DATA[k].color};color:${LAYER_DATA[k].color}"></span>
+            <span class="tp-pill-num">${String(li + 1).padStart(2, '0')}</span>
+            <span>${LAYER_DATA[k][lang].shortName.replace(/^\s*\d+\.\s*/, '')}</span>
+          </button>
+        `).join('');
+        layerNavEl.scrollLeft = savedLayerScroll;
+
+        layerNavEl.querySelectorAll('.layer-btn').forEach(b => {
+          b.addEventListener('click', (e) => {
+            if (wasLayerDragged()) { e.preventDefault(); return; }
+            toggleLayer(b.getAttribute('data-layer'));
+          });
+        });
+
+        // (a) Sinkron label mengambang lapisan: nama (bahasa), nomor & status aktif
+        document.querySelectorAll('#tp3dLabels .tp-layer-label').forEach(el => {
+          const k = el.dataset.layer;
+          const li = LAYER_ORDER.indexOf(k);
+          const nameSpan = el.querySelector('.tp-name');
+          if (nameSpan) nameSpan.textContent = LAYER_DATA[k][lang].shortName.replace(/^\s*\d+\.\s*/, '');
+          const numSpan = el.querySelector('.tp-num');
+          if (numSpan && li >= 0) numSpan.textContent = String(li + 1).padStart(2, '0');
+          el.classList.toggle('active', k === selectedLayer);
+        });
+
+        if (selectedDino) {
+          const activeBtn = dinoNavEl.querySelector(`.dino-pill[data-dino="${selectedDino}"]`);
+          if (activeBtn && activeBtn.scrollIntoView) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        } else if (selectedLayer) {
+          const activeBtn = layerNavEl.querySelector(`.layer-btn[data-layer="${selectedLayer}"]`);
+          if (activeBtn && activeBtn.scrollIntoView) activeBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+
+        if (!selectedLayer && !selectedDino) {
+          infoPanelEl.classList.remove('open', 'dino-mode');
+          touchPromptEl.classList.remove('hidden');
+          return;
+        }
+
+        const isDino = Boolean(selectedDino);
+        infoPanelEl.classList.toggle('dino-mode', isDino);
+        const cur = isDino ? DINO_DATA[selectedDino][lang] : LAYER_DATA[selectedLayer][lang];
+
+        // Color badge: number chip for layers, ◆ for fauna (no glow)
+        const badgeEl = document.getElementById('infoBadge');
+        if (badgeEl) {
+          const src = isDino ? DINO_DATA[selectedDino] : LAYER_DATA[selectedLayer];
+          if (isDino) {
+            badgeEl.textContent = '◆';
+            badgeEl.style.color = '#fbbf24';
+            badgeEl.style.background = 'rgba(251,191,36,.12)';
+            badgeEl.style.borderColor = 'rgba(251,191,36,.4)';
+          } else {
+            const num = (src[lang].shortName.match(/\d+/) || [])[0];
+            badgeEl.textContent = num ? String(num).padStart(2, '0') : '◆';
+            badgeEl.style.color = src.color;
+            badgeEl.style.background = src.color + '1f';
+            badgeEl.style.borderColor = src.color + '66';
+          }
+        }
+
+        document.getElementById('infoEyebrow').textContent = cur.eyebrow;
+        document.getElementById('infoTitle').textContent = cur.title;
+        document.getElementById('infoDesc').textContent = cur.desc;
+        document.getElementById('infoMetrics').innerHTML = cur.metrics.map(m => `<div class="metric-card"><div class="metric-lbl">${m.l}</div><div class="metric-val">${m.v}</div></div>`).join('');
+        document.getElementById('infoSubHeading').textContent = cur.subHeading;
+        document.getElementById('infoSubList').innerHTML = cur.subs.map(sb => `<div class="sublayer-item"><div class="sublayer-top"><span>${sb.n}</span><span>${sb.m}</span></div><p class="sublayer-p">${sb.d}</p></div>`).join('');
+        infoPanelEl.classList.add('open');
+        touchPromptEl.classList.add('hidden');
+      }
+
+      // Render UI pills immediately
+      renderUI();
+
+      const canvas = document.getElementById('canvas3d');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(36, window.innerWidth / window.innerHeight, 0.1, 150);
+      camera.position.set(0, 1.35, 8.3);
+
+      const controls = createOrbitController(camera, renderer.domElement);
+
+      scene.add(new THREE.HemisphereLight(0xf0f7ff, 0x452c1e, 1.15));
+      const dirLight = new THREE.DirectionalLight(0xfff8eb, 1.22);
+      dirLight.position.set(5, 9, 6);
+      scene.add(dirLight);
+
+      // DEEP-SPACE STARFIELD + HALO GLOW
+      const spaceEnvGroup = new THREE.Group();
+      scene.add(spaceEnvGroup);
+
+      const starCount = 1200, starGeo = new THREE.BufferGeometry(), starPos = new Float32Array(starCount * 3), starSeed = new Float32Array(starCount);
+      for (let i = 0; i < starCount; i++) {
+        const r = 28 + Math.random() * 55, th = Math.random() * Math.PI * 2, ph = Math.acos(Math.random() * 2 - 1);
+        starPos[i * 3] = Math.sin(ph) * Math.cos(th) * r; starPos[i * 3 + 1] = Math.cos(ph) * r; starPos[i * 3 + 2] = Math.sin(ph) * Math.sin(th) * r;
+        starSeed[i] = Math.random() * 100;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      starGeo.setAttribute('aSeed', new THREE.BufferAttribute(starSeed, 1));
+
+      const starMat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        uniforms: { uTime: { value: 0 }, uDpr: { value: Math.min(window.devicePixelRatio || 1, 2) } },
+        vertexShader: `attribute float aSeed; uniform float uTime; uniform float uDpr; varying float vTw; varying float vTint; void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vTw=0.45+0.55*sin(uTime*(1.2+fract(aSeed)*1.8)+aSeed);vTint=fract(aSeed*3.17);gl_PointSize=(1.4+1.8*fract(aSeed*7.1))*(65.0/max(-mv.z,1.0))*uDpr;gl_Position=projectionMatrix*mv;}`,
+        fragmentShader: `varying float vTw; varying float vTint; void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0)discard;vec3 col=mix(vec3(0.80,0.88,1.0),vec3(0.45,0.96,0.72),step(0.82,vTint));gl_FragColor=vec4(col,pow(1.0-d,2.2)*vTw);}`
+      });
+      const starPoints = new THREE.Points(starGeo, starMat);
+      spaceEnvGroup.add(starPoints);
+
+      const haloMat = new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+        uniforms: { uGlow: { value: new THREE.Vector3(0.20, 0.46, 0.98) } },
+        vertexShader: `varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+        fragmentShader: `uniform vec3 uGlow; varying vec2 vUv; void main(){float d=length(vUv-0.5)*2.0;float a=pow(clamp(1.0-d,0.0,1.0),2.4);gl_FragColor=vec4(uGlow*a*0.75,a*0.55);}`
+      });
+      const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(10.5, 10.5), haloMat);
+      spaceEnvGroup.add(haloMesh);
+
+      const SHADER_NOISE = `
+        vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+        vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+        float snoise(vec3 v){
+          const vec2 C = vec2(1.0/6.0, 1.0/3.0); const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+          vec3 i = floor(v + dot(v, C.yyy)); vec3 x0 = v - i + dot(i, C.xxx);
+          vec3 g = step(x0.yzx, x0.xyz); vec3 l = 1.0 - g;
+          vec3 i1 = min(g.xyz, l.zxy); vec3 i2 = max(g.xyz, l.zxy);
+          vec3 x1 = x0 - i1 + 1.0 * C.xxx; vec3 x2 = x0 - i2 + 2.0 * C.xxx; vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+          i = mod(i, 289.0);
+          vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+          float n_ = 1.0/7.0; vec3 ns = n_ * D.wyz - D.xzx;
+          vec4 j = p - 49.0 * floor(p * ns.z *ns.z);
+          vec4 x_ = floor(j * ns.z); vec4 y_ = floor(j - 7.0 * x_);
+          vec4 x = x_ *ns.x + ns.yyyy; vec4 y = y_ *ns.x + ns.yyyy; vec4 h = 1.0 - abs(x) - abs(y);
+          vec4 b0 = vec4(x.xy, y.xy); vec4 b1 = vec4(x.zw, y.zw);
+          vec4 s0 = floor(b0)*2.0 + 1.0; vec4 s1 = floor(b1)*2.0 + 1.0; vec4 sh = -step(h, vec4(0.0));
+          vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy; vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+          vec3 p0 = vec3(a0.xy,h.x); vec3 p1 = vec3(a0.zw,h.y); vec3 p2 = vec3(a1.xy,h.z); vec3 p3 = vec3(a1.zw,h.w);
+          vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+          p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+          vec4 m = max(0.5 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0); m = m * m;
+          return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+        }
+        float fbm3(vec3 p){float v=0.0,a=0.5;for(int i=0;i<4;i++){v+=a*snoise(p);p*=2.05;a*=0.5;}return v;}
+      `;
+
+      const wedgeRoot = new THREE.Group();
+      wedgeRoot.position.y = 0.22;
+      scene.add(wedgeRoot);
+
+      const layerGroups = { crust: new THREE.Group(), litho: new THREE.Group(), mantle: new THREE.Group(), outerCore: new THREE.Group(), innerCore: new THREE.Group() };
+      const pickableMeshes = [];
+      const dinoPickMeshes = [];
+      const highlightUniforms = {};
+      Object.entries(layerGroups).forEach(([k, g]) => { g.userData.layerKey = k; highlightUniforms[k] = { value: 0 }; wedgeRoot.add(g); });
+      const regPick = (m, k) => { m.userData.layerKey = k; pickableMeshes.push(m); };
+
+      const hitboxMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+      function regDinoPick(rootGrp, dinoKey, hitRadius = 0.13) {
+        const hitSphere = new THREE.Mesh(new THREE.SphereGeometry(hitRadius, 10, 10), hitboxMat);
+        hitSphere.position.set(0, hitRadius * 0.45, 0);
+        rootGrp.add(hitSphere);
+        rootGrp.traverse(c => {
+          if (c.isMesh) {
+            c.userData.dinoKey = dinoKey;
+            dinoPickMeshes.push(c);
+          }
+        });
+      }
+
+      const R_DISC = 2.20, R_CRUST_BOT = 2.05, VOLC_X = 0.02, VOLC_Z = 0.02;
+      const RIVER_SEGS = [
+        { ax: 0.02, az: -0.08, bx: -0.03, bz: -0.45, cx: 0.14, cz: -0.86, w: 0.022 },
+        { ax: 0.04, az: -0.48, bx: 0.12, bz: -0.64, cx: 0.14, cz: -0.86, w: 0.016 },
+        { ax: 0.12, az: -0.06, bx: 0.28, bz: -0.36, cx: 0.68, cz: -0.46, w: 0.019 },
+        { ax: -0.14, az: 0.02, bx: -0.42, bz: -0.06, cx: -0.76, cz: -0.26, w: 0.022 },
+        { ax: -0.08, az: 0.16, bx: -0.18, bz: 0.34, cx: -0.32, cz: 0.52, w: 0.016 },
+        { ax: 0.14, az: 0.14, bx: 0.32, bz: 0.42, cx: 0.34, cz: 0.78, w: 0.021 },
+        { ax: 0.22, az: 0.08, bx: 0.58, bz: 0.18, cx: 0.96, cz: 0.08, w: 0.021 }
+      ];
+      const MTN_PEAKS = [
+        [0.62, -0.26, 0.20, 0.35], [0.74, -0.30, 0.19, 0.38], [0.70, -0.10, 0.19, 0.32],
+        [0.78,  0.28, 0.23, 0.38], [0.68,  0.46, 0.24, 0.42], [0.56,  0.62, 0.22, 0.36],
+        [-0.78, 0.34, 0.20, 0.24]
+      ];
+
+      function evalSurf(nx, nz) {
+        const r = Math.hypot(nx, nz), ang = Math.atan2(nz, nx);
+        const nLow = fbm2(nx * 3.2 + 1.7, nz * 3.2 - 0.8, 4), nMed = fbm2(nx * 7.5 - 2.1, nz * 7.5 + 1.4, 4), nHigh = fbm2(nx * 18, nz * 18, 3);
+        const mainCoast = 0.74 + 0.16 * Math.cos(ang - 0.2) + 0.14 * Math.sin(ang - 1.2) + 0.10 * Math.cos(ang * 2 + 0.8) - 0.15 * Math.exp(-Math.pow(ang - Math.PI, 2) / 0.45) + 0.08 * nLow;
+        const northDelta = Math.exp(-Math.pow((nx - 0.24) / 0.36, 2) - Math.pow((nz + 0.82) / 0.28, 2)) * 0.45;
+        const eastReach = Math.exp(-Math.pow((nx - 0.72) / 0.38, 2) - Math.pow((nz - 0.18) / 0.68, 2)) * 0.42;
+        const nwPen = Math.exp(-Math.pow((nx + 0.46) / 0.22, 2) - Math.pow((nz + 0.48) / 0.20, 2)) * 0.32;
+        const sSpit = Math.exp(-Math.pow((nx - 0.02) / 0.26, 2) - Math.pow((nz - 0.76) / 0.16, 2)) * 0.30;
+        const swIsl = Math.exp(-Math.pow((nx + 0.74) / 0.22, 2) - Math.pow((nz - 0.36) / 0.24, 2)) * 0.42;
+        let landVal = Math.max((mainCoast + northDelta + eastReach + nwPen + sSpit - r) * 4.2, (swIsl - 0.16) * 4.5);
+        landVal -= Math.exp(-Math.pow((nx - 0.36) / 0.11, 2) - Math.pow((nz + 0.62) / 0.08, 2)) * 1.45 + Math.exp(-Math.pow((nx - 0.02) / 0.13, 2) - Math.pow((nz - 0.68) / 0.08, 2)) * 1.15;
+        const landMask = smoothstep(-0.08, 0.12, landVal);
+
+        let minRD = 1e9, rW = 0.018;
+        for (let i = 0; i < RIVER_SEGS.length; i++) {
+          const sg = RIVER_SEGS[i], d = distToBezier(nx, nz, sg.ax, sg.az, sg.bx, sg.bz, sg.cx, sg.cz) + nMed * 0.005;
+          if (d < minRD) { minRD = d; rW = sg.w; }
+        }
+        const dVolc = Math.hypot(nx - VOLC_X, nz - VOLC_Z);
+        const riverWater = smoothstep(rW, rW * 0.38, minRD) * smoothstep(0.14, 0.22, dVolc);
+        const riverBank = smoothstep(rW * 2.8, rW * 0.9, minRD) * smoothstep(0.14, 0.22, dVolc);
+
+        const vx = nx - VOLC_X, vz = nz - VOLC_Z, vr = Math.hypot(vx, vz), vAng = Math.atan2(vz, vx);
+        const vRad = 0.26 + 0.018 * Math.sin(vAng * 5) + 0.012 * Math.cos(vAng * 9) + nMed * 0.012;
+        const vCone = clamp(1 - vr / vRad, 0, 1);
+        const vGullies = ridgedNoise(vx * 9.5 + 3.1, vz * 9.5 - 1.4) * 0.18 + Math.sin(vAng * 16 + nMed * 2.5) * 0.04;
+        const craterMask = smoothstep(0.070, 0.024, Math.hypot(vx + 0.012, vz + 0.010));
+        const volcanoH = Math.pow(vCone, 1.42) * 0.56 + vCone * (1 - vCone) * vGullies - craterMask * 0.21;
+
+        let mtnH = 0;
+        const ridgeDetail = ridgedNoise(nx * 10.5, nz * 10.5) * 0.65 + (nHigh * 0.5 + 0.5) * 0.35;
+        for (let i = 0; i < MTN_PEAKS.length; i++) {
+          const [mx, mz, mr, mh] = MTN_PEAKS[i], md = Math.hypot(nx - mx, nz - mz);
+          if (md < mr) mtnH = Math.max(mtnH, Math.pow(1 - md / mr, 1.65) * mh * (0.52 + 0.68 * ridgeDetail));
+        }
+        const height = landMask > 0.001 ? Math.max(0.002, (0.025 + 0.045 * smoothstep(0, 0.5, landMask) + nLow * 0.015 + volcanoH + mtnH) * landMask - riverWater * 0.028 * landMask) : 0;
+        return { landVal, landMask, riverWater, riverBank, vCone, vGullies, craterMask, mtnH, ridgeDetail, nLow, nMed, nHigh, height };
+      }
+
+      function buildTopTextures() {
+        const size = 768;
+        const cCnv = document.createElement('canvas'); cCnv.width = cCnv.height = size;
+        const cCtx = cCnv.getContext('2d'), cImg = cCtx.createImageData(size, size), cD = cImg.data;
+        const mCnv = document.createElement('canvas'); mCnv.width = mCnv.height = size;
+        const mCtx = mCnv.getContext('2d'), mImg = mCtx.createImageData(size, size), mD = mImg.data;
+
+        for (let py = 0; py < size; py++) {
+          const nz = (py / (size - 1)) * 2 - 1;
+          for (let px = 0; px < size; px++) {
+            const nx = (px / (size - 1)) * 2 - 1, s = evalSurf(nx, nz);
+            let rC = 18, gC = 108, bC = 158, oM = 0, rvM = 0, shM = 0, lvM = s.craterMask;
+            if (s.landMask < 0.5) {
+              oM = 1 - s.landMask * 2; shM = smoothstep(-0.38, 0.06, s.landVal);
+              const ws = Math.sin(nx * 14 + nz * 11 + s.nLow * 4.5) * 0.5 + 0.5;
+              rC = lerp(14, 52, shM) + ws * 8; gC = lerp(96, 152, shM) + ws * 12; bC = lerp(144, 182, shM) + ws * 10;
+            } else {
+              const gt = clamp(0.5 + s.nMed * 0.45 + s.nHigh * 0.2, 0, 1);
+              rC = lerp(84, 122, gt); gC = lerp(118, 148, gt); bC = lerp(42, 58, gt);
+              const sw = clamp(Math.max(smoothstep(-0.25, -0.62, nz) * smoothstep(-0.15, 0.25, nx) * 0.92, smoothstep(0.48, 0.20, Math.hypot(nx - 0.04, nz + 0.06)) * 0.58, smoothstep(0.32, 0.02, s.landVal) * 0.85, s.riverBank * 0.78), 0, 1);
+              rC = lerp(rC, 194 + s.nHigh * 14, sw); gC = lerp(gC, 166 + s.nHigh * 12, sw); bC = lerp(bC, 116 + s.nHigh * 10, sw);
+              if (s.riverWater > 0.05) {
+                rvM = s.riverWater;
+                const be = smoothstep(0.05, 0.35, s.riverWater) * (1 - smoothstep(0.35, 0.68, s.riverWater));
+                rC = lerp(rC, 34, s.riverWater) * (1 - be * 0.42); gC = lerp(gC, 140, s.riverWater) * (1 - be * 0.38); bC = lerp(bC, 195, s.riverWater) * (1 - be * 0.30);
+              }
+              if (s.mtnH > 0.025) {
+                const mw = smoothstep(0.025, 0.09, s.mtnH), snw = smoothstep(0.13, 0.26, s.mtnH + s.nHigh * 0.03), crv = smoothstep(0.32, 0.58, s.ridgeDetail);
+                rC = lerp(rC, lerp(lerp(88, 152, crv), 228, snw), mw); gC = lerp(gC, lerp(lerp(94, 158, crv), 234, snw), mw); bC = lerp(bC, lerp(lerp(96, 162, crv), 238, snw), mw);
+              }
+              if (s.vCone > 0.04) {
+                const vw = smoothstep(0.04, 0.22, s.vCone), ab = smoothstep(0.18, 0.72, s.vCone + s.vGullies * 0.65), st = 0.72 + 0.28 * smoothstep(-0.04, 0.06, s.vGullies);
+                if (s.vCone > 0.55 && s.vGullies < -0.015) lvM = Math.max(lvM, smoothstep(0.55, 0.85, s.vCone) * 0.65);
+                rC = lerp(rC, lerp(112, 212, ab) * st, vw); gC = lerp(gC, lerp(110, 214, ab) * st, vw); bC = lerp(bC, lerp(104, 210, ab) * st, vw);
+              }
+              if (s.craterMask > 0.01) { rC = lerp(rC, 35, s.craterMask); gC = lerp(gC, 18, s.craterMask); bC = lerp(bC, 14, s.craterMask); }
+            }
+            const idx = (py * size + px) * 4;
+            cD[idx] = clamp(Math.round(rC), 0, 255); cD[idx + 1] = clamp(Math.round(gC), 0, 255); cD[idx + 2] = clamp(Math.round(bC), 0, 255); cD[idx + 3] = 255;
+            mD[idx] = clamp(Math.round(oM * 255), 0, 255); mD[idx + 1] = clamp(Math.round(rvM * 255), 0, 255); mD[idx + 2] = clamp(Math.round(shM * 255), 0, 255); mD[idx + 3] = clamp(Math.round(lvM * 255), 0, 255);
+          }
+        }
+        cCtx.putImageData(cImg, 0, 0); mCtx.putImageData(mImg, 0, 0);
+        const colorTex = new THREE.CanvasTexture(cCnv); colorTex.encoding = THREE.sRGBEncoding; colorTex.needsUpdate = true;
+        const maskTex = new THREE.CanvasTexture(mCnv); maskTex.needsUpdate = true;
+        return { colorTex, maskTex };
+      }
+
+      const crustBotWave = (ang) => Math.sin(ang * 10) * 0.032 + Math.cos(ang * 17) * 0.018;
+
+      // 1. CRUST LAYER + INTERACTIVE VOLCANO ERUPTION SYSTEM
+      let volcanoHitMesh = null;
+      let eruptBoost = 0;
+      const lavaBombs = [];
+      const eruptSparks = [];
+      let eruptSparkGeo = null;
+      let eruptSparkPosArr = null;
+      let eruptSparkMat = null;
+      let craterLight = null;
+      let craterPulseRing = null;
+      let craterPulseMat = null;
+      let craterPulseAge = 99;
+      const UP_AXIS = new THREE.Vector3(0, 1, 0);
+      const tempVelDir = new THREE.Vector3();
+
+      {
+        const { colorTex, maskTex } = buildTopTextures();
+        const radSegs = 180, rngSegs = 104;
+        const topGeo = new THREE.RingGeometry(0.0005, R_DISC, radSegs, rngSegs);
+        topGeo.rotateX(-Math.PI / 2);
+        const tP = topGeo.attributes.position, tU = topGeo.attributes.uv;
+        for (let i = 0; i < tP.count; i++) {
+          const x = tP.getX(i), z = tP.getZ(i), nx = clamp(x / R_DISC, -1, 1), nz = clamp(z / R_DISC, -1, 1);
+          tP.setY(i, evalSurf(nx, nz).height);
+          tU.setXY(i, 0.5 + nx * 0.5, 0.5 - nz * 0.5);
+        }
+        topGeo.computeVertexNormals();
+
+        const topMat = new THREE.ShaderMaterial({
+          uniforms: {
+            uMap: { value: colorTex },
+            uMask: { value: maskTex },
+            uTime: { value: 0 },
+            uErupt: { value: 0 },
+            uHighlight: highlightUniforms.crust,
+            uSun: { value: new THREE.Vector3(0.45, 0.85, 0.45).normalize() }
+          },
+          vertexShader: `
+            uniform sampler2D uMask; uniform float uTime; varying vec2 vUv; varying vec3 vNorm; varying vec3 vPos;
+            void main(){
+              vUv = uv; vec3 p = position; float oM = texture2D(uMask, uv).r;
+              if(oM > 0.1){ p.y += (sin(p.x*5.5+uTime*2.4)*cos(p.z*5.0-uTime*1.9)*0.012 + sin(length(p.xz)*9.0-uTime*3.0)*0.008)*oM; }
+              vPos = p; vNorm = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform sampler2D uMap; uniform sampler2D uMask; uniform float uTime; uniform float uErupt; uniform float uHighlight; uniform vec3 uSun;
+            varying vec2 vUv; varying vec3 vNorm; varying vec3 vPos;
+            ${SHADER_NOISE}
+            void main(){
+              vec3 col = texture2D(uMap, vUv).rgb * (max(dot(normalize(vNorm), uSun), 0.0)*0.52 + 0.52);
+              vec4 mk = texture2D(uMask, vUv);
+              if(mk.r > 0.05){
+                float wn = fbm3(vec3(vPos.xz*4.2 + vec2(uTime*0.28,-uTime*0.22), uTime*0.45));
+                col += vec3(0.08,0.28,0.38)*smoothstep(0.18,0.62,wn)*mk.r*0.55;
+                col += vec3(0.45,0.85,1.0)*pow(clamp(sin(vPos.x*18.0+uTime*3.5)*cos(vPos.z*18.0-uTime*2.8),0.0,1.0),6.0)*mk.r*0.35;
+                if(mk.b > 0.15){
+                  float fm = smoothstep(0.62,0.92,sin(mk.b*22.0+uTime*3.4+wn*2.5))*smoothstep(0.15,0.85,mk.b);
+                  col = mix(col, vec3(0.88,0.96,1.0), fm*0.72*mk.r);
+                }
+              }
+              if(mk.g > 0.05){
+                float d = length(vPos.xz - vec2(0.04,0.04));
+                float sp = smoothstep(0.58,0.92, sin(d*26.0 - uTime*6.5 + snoise(vec3(vPos.xz*10.0,uTime*1.4))*2.5)*0.5+0.5);
+                col = mix(col, vec3(0.48,0.88,1.0), sp*mk.g*0.68);
+              }
+              if(mk.a > 0.04){
+                float bl = fbm3(vec3(vPos.xz*18.0, uTime*(2.2 + uErupt*4.0)));
+                float pl = 0.5+0.5*sin(uTime*(4.2 + uErupt*8.0)+bl*3.0);
+                vec3 lc = mix(vec3(0.22,0.04,0.01), vec3(0.98,0.22,0.02), smoothstep(-0.35,0.25,bl+pl*0.35 + uErupt*0.35));
+                lc = mix(lc, vec3(1.0,0.88,0.32), smoothstep(0.28,0.78,bl+pl*0.4 + uErupt*0.45));
+                col = mix(col, lc, smoothstep(0.04,0.45,mk.a));
+              }
+              col *= 0.72 + 0.28*smoothstep(2.20, 2.15, length(vPos.xz));
+              col += vec3(0.25,0.95,0.65)*uHighlight*0.28;
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `
+        });
+        const topMesh = new THREE.Mesh(topGeo, topMat); topMesh.position.y = 1.85;
+        layerGroups.crust.add(topMesh); regPick(topMesh, 'crust');
+        layerGroups.crust.userData.topDiscMat = topMat;
+
+        const volcHitGeo = new THREE.ConeGeometry(0.60, 0.58, 24);
+        volcHitMesh = new THREE.Mesh(volcHitGeo, hitboxMat);
+        volcHitMesh.position.set(VOLC_X * R_DISC, 1.85 + 0.27, VOLC_Z * R_DISC);
+        layerGroups.crust.add(volcHitMesh);
+
+        craterLight = new THREE.PointLight(0xff6a00, 0.5, 2.8);
+        craterLight.position.set(VOLC_X * R_DISC, 2.42, VOLC_Z * R_DISC);
+        layerGroups.crust.add(craterLight);
+
+        const cpGeo = new THREE.RingGeometry(0.04, 0.08, 28);
+        cpGeo.rotateX(-Math.PI / 2);
+        craterPulseMat = new THREE.MeshBasicMaterial({ color: 0xffaa33, side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false });
+        craterPulseRing = new THREE.Mesh(cpGeo, craterPulseMat);
+        craterPulseRing.position.set(VOLC_X * R_DISC, 2.28, VOLC_Z * R_DISC);
+        layerGroups.crust.add(craterPulseRing);
+
+        const bombGeo = new THREE.IcosahedronGeometry(0.024, 1);
+        for (let i = 0; i < 36; i++) {
+          const bMat = new THREE.MeshBasicMaterial({ color: 0xffcc33 });
+          const bMesh = new THREE.Mesh(bombGeo, bMat);
+          bMesh.visible = false;
+          layerGroups.crust.add(bMesh);
+          lavaBombs.push({
+            mesh: bMesh, mat: bMat, active: false,
+            age: 0, life: 1.6,
+            x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, baseScale: 1
+          });
+        }
+
+        const spCnt = 80;
+        eruptSparkGeo = new THREE.BufferGeometry();
+        eruptSparkPosArr = new Float32Array(spCnt * 3);
+        for (let i = 0; i < spCnt; i++) {
+          eruptSparkPosArr[i * 3 + 1] = -999;
+          eruptSparks.push({ active: false, age: 0, life: 1.2, x: 0, y: -999, z: 0, vx: 0, vy: 0, vz: 0 });
+        }
+        eruptSparkGeo.setAttribute('position', new THREE.BufferAttribute(eruptSparkPosArr, 3));
+        eruptSparkMat = new THREE.PointsMaterial({
+          color: 0xffdd55, size: 0.055, transparent: true, opacity: 0.95,
+          blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        const sparkPoints = new THREE.Points(eruptSparkGeo, eruptSparkMat);
+        sparkPoints.frustumCulled = false;
+        layerGroups.crust.add(sparkPoints);
+
+        // Cliff Wall
+        const wallGeo = new THREE.CylinderGeometry(R_DISC, R_CRUST_BOT, 0.40, radSegs, 24, true);
+        const wP = wallGeo.attributes.position;
+        for (let i = 0; i < wP.count; i++) {
+          let x = wP.getX(i), y = wP.getY(i), z = wP.getZ(i);
+          const r = Math.hypot(x, z), ang = Math.atan2(z, x), tf = clamp((y + 0.20) / 0.40, 0, 1);
+          const rH = evalSurf(Math.cos(ang) * 0.985, Math.sin(ang) * 0.985).height;
+          y = y > 0.17 ? 0.20 + rH : y + tf * rH + (1 - tf) * crustBotWave(ang);
+          const s = (r + (Math.sin(ang * 16 + y * 6) * 0.022 + fbm(x * 2.5, y * 4, z * 2.5) * 0.025) * Math.sin(tf * Math.PI)) / r;
+          wP.setXYZ(i, x * s, y, z * s);
+        }
+        wallGeo.computeVertexNormals();
+
+        const wallMat = new THREE.ShaderMaterial({
+          uniforms: { uTime: { value: 0 }, uHighlight: highlightUniforms.crust, uSun: { value: new THREE.Vector3(0.55, 0.78, 0.55).normalize() } },
+          vertexShader: `varying vec3 vPos; varying vec3 vNorm; void main(){vPos=position;vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+          fragmentShader: `
+            uniform float uTime; uniform float uHighlight; uniform vec3 uSun; varying vec3 vPos; varying vec3 vNorm;
+            ${SHADER_NOISE}
+            void main(){
+              float ang = atan(vPos.z, vPos.x), gr = fbm3(vPos*14.0), st = sin(vPos.y*32.0+fbm3(vPos*4.5)*2.5);
+              vec3 col = mix(vec3(0.28,0.20,0.15), vec3(0.54,0.39,0.28), smoothstep(-0.65,0.15,gr+st*0.3));
+              col = mix(col, vec3(0.76,0.60,0.45), smoothstep(0.15,0.75,gr+st*0.25));
+              col = mix(col, vec3(0.52,0.53,0.52), smoothstep(0.2,0.8,cos(ang-0.5))*0.55*smoothstep(-0.2,0.5,gr));
+              col *= 0.62 + 0.38*smoothstep(0.02,0.22,abs(snoise(vec3(ang*18.0,vPos.y*5.5,1.0))));
+              float wf = clamp(exp(-pow(ang-2.15,2.0)/0.016)+exp(-pow(ang+2.65,2.0)/0.012),0.0,1.0);
+              float wMask = clamp(max(smoothstep(0.13,0.19,vPos.y)*smoothstep(0.23,0.205,vPos.y)*smoothstep(-0.3,0.4,-cos(ang-0.3)), wf*0.96),0.0,1.0);
+              float fs = snoise(vec3(ang*48.0, vPos.y*22.0+uTime*7.5, uTime*0.8));
+              vec3 wCol = mix(mix(vec3(0.06,0.42,0.68),vec3(0.24,0.70,0.92),smoothstep(-0.3,0.4,fs)), vec3(0.92,0.98,1.0), clamp(smoothstep(0.35,0.8,fs)*wf*0.65 + smoothstep(-0.08,-0.19,vPos.y)*wf*(0.6+0.4*sin(uTime*9.0+ang*30.0)),0.0,1.0));
+              col = mix(col, wCol, wMask) * (max(dot(normalize(vNorm),uSun),0.0)*0.62+0.42) + vec3(0.25,0.95,0.65)*uHighlight*0.28;
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `
+        });
+        const wallMesh = new THREE.Mesh(wallGeo, wallMat); wallMesh.position.y = 1.65;
+        layerGroups.crust.add(wallMesh); regPick(wallMesh, 'crust');
+        layerGroups.crust.userData.cliffWallMat = wallMat;
+
+        // Solid Underside Bedrock Cap
+        const uCapGeo = new THREE.RingGeometry(0.0005, R_CRUST_BOT, radSegs, 36);
+        uCapGeo.rotateX(Math.PI / 2);
+        const uP = uCapGeo.attributes.position;
+        for (let i = 0; i < uP.count; i++) {
+          const x = uP.getX(i), z = uP.getZ(i), r = Math.hypot(x, z), er = clamp(r / R_CRUST_BOT, 0, 1);
+          uP.setY(i, crustBotWave(Math.atan2(z, x)) * Math.pow(er, 1.5) + fbm(x * 3, 0, z * 3) * 0.025 * (1 - er));
+        }
+        uCapGeo.computeVertexNormals();
+
+        const uCapMat = new THREE.ShaderMaterial({
+          side: THREE.DoubleSide,
+          uniforms: { uTime: { value: 0 }, uHighlight: highlightUniforms.crust },
+          vertexShader: `varying vec3 vPos; void main(){vPos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+          fragmentShader: `
+            uniform float uTime; uniform float uHighlight; varying vec3 vPos;
+            ${SHADER_NOISE}
+            void main(){
+              float r = length(vPos.xz), n = fbm3(vPos*6.5), rg = sin(r*16.0+n*3.0);
+              vec3 col = mix(vec3(0.26,0.19,0.14), vec3(0.48,0.36,0.27), smoothstep(-0.6,0.2,rg+n*0.4));
+              col = mix(col, vec3(0.68,0.52,0.38), smoothstep(0.2,0.75,rg));
+              float cd = length(vPos.xz - vec2(0.04,0.04)), cn = smoothstep(0.32,0.04,cd);
+              col = mix(col, mix(vec3(0.92,0.22,0.02),vec3(1.0,0.78,0.20),cn*(0.65+0.35*sin(uTime*3.8-cd*12.0))), cn*0.92);
+              col = col * (smoothstep(2.06,1.88,r)*0.35+0.65) + vec3(0.25,0.95,0.65)*uHighlight*0.28;
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `
+        });
+        const uCapMesh = new THREE.Mesh(uCapGeo, uCapMat); uCapMesh.position.y = 1.45;
+        layerGroups.crust.add(uCapMesh); regPick(uCapMesh, 'crust');
+        layerGroups.crust.userData.underCapMat = uCapMat;
+
+        // Scalloped Forest Patches
+        const PATCHES = [[-0.50,-0.48,1.1,0.9,0.3],[-0.26,-0.22,1.0,0.85,-0.4],[-0.28,0.28,1.1,0.9,-0.3],[0.06,0.28,1.15,0.85,0.1],[0.04,0.58,0.95,0.8,0.4],[0.48,0.34,1.0,1.1,0.1],[0.50,0.04,1.0,1.15,-0.2],[0.50,-0.30,0.9,0.85,0.6]];
+        const pGeo = new THREE.CylinderGeometry(0.12, 0.135, 0.042, 28, 3, false);
+        const fP = pGeo.attributes.position;
+        for (let i = 0; i < fP.count; i++) {
+          let fx = fP.getX(i), fy = fP.getY(i), fz = fP.getZ(i), r = Math.hypot(fx, fz), ang = Math.atan2(fz, fx);
+          const sr = 1 + 0.18 * Math.sin(ang * 11) + 0.10 * Math.cos(ang * 7);
+          fx *= sr; fz *= sr;
+          if (fy > 0) fy += Math.abs(Math.sin(fx * 38) * Math.cos(fz * 38)) * 0.025 + (1 - clamp(r / 0.14, 0, 1)) * 0.02;
+          fP.setXYZ(i, fx, fy, fz);
+        }
+        pGeo.computeVertexNormals();
+        const pMat = new THREE.ShaderMaterial({
+          uniforms: { uHighlight: highlightUniforms.crust, uSun: { value: new THREE.Vector3(0.45, 0.85, 0.45).normalize() } },
+          vertexShader: `varying vec3 vPos; varying vec3 vNorm; void main(){vPos=position;vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+          fragmentShader: `uniform float uHighlight; uniform vec3 uSun; varying vec3 vPos; varying vec3 vNorm; ${SHADER_NOISE} void main(){float cn=fbm3(vPos*36.0);vec3 col=mix(vec3(0.06,0.18,0.05),vec3(0.13,0.31,0.09),smoothstep(-0.35,0.25,cn));col=mix(col,vec3(0.22,0.42,0.14),smoothstep(0.2,0.7,cn+vNorm.y*0.25));col=col*(smoothstep(0.17,0.10,length(vPos.xz))*0.35+0.65)*(max(dot(normalize(vNorm),uSun),0.0)*0.55+0.45)+vec3(0.25,0.95,0.65)*uHighlight*0.28;gl_FragColor=vec4(col,1.0);}`
+        });
+        PATCHES.forEach(([nx, nz, sx, sz, rot]) => {
+          const m = new THREE.Mesh(pGeo, pMat);
+          m.position.set(nx * R_DISC, 1.85 + evalSurf(nx, nz).height + 0.008, nz * R_DISC);
+          m.rotation.y = rot; m.scale.set(sx, 1, sz);
+          regPick(m, 'crust'); layerGroups.crust.add(m);
+        });
+
+        // Volcano Smoke Puffs + Ambient Crater Embers
+        const smokePuffs = [], puffGeo = new THREE.IcosahedronGeometry(0.11, 2);
+        for (let i = 0; i < 10; i++) {
+          const smMat = new THREE.ShaderMaterial({
+            transparent: true, depthWrite: false,
+            uniforms: { uTime: { value: 0 }, uAlpha: { value: 0.9 }, uWarmGlow: { value: 0 }, uHighlight: highlightUniforms.crust, uSun: { value: new THREE.Vector3(0.35, 0.88, 0.35).normalize() } },
+            vertexShader: `uniform float uTime; varying vec3 vPos; varying vec3 vNorm; ${SHADER_NOISE} void main(){vec3 p=position+normal*(snoise(position*6.0+vec3(0.0,-uTime*1.8,0.0))*0.025);vPos=p;vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);}`,
+            fragmentShader: `uniform float uAlpha; uniform float uWarmGlow; uniform float uHighlight; uniform vec3 uSun; varying vec3 vPos; varying vec3 vNorm; ${SHADER_NOISE} void main(){float l=dot(normalize(vNorm),uSun)*0.5+0.5+fbm3(vPos*14.0)*0.15;vec3 col=mix(vec3(0.34,0.33,0.31),vec3(0.66,0.64,0.58),smoothstep(0.2,0.55,l));col=mix(col,vec3(0.88,0.86,0.80),smoothstep(0.55,0.85,l))+vec3(1.0,0.36,0.05)*uWarmGlow*0.55+vec3(0.25,0.95,0.65)*uHighlight*0.25;gl_FragColor=vec4(col,uAlpha);}`
+          });
+          const pm = new THREE.Mesh(puffGeo, smMat); regPick(pm, 'crust');
+          layerGroups.crust.add(pm); smokePuffs.push({ mesh: pm, mat: smMat, phase: i / 10 });
+        }
+        layerGroups.crust.userData.smokePuffs = smokePuffs;
+
+        const eCnt = 16, eGeo = new THREE.BufferGeometry(), ePos = new Float32Array(eCnt * 3), eData = [];
+        for (let i = 0; i < eCnt; i++) {
+          const a = Math.random() * Math.PI * 2, sr = 0.05 + Math.random() * 0.14;
+          eData.push({ phase: Math.random(), speed: 0.38 + Math.random() * 0.32, vx: Math.cos(a) * sr, vz: Math.sin(a) * sr, peakH: 0.10 + Math.random() * 0.14 });
+        }
+        eGeo.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
+        const ePts = new THREE.Points(eGeo, new THREE.PointsMaterial({ color: 0xff9922, size: 0.048, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+        layerGroups.crust.add(ePts);
+        layerGroups.crust.userData.emberPoints = ePts; layerGroups.crust.userData.emberData = eData;
+      }
+
+      function triggerVolcanoEruption() {
+        eruptBoost = 1.0;
+        craterPulseAge = 0;
+        const cx = VOLC_X * R_DISC;
+        const cz = VOLC_Z * R_DISC;
+        const cy = 2.24;
+
+        let spawnedBombs = 0;
+        for (let i = 0; i < lavaBombs.length && spawnedBombs < 18; i++) {
+          const b = lavaBombs[i];
+          if (!b.active) {
+            b.active = true;
+            b.age = 0;
+            b.life = 1.45 + Math.random() * 0.55;
+            const ang = Math.random() * Math.PI * 2;
+            const offR = Math.random() * 0.045;
+            b.x = cx + Math.cos(ang) * offR;
+            b.y = cy;
+            b.z = cz + Math.sin(ang) * offR;
+
+            const outSpd = 0.16 + Math.random() * 0.44;
+            b.vx = Math.cos(ang) * outSpd;
+            b.vy = 1.38 + Math.random() * 1.15;
+            b.vz = Math.sin(ang) * outSpd;
+            b.baseScale = 0.65 + Math.random() * 0.85;
+
+            b.mesh.position.set(b.x, b.y, b.z);
+            b.mesh.visible = true;
+            spawnedBombs++;
+          }
+        }
+
+        let spawnedSparks = 0;
+        for (let i = 0; i < eruptSparks.length && spawnedSparks < 42; i++) {
+          const sp = eruptSparks[i];
+          if (!sp.active) {
+            sp.active = true;
+            sp.age = 0;
+            sp.life = 1.05 + Math.random() * 0.55;
+            const ang = Math.random() * Math.PI * 2;
+            const offR = Math.random() * 0.05;
+            sp.x = cx + Math.cos(ang) * offR;
+            sp.y = cy + 0.02;
+            sp.z = cz + Math.sin(ang) * offR;
+
+            const outSpd = 0.22 + Math.random() * 0.58;
+            sp.vx = Math.cos(ang) * outSpd;
+            sp.vy = 1.75 + Math.random() * 1.45;
+            sp.vz = Math.sin(ang) * outSpd;
+            spawnedSparks++;
+          }
+        }
+      }
+
+      // ============================================================================
+      // 6 PREHISTORIC FAUNA MODELS (INCLUDING FLYING PTERODACTYLUS)
+      // ============================================================================
+      const dinoMat = (hex, rough = 0.65) => new THREE.MeshStandardMaterial({ color: hex, roughness: rough, metalness: 0.06, side: THREE.DoubleSide });
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
+      const hornMat = dinoMat(0xf5f0dc, 0.4);
+
+      function addEyes(headGrp, xOff, yOff, zOff, r = 0.0045) {
+        const eg = new THREE.SphereGeometry(r, 8, 8);
+        const eL = new THREE.Mesh(eg, eyeMat); eL.position.set(xOff, yOff, zOff);
+        const eR = new THREE.Mesh(eg, eyeMat); eR.position.set(-xOff, yOff, zOff);
+        headGrp.add(eL, eR);
+      }
+
+      function createBrachiosaurus() {
+        const root = new THREE.Group(), bodyMat = dinoMat(0x4d7c6f), bellyMat = dinoMat(0x8ab09b), spotMat = dinoMat(0x2c4c43);
+        const torso = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 12), bodyMat);
+        torso.scale.set(0.88, 1.05, 1.48); torso.position.set(0, 0.115, 0); torso.rotation.x = -0.22; root.add(torso);
+        const legs = [];
+        [[0.034,0.115,0.052,0.115],[-0.034,0.115,0.052,0.115],[0.032,0.095,-0.055,0.095],[-0.032,0.095,-0.055,0.095]].forEach(([lx, ly, lz, h]) => {
+          const pivot = new THREE.Group(); pivot.position.set(lx, ly, lz);
+          const col = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.013, h, 10), bodyMat); col.position.y = -h * 0.5;
+          const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.019, 0.018, 10), spotMat); foot.position.set(0, -h + 0.008, 0.004);
+          pivot.add(col, foot); root.add(pivot); legs.push(pivot);
+        });
+        const neckPivot = new THREE.Group(); neckPivot.position.set(0, 0.145, 0.062);
+        const neckLower = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.024, 0.14, 10), bodyMat); neckLower.position.set(0, 0.065, 0.022); neckLower.rotation.x = 0.32;
+        const neckUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.014, 0.12, 10), bodyMat); neckUpper.position.set(0, 0.175, 0.052); neckUpper.rotation.x = 0.18;
+        const headGrp = new THREE.Group(); headGrp.position.set(0, 0.235, 0.066);
+        const skull = new THREE.Mesh(new THREE.SphereGeometry(0.016, 10, 8), bodyMat); skull.scale.set(0.85, 0.9, 1.35);
+        const crest = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 8), spotMat); crest.position.set(0, 0.012, -0.002);
+        const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.024, 8), bellyMat); snout.rotation.x = Math.PI * 0.52; snout.position.set(0, -0.003, 0.018);
+        addEyes(headGrp, 0.011, 0.004, 0.008, 0.0035);
+        headGrp.add(skull, crest, snout); neckPivot.add(neckLower, neckUpper, headGrp); root.add(neckPivot);
+        const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.10, -0.068);
+        const tail1 = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.16, 10), bodyMat); tail1.rotation.x = -Math.PI * 0.42; tail1.position.set(0, -0.018, -0.075);
+        tailPivot.add(tail1); root.add(tailPivot);
+        root.scale.setScalar(1.15);
+        regDinoPick(root, 'brachio', 0.15);
+        return { key: 'brachio', root, legs, neckPivot, tailPivot, type: 'quad', angSpeed: 0.15, stride: 18 };
+      }
+
+      function createTriceratops() {
+        const root = new THREE.Group(), skinMat = dinoMat(0xb46938), frillMat = dinoMat(0x853b1e), bellyMat = dinoMat(0xd69e6b);
+        const torso = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 10), skinMat); torso.scale.set(0.95, 0.92, 1.45); torso.position.set(0, 0.062, 0); root.add(torso);
+        const legs = [];
+        [[0.028,0.055,0.038],[-0.028,0.055,0.038],[0.030,0.058,-0.038],[-0.030,0.058,-0.038]].forEach(([lx, ly, lz]) => {
+          const p = new THREE.Group(); p.position.set(lx, ly, lz);
+          const lg = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.010, 0.058, 8), skinMat); lg.position.y = -0.029;
+          p.add(lg); root.add(p); legs.push(p);
+        });
+        const headPivot = new THREE.Group(); headPivot.position.set(0, 0.068, 0.056);
+        const head = new THREE.Mesh(new THREE.ConeGeometry(0.026, 0.058, 10), skinMat); head.rotation.x = Math.PI * 0.54; head.position.set(0, -0.004, 0.022);
+        const frill = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.036, 0.008, 12), frillMat); frill.rotation.x = Math.PI * 0.36; frill.scale.set(1.15, 1.0, 0.95); frill.position.set(0, 0.022, -0.004);
+        const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.0045, 0.048, 8), hornMat); hornL.rotation.x = Math.PI * 0.38; hornL.rotation.z = -0.12; hornL.position.set(0.014, 0.016, 0.028);
+        const hornR = new THREE.Mesh(new THREE.ConeGeometry(0.0045, 0.048, 8), hornMat); hornR.rotation.x = Math.PI * 0.38; hornR.rotation.z =  0.12; hornR.position.set(-0.014, 0.016, 0.028);
+        const hornNose = new THREE.Mesh(new THREE.ConeGeometry(0.0038, 0.020, 8), hornMat); hornNose.rotation.x = Math.PI * 0.18; hornNose.position.set(0, 0.005, 0.044);
+        addEyes(headPivot, 0.016, 0.002, 0.014, 0.0035);
+        headPivot.add(head, frill, hornL, hornR, hornNose); root.add(headPivot);
+        const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.058, -0.052);
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.075, 8), bellyMat); tail.rotation.x = -Math.PI * 0.45; tail.position.set(0, -0.008, -0.034);
+        tailPivot.add(tail); root.add(tailPivot);
+        root.scale.setScalar(1.02);
+        regDinoPick(root, 'trice', 0.13);
+        return { key: 'trice', root, legs, neckPivot: headPivot, tailPivot, type: 'quad', angSpeed: 0.21, stride: 24 };
+      }
+
+      function createStegosaurus() {
+        const root = new THREE.Group(), bodyMat = dinoMat(0x4b703e), plateMat = dinoMat(0xd96532, 0.5);
+        const torso = new THREE.Mesh(new THREE.SphereGeometry(0.044, 14, 10), bodyMat); torso.scale.set(0.85, 1.15, 1.42); torso.position.set(0, 0.068, 0); root.add(torso);
+        const plateGeo = new THREE.ConeGeometry(0.018, 0.032, 4); plateGeo.scale(0.22, 1.0, 1.0);
+        for (let i = 0; i < 9; i++) {
+          const t = i / 8, pl = new THREE.Mesh(plateGeo, plateMat);
+          pl.position.set((i % 2 === 0 ? 1 : -1) * 0.006, 0.095 + Math.sin(t * Math.PI) * 0.032, 0.052 - t * 0.115);
+          pl.scale.setScalar(0.55 + Math.sin(t * Math.PI) * 0.65); pl.rotation.x = (0.5 - t) * 0.45; root.add(pl);
+        }
+        const legs = [];
+        [[0.026,0.048,0.038,0.048],[-0.026,0.048,0.038,0.048],[0.028,0.065,-0.036,0.065],[-0.028,0.065,-0.036,0.065]].forEach(([lx, ly, lz, h]) => {
+          const p = new THREE.Group(); p.position.set(lx, ly, lz);
+          const lg = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.009, h, 8), bodyMat); lg.position.y = -h * 0.5;
+          p.add(lg); root.add(p); legs.push(p);
+        });
+        const neckPivot = new THREE.Group(); neckPivot.position.set(0, 0.055, 0.055);
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.016, 0.038, 8), bodyMat); neck.rotation.x = Math.PI * 0.42; neck.position.set(0, -0.004, 0.016);
+        const head = new THREE.Mesh(new THREE.ConeGeometry(0.011, 0.032, 8), bodyMat); head.rotation.x = Math.PI * 0.52; head.position.set(0, -0.008, 0.038);
+        addEyes(neckPivot, 0.008, -0.004, 0.032, 0.0028);
+        neckPivot.add(neck, head); root.add(neckPivot);
+        const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.062, -0.055);
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.095, 8), bodyMat); tail.rotation.x = -Math.PI * 0.46; tail.position.set(0, -0.006, -0.044);
+        const spikeGeo = new THREE.ConeGeometry(0.0032, 0.028, 6);
+        [[-0.068,0.6],[-0.068,-0.6],[-0.082,0.7],[-0.082,-0.7]].forEach(([sz, rz]) => {
+          const sp = new THREE.Mesh(spikeGeo, hornMat); sp.position.set(rz > 0 ? 0.012 : -0.012, -0.004, sz); sp.rotation.z = -rz; sp.rotation.x = -0.3; tailPivot.add(sp);
+        });
+        tailPivot.add(tail); root.add(tailPivot);
+        root.scale.setScalar(1.02);
+        regDinoPick(root, 'stego', 0.13);
+        return { key: 'stego', root, legs, neckPivot, tailPivot, type: 'quad', angSpeed: 0.19, stride: 22 };
+      }
+
+      function createTRex() {
+        const root = new THREE.Group(), skinMat = dinoMat(0x823620), darkMat = dinoMat(0x3b170e), bellyMat = dinoMat(0xc4956c);
+        const bodyGrp = new THREE.Group(); bodyGrp.position.set(0, 0.082, 0);
+        const torso = new THREE.Mesh(new THREE.SphereGeometry(0.038, 12, 10), skinMat); torso.scale.set(0.85, 0.95, 1.48); torso.rotation.x = 0.14;
+        const backStripe = new THREE.Mesh(new THREE.SphereGeometry(0.032, 10, 8), darkMat); backStripe.scale.set(0.65, 0.55, 1.42); backStripe.position.set(0, 0.018, 0); backStripe.rotation.x = 0.14;
+        const armGeo = new THREE.CylinderGeometry(0.0035, 0.0025, 0.022, 6);
+        const armL = new THREE.Mesh(armGeo, skinMat); armL.position.set( 0.022, -0.018, 0.036); armL.rotation.x = 0.7;
+        const armR = new THREE.Mesh(armGeo, skinMat); armR.position.set(-0.022, -0.018, 0.036); armR.rotation.x = 0.7;
+        bodyGrp.add(torso, backStripe, armL, armR); root.add(bodyGrp);
+        const legs = [];
+        [0.024, -0.024].forEach(lx => {
+          const hip = new THREE.Group(); hip.position.set(lx, 0.078, -0.008);
+          const thigh = new THREE.Mesh(new THREE.SphereGeometry(0.018, 8, 8), skinMat); thigh.scale.set(0.75, 1.35, 0.95); thigh.position.set(0, -0.022, 0.004); thigh.rotation.x = -0.25;
+          const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.006, 0.048, 8), skinMat); shin.position.set(0, -0.052, -0.006); shin.rotation.x = 0.22;
+          const foot = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.008, 0.028), darkMat); foot.position.set(0, -0.075, 0.005);
+          hip.add(thigh, shin, foot); root.add(hip); legs.push(hip);
+        });
+        const neckPivot = new THREE.Group(); neckPivot.position.set(0, 0.095, 0.045);
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.024, 0.042, 8), skinMat); neck.rotation.x = 0.45; neck.position.set(0, 0.016, 0.010);
+        const headGrp = new THREE.Group(); headGrp.position.set(0, 0.036, 0.024);
+        const upperSkull = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.024, 0.052), skinMat); upperSkull.position.set(0, 0.006, 0.016);
+        const snoutBridge = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.010, 0.046), darkMat); snoutBridge.position.set(0, 0.016, 0.018);
+        const jawPivot = new THREE.Group(); jawPivot.position.set(0, -0.004, 0.002);
+        const lowerJaw = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.010, 0.046), bellyMat); lowerJaw.position.set(0, -0.004, 0.018);
+        const teeth = new THREE.Mesh(new THREE.BoxGeometry(0.019, 0.005, 0.036), hornMat); teeth.position.set(0, 0.002, 0.020);
+        jawPivot.add(lowerJaw, teeth); addEyes(headGrp, 0.0145, 0.010, 0.012, 0.0035);
+        headGrp.add(upperSkull, snoutBridge, jawPivot); neckPivot.add(neck, headGrp); root.add(neckPivot);
+        const tailPivot = new THREE.Group(); tailPivot.position.set(0, 0.084, -0.045);
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.135, 10), skinMat); tail.rotation.x = -Math.PI * 0.48; tail.position.set(0, -0.004, -0.062);
+        tailPivot.add(tail); root.add(tailPivot);
+        root.scale.setScalar(1.12);
+        regDinoPick(root, 'trex', 0.14);
+        return { key: 'trex', root, bodyGrp, legs, neckPivot, jawPivot, tailPivot, type: 'biped', angSpeed: 0.24, stride: 26 };
+      }
+
+      function createMosasaurus() {
+        const root = new THREE.Group(), dorsalMat = dinoMat(0x133b5c, 0.35), bellyMat = dinoMat(0x8ec5db, 0.4), finMat = dinoMat(0x0c2740, 0.4);
+        const torso = new THREE.Mesh(new THREE.SphereGeometry(0.036, 14, 10), dorsalMat); torso.scale.set(0.88, 0.78, 2.15);
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(0.033, 12, 10), bellyMat); belly.scale.set(0.82, 0.65, 2.05); belly.position.y = -0.006;
+        root.add(torso, belly);
+        const headGrp = new THREE.Group(); headGrp.position.set(0, 0.002, 0.072);
+        const upperJaw = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.075, 10), dorsalMat); upperJaw.rotation.x = Math.PI * 0.5; upperJaw.scale.set(0.85, 1.0, 0.65); upperJaw.position.set(0, 0.004, 0.032);
+        const jawPivot = new THREE.Group(); jawPivot.position.set(0, -0.004, 0.004);
+        const lowerJaw = new THREE.Mesh(new THREE.ConeGeometry(0.020, 0.068, 10), bellyMat); lowerJaw.rotation.x = Math.PI * 0.5; lowerJaw.scale.set(0.80, 1.0, 0.52); lowerJaw.position.set(0, -0.003, 0.028);
+        jawPivot.add(lowerJaw); addEyes(headGrp, 0.015, 0.006, 0.014, 0.0035);
+        headGrp.add(upperJaw, jawPivot); root.add(headGrp);
+        const flippers = [], flipGeo = new THREE.BoxGeometry(0.065, 0.005, 0.026);
+        [[0.028,-0.008,0.032,1.0,0.35],[-0.028,-0.008,0.032,-1.0,0.35],[0.022,-0.008,-0.042,0.7,0.45],[-0.022,-0.008,-0.042,-0.7,0.45]].forEach(([fx, fy, fz, dir, sweep]) => {
+          const fp = new THREE.Group(); fp.position.set(fx, fy, fz);
+          const m = new THREE.Mesh(flipGeo, finMat); m.position.set(dir * 0.026, 0, -0.006); m.rotation.y = dir * sweep; m.rotation.z = -dir * 0.25;
+          fp.add(m); root.add(fp); flippers.push({ grp: fp, dir });
+        });
+        const tail1Pivot = new THREE.Group(); tail1Pivot.position.set(0, 0, -0.068);
+        const tail1 = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.026, 0.075, 10), dorsalMat); tail1.rotation.x = Math.PI * 0.5; tail1.position.z = -0.035;
+        const tail2Pivot = new THREE.Group(); tail2Pivot.position.set(0, 0, -0.070);
+        const tail2 = new THREE.Mesh(new THREE.ConeGeometry(0.015, 0.075, 10), dorsalMat); tail2.rotation.x = Math.PI * 0.5; tail2.position.z = -0.035;
+        const fluke = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.068, 0.032), finMat); fluke.position.set(0, 0.006, -0.068); fluke.rotation.x = 0.28;
+        tail2Pivot.add(tail2, fluke); tail1Pivot.add(tail1, tail2Pivot); root.add(tail1Pivot);
+        root.scale.setScalar(1.18);
+        regDinoPick(root, 'mosa', 0.16);
+        return { key: 'mosa', root, jawPivot, flippers, tail1Pivot, tail2Pivot };
+      }
+
+      function createPterodactylus() {
+        const root = new THREE.Group();
+        const bodyMat = dinoMat(0x9a5b32, 0.55);
+        const membraneMat = dinoMat(0xc88455, 0.45);
+        const beakMat = dinoMat(0xe5b869, 0.4);
+        const crestMat = dinoMat(0xd9462f, 0.5);
+
+        const torso = new THREE.Mesh(new THREE.SphereGeometry(0.022, 12, 10), bodyMat);
+        torso.scale.set(0.78, 0.72, 1.65);
+        root.add(torso);
+
+        const headGrp = new THREE.Group();
+        headGrp.position.set(0, 0.006, 0.034);
+        const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.010, 0.026, 8), bodyMat);
+        neck.rotation.x = Math.PI * 0.42; neck.position.set(0, 0.002, 0.008);
+        const skull = new THREE.Mesh(new THREE.SphereGeometry(0.010, 10, 8), bodyMat);
+        skull.position.set(0, 0.006, 0.020);
+        const beak = new THREE.Mesh(new THREE.ConeGeometry(0.0075, 0.056, 8), beakMat);
+        beak.rotation.x = Math.PI * 0.52; beak.position.set(0, 0.004, 0.050);
+        const crest = new THREE.Mesh(new THREE.ConeGeometry(0.0065, 0.034, 6), crestMat);
+        crest.rotation.x = -Math.PI * 0.36; crest.scale.set(0.45, 1.0, 1.0); crest.position.set(0, 0.014, 0.005);
+        addEyes(headGrp, 0.007, 0.008, 0.024, 0.0026);
+        headGrp.add(neck, skull, beak, crest);
+        root.add(headGrp);
+
+        function buildWing(dir) {
+          const pivot = new THREE.Group();
+          pivot.position.set(dir * 0.014, 0.004, 0.008);
+          const spar = new THREE.Mesh(new THREE.CylinderGeometry(0.0022, 0.0045, 0.145, 8), bodyMat);
+          spar.rotation.z = -dir * Math.PI * 0.5;
+          spar.position.set(dir * 0.072, 0, 0.008);
+
+          const memGeo = new THREE.BufferGeometry();
+          const verts = new Float32Array([
+            0, 0, 0.012,
+            dir * 0.145, 0, 0.006,
+            dir * 0.065, 0, -0.036,
+            0, 0, 0.012,
+            dir * 0.065, 0, -0.036,
+            0, 0, -0.028
+          ]);
+          memGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+          memGeo.computeVertexNormals();
+          const membrane = new THREE.Mesh(memGeo, membraneMat);
+          pivot.add(spar, membrane);
+          return pivot;
+        }
+
+        const wingLPivot = buildWing(1);
+        const wingRPivot = buildWing(-1);
+        root.add(wingLPivot, wingRPivot);
+
+        [-0.008, 0.008].forEach(lx => {
+          const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.0025, 0.002, 0.026, 6), bodyMat);
+          leg.rotation.x = Math.PI * 0.48;
+          leg.position.set(lx, -0.006, -0.042);
+          root.add(leg);
+        });
+
+        root.scale.setScalar(1.22);
+        regDinoPick(root, 'ptero', 0.17);
+        return { key: 'ptero', root, wingLPivot, wingRPivot, headGrp, orbitAngle: 0.8 };
+      }
+
+      const dinoWorldGroup = new THREE.Group();
+      layerGroups.crust.add(dinoWorldGroup);
+
+      const trackRingGeo = new THREE.RingGeometry(0.085, 0.115, 32);
+      trackRingGeo.rotateX(-Math.PI / 2);
+      const trackRingMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false });
+      const trackRingMesh = new THREE.Mesh(trackRingGeo, trackRingMat);
+      trackRingMesh.visible = false;
+      dinoWorldGroup.add(trackRingMesh);
+
+      function sampleMeadowTrack(theta, lane) {
+        const r = 0.405 + clamp(lane, -0.85, 0.85) * 0.048;
+        return { nx: VOLC_X + Math.cos(theta) * r, nz: VOLC_Z + Math.sin(theta) * r };
+      }
+
+      const brachioDino = { ...createBrachiosaurus(), theta: 0.2, dir:  1, lane: -0.45, targetLane: -0.45, phase: 0.0 };
+      const triceDino   = { ...createTriceratops(),   theta: 2.2, dir: -1, lane:  0.45, targetLane:  0.45, phase: 2.1 };
+      const stegoDino   = { ...createStegosaurus(),   theta: 4.0, dir:  1, lane:  0.10, targetLane:  0.10, phase: 4.2 };
+      const tRexDino    = { ...createTRex(),          theta: 5.3, dir:  1, lane:  0.00, targetLane:  0.00, phase: 1.3, chaseCooldown: 0 };
+
+      const landDinos = [brachioDino, tRexDino, triceDino, stegoDino];
+      const herbivores = [brachioDino, triceDino, stegoDino];
+
+      landDinos.forEach(d => {
+        const pt = sampleMeadowTrack(d.theta, d.lane);
+        d.nx = pt.nx; d.nz = pt.nz;
+        const ahead = sampleMeadowTrack(d.theta + d.dir * 0.06, d.lane);
+        d.yaw = Math.atan2(ahead.nx - d.nx, ahead.nz - d.nz);
+        d.state = 'wander'; d.stateTimer = 0;
+        dinoWorldGroup.add(d.root);
+      });
+
+      const mosa = createMosasaurus();
+      mosa.root.visible = true;
+      dinoWorldGroup.add(mosa.root);
+
+      const rawOceanWaypoints = [
+        [-0.16, -0.86],
+        [-0.44, -0.78],
+        [-0.72, -0.54],
+        [-0.86, -0.28],
+        [-0.89,  0.02],
+        [-0.84,  0.20],
+        [-0.64,  0.04],
+        [-0.66, -0.18],
+        [-0.74, -0.38],
+        [-0.34, -0.74]
+      ];
+      const verifiedOceanPoints = rawOceanWaypoints.map(([nx, nz]) => {
+        let cx = nx, cz = nz;
+        for (let step = 0; step < 12; step++) {
+          const s = evalSurf(cx, cz);
+          if (s.landMask < 0.01 && s.landVal < -0.12) break;
+          const r = Math.hypot(cx, cz) + 1e-6;
+          const nextR = Math.min(0.90, r + 0.025);
+          cx = (cx / r) * nextR;
+          cz = (cz / r) * nextR;
+        }
+        return new THREE.Vector3(cx * R_DISC, 1.842, cz * R_DISC);
+      });
+      const oceanLoopCurve = new THREE.CatmullRomCurve3(verifiedOceanPoints, true, 'centripetal', 0.5);
+
+      const mosaState = {
+        u: 0.0,
+        swimSpeed: 0.036,
+        jumpDeltaU: 0.115,
+        uStart: 0.0,
+        active: false,
+        timer: 2.2,
+        progress: 0,
+        duration: 1.60,
+        entrySplashTriggered: false
+      };
+
+      const ptero = createPterodactylus();
+      dinoWorldGroup.add(ptero.root);
+
+      const dinoMap = {
+        trex: tRexDino,
+        brachio: brachioDino,
+        trice: triceDino,
+        stego: stegoDino,
+        mosa: mosa,
+        ptero: ptero
+      };
+
+      const splashCount = 38, splashGeo = new THREE.BufferGeometry(), splashPosArr = new Float32Array(splashCount * 3), splashVels = [];
+      for (let i = 0; i < splashCount; i++) splashVels.push({ x: 0, y: 0, z: 0 });
+      splashGeo.setAttribute('position', new THREE.BufferAttribute(splashPosArr, 3));
+      const splashMat = new THREE.PointsMaterial({ color: 0xe0f7ff, size: 0.052, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+      dinoWorldGroup.add(new THREE.Points(splashGeo, splashMat));
+
+      const splashRings = [];
+      for (let i = 0; i < 2; i++) {
+        const rg = new THREE.RingGeometry(0.03, 0.065, 28); rg.rotateX(-Math.PI / 2);
+        const rm = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0, depthWrite: false });
+        const rMesh = new THREE.Mesh(rg, rm);
+        dinoWorldGroup.add(rMesh);
+        splashRings.push({ mesh: rMesh, mat: rm, delay: i * 0.14 });
+      }
+
+      let splashActive = false, splashElapsed = 0, splashOrigin = { x: 0, y: 1.86, z: 0 }, splashIntensity = 1.0;
+      function triggerWaterSplash(wx, wz, intensity = 1.0) {
+        splashActive = true; splashElapsed = 0; splashIntensity = intensity;
+        splashOrigin = { x: wx, y: 1.86, z: wz };
+        for (let i = 0; i < splashCount; i++) {
+          const ang = Math.random() * Math.PI * 2, outSpd = (0.18 + Math.random() * 0.42) * intensity;
+          splashVels[i].x = Math.cos(ang) * outSpd;
+          splashVels[i].y = (0.55 + Math.random() * 0.65) * intensity;
+          splashVels[i].z = Math.sin(ang) * outSpd;
+          splashPosArr[i * 3] = wx; splashPosArr[i * 3 + 1] = 1.86; splashPosArr[i * 3 + 2] = wz;
+        }
+        splashGeo.attributes.position.needsUpdate = true;
+        splashMat.opacity = 0.95;
+        splashRings.forEach(r => { r.mesh.position.set(wx, 1.862, wz); r.mesh.scale.setScalar(0.2); r.mat.opacity = 0.85 * intensity; });
+      }
+
+      // 2. LITHOSPHERE & ASTHENOSPHERE
+      {
+        const lGeo = new THREE.CylinderGeometry(2.05, 1.72, 0.52, 180, 36, false);
+        const pos = lGeo.attributes.position, norm = lGeo.attributes.normal, v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          const r = Math.hypot(v.x, v.z);
+          if (Math.abs(norm.getY(i)) < 0.5 && r > 0.3) {
+            const ang = Math.atan2(v.z, v.x);
+            v.y += (Math.sin(ang * 8) * 0.085 + Math.cos(ang * 15 + 0.7) * 0.055 + Math.sin(ang * 23 - 0.4) * 0.025) * clamp((0.08 - v.y) / 0.34, 0, 1);
+            const fold = Math.sin((v.y + Math.sin(ang * 8) * 0.14 + Math.cos(ang * 15) * 0.08) * 26) * 0.032 + Math.cos(ang * 16 + v.y * 12) * 0.016;
+            v.x *= (r + fold) / r; v.z *= (r + fold) / r;
+          }
+          pos.setXYZ(i, v.x, v.y, v.z);
+        }
+        lGeo.computeVertexNormals();
+        const lMat = new THREE.ShaderMaterial({
+          uniforms: { uHighlight: highlightUniforms.litho, uSun: { value: new THREE.Vector3(0.55, 0.78, 0.55).normalize() } },
+          vertexShader: `varying vec3 vPos; varying vec3 vNorm; varying vec3 vObjNorm; void main(){vPos=position;vObjNorm=normal;vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+          fragmentShader: `
+            uniform float uHighlight; uniform vec3 uSun; varying vec3 vPos; varying vec3 vNorm; varying vec3 vObjNorm;
+            ${SHADER_NOISE}
+            void main(){
+              vec3 gD = vec3(0.36,0.22,0.14), fM = vec3(0.65,0.46,0.31), fC = vec3(0.86,0.69,0.53), col;
+              if(abs(vObjNorm.y) > 0.5){
+                float r = length(vPos.xz), rg = sin(r*18.0+fbm3(vPos*6.0)*3.5);
+                col = mix(mix(gD,fM,smoothstep(-0.6,0.2,rg)), fC, smoothstep(0.2,0.8,rg));
+                col = mix(col, vec3(0.98,0.38,0.05), smoothstep(0.30,0.05,r)*0.88);
+              } else {
+                float ang = atan(vPos.z,vPos.x), hV = sin((vPos.y+sin(ang*8.0)*0.15+cos(ang*15.0+0.7)*0.09+snoise(vec3(ang*5.0,vPos.y*5.0,1.5))*0.14)*42.0)*0.78 + fbm3(vPos*12.0)*0.22;
+                col = mix(mix(gD,fM,smoothstep(-0.75,0.1,hV)), fC, smoothstep(0.15,0.78,hV));
+              }
+              col = col * (max(dot(normalize(vNorm),uSun),0.0)*0.58+0.42) + vec3(0.25,0.95,0.65)*uHighlight*0.32;
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `
+        });
+        const lMesh = new THREE.Mesh(lGeo, lMat); lMesh.position.y = 1.24;
+        layerGroups.litho.add(lMesh); regPick(lMesh, 'litho');
+      }
+
+      // 3. DEEP MANTLE
+      {
+        const mGeo = new THREE.CylinderGeometry(1.70, 0.98, 1.55, 180, 52, false);
+        const pos = mGeo.attributes.position, norm = mGeo.attributes.normal, v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i);
+          const r = Math.hypot(v.x, v.z);
+          if (Math.abs(norm.getY(i)) < 0.5 && r > 0.25 && Math.abs(v.y) < 0.755) {
+            const ang = Math.atan2(v.z, v.x);
+            const disp = (Math.sin(ang * 14 + v.y * 3.5) * 0.042 + Math.cos(ang * 23 - v.y * 5) * 0.028 + fbm(v.x * 2.6, v.y * 2.6, v.z * 2.6) * 0.075 + fbm(v.x * 6, v.y * 6, v.z * 6) * 0.03) * smoothstep(0.76, 0.64, Math.abs(v.y));
+            v.x *= (r + disp) / r; v.z *= (r + disp) / r;
+          }
+          pos.setXYZ(i, v.x, v.y, v.z);
+        }
+        mGeo.computeVertexNormals();
+        const mMat = new THREE.ShaderMaterial({
+          uniforms: { uHighlight: highlightUniforms.mantle, uSun: { value: new THREE.Vector3(0.55, 0.78, 0.55).normalize() } },
+          vertexShader: `varying vec3 vPos; varying vec3 vNorm; varying vec3 vObjNorm; varying vec3 vViewDir; void main(){vPos=position;vObjNorm=normal;vec4 mv=modelViewMatrix*vec4(position,1.0);vViewDir=normalize(-mv.xyz);vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*mv;}`,
+          fragmentShader: `
+            uniform float uHighlight; uniform vec3 uSun; varying vec3 vPos; varying vec3 vNorm; varying vec3 vObjNorm; varying vec3 vViewDir;
+            ${SHADER_NOISE}
+            void main(){
+              float hM = fbm3(vPos*3.2)*0.65 - smoothstep(0.0,0.25,abs(snoise(vPos*6.5)))*0.35 + snoise(vPos*20.0)*0.08;
+              vec3 col = mix(mix(vec3(0.28,0.10,0.07),vec3(0.58,0.25,0.16),smoothstep(-0.48,0.28,hM)), vec3(0.76,0.39,0.25), smoothstep(0.22,0.72,hM));
+              if(vObjNorm.y > 0.5) col = mix(col, vec3(0.95,0.36,0.06), smoothstep(0.65,0.08,length(vPos.xz))*0.75);
+              else if(vObjNorm.y < -0.5) col *= 0.45 + 0.45*smoothstep(0.84,0.96,length(vPos.xz));
+              else col *= 0.48 + 0.52*smoothstep(0.08,0.35,clamp(dot(normalize(vNorm),vViewDir),0.0,1.0));
+              col = col * (max(dot(normalize(vNorm),uSun),0.0)*0.65+0.35) + vec3(0.25,0.95,0.65)*uHighlight*0.32;
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `
+        });
+        const mMesh = new THREE.Mesh(mGeo, mMat); mMesh.position.y = 0.28;
+        layerGroups.mantle.add(mMesh); regPick(mMesh, 'mantle');
+      }
+
+      // 4. LIQUID OUTER CORE + VISCOUS LAVA DROPPING & SUBTLE MINI MAGMA SPATTER
+      let outerCoreMat = null;
+      const coreLavaDrops = [];
+      const coreMiniBursts = [];
+      {
+        const oGeo = new THREE.CylinderGeometry(0.88, 0.43, 1.18, 16, 24, false);
+        oGeo.computeVertexNormals();
+        outerCoreMat = new THREE.ShaderMaterial({
+          extensions: { derivatives: true },
+          uniforms: { uTime: { value: 0 }, uHighlight: highlightUniforms.outerCore },
+          vertexShader: `varying vec3 vPos; varying vec3 vViewPos; varying vec3 vViewDir; varying vec3 vNorm; varying vec3 vObjNorm; void main(){vPos=position;vObjNorm=normal;vec4 mv=modelViewMatrix*vec4(position,1.0);vViewPos=-mv.xyz;vViewDir=normalize(-mv.xyz);vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*mv;}`,
+          fragmentShader: `
+            uniform float uTime; uniform float uHighlight; varying vec3 vPos; varying vec3 vViewPos; varying vec3 vViewDir; varying vec3 vNorm; varying vec3 vObjNorm;
+            ${SHADER_NOISE}
+            void main(){
+              vec3 p = vPos*2.9 + vec3(0.0,-uTime*0.45,0.0); float wp = fbm3(p), lv = fbm3(p*1.7+vec3(wp*1.5));
+              vec3 dR = vec3(0.68,0.02,0.0), fR = vec3(0.95,0.16,0.01), mO = vec3(1.0,0.46,0.03), bG = vec3(1.0,0.76,0.18), col;
+              if(abs(vObjNorm.y) > 0.5){
+                float r = length(vPos.xz)/0.88;
+                col = mix(fR, mO, smoothstep(-0.5,0.3,lv+sin(r*14.0-uTime*2.0+lv*4.0)*0.3));
+                col = mix(col, bG, smoothstep(0.65,0.05,r)*0.75);
+              } else {
+                vec3 fN = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
+                float mV = lv*0.65 + clamp((0.59-vPos.y)/1.18,0.0,1.0)*0.55 + dot(fN,normalize(vec3(0.5,0.4,0.8)))*0.14;
+                col = mix(mix(mix(dR,fR,smoothstep(-0.35,0.15,mV)),mO,smoothstep(0.15,0.55,mV)),bG,smoothstep(0.55,0.92,mV));
+                col *= 0.45+0.55*smoothstep(0.05,0.28,clamp(dot(normalize(vNorm),vViewDir),0.0,1.0));
+              }
+              gl_FragColor = vec4(col + vec3(0.25,0.95,0.65)*uHighlight*0.32, 1.0);
+            }
+          `
+        });
+        const oMesh = new THREE.Mesh(oGeo, outerCoreMat); oMesh.position.y = -1.06;
+        layerGroups.outerCore.add(oMesh); regPick(oMesh, 'outerCore');
+
+        const dropGeo = new THREE.SphereGeometry(0.021, 10, 10);
+        for (let i = 0; i < 14; i++) {
+          const dMat = new THREE.MeshBasicMaterial({ color: 0xffaa22, transparent: true, opacity: 0.95 });
+          const dMesh = new THREE.Mesh(dropGeo, dMat);
+          regPick(dMesh, 'outerCore');
+          layerGroups.outerCore.add(dMesh);
+          const isUpper = i < 9;
+          coreLavaDrops.push({ mesh: dMesh, mat: dMat, isUpper, angle: (i / (isUpper ? 9 : 5)) * Math.PI * 2 + Math.random() * 0.4, phase: Math.random(), speed: 0.24 + Math.random() * 0.16 });
+        }
+
+        const globGeo = new THREE.SphereGeometry(0.015, 8, 8);
+        const blisterGeo = new THREE.SphereGeometry(0.028, 10, 10);
+        for (let b = 0; b < 4; b++) {
+          const blisterMat = new THREE.MeshBasicMaterial({ color: 0xffdd55, transparent: true, opacity: 0 });
+          const blisterMesh = new THREE.Mesh(blisterGeo, blisterMat);
+          layerGroups.outerCore.add(blisterMesh);
+          const globs = [];
+          for (let g = 0; g < 5; g++) {
+            const gMat = new THREE.MeshBasicMaterial({ color: 0xff7711, transparent: true, opacity: 0 });
+            const gMesh = new THREE.Mesh(globGeo, gMat);
+            layerGroups.outerCore.add(gMesh);
+            globs.push({ mesh: gMesh, mat: gMat, vx: 0, vy: 0, vz: 0 });
+          }
+          coreMiniBursts.push({ blisterMesh, blisterMat, globs, timer: b * 0.85, duration: 1.45, active: false, originX: 0, originY: 0, originZ: 0, normX: 0, normZ: 0 });
+        }
+      }
+
+      function spawnMiniBurstSite(b) {
+        const ang = Math.random() * Math.PI * 2;
+        const localH = (Math.random() - 0.35) * 0.85;
+        const tCone = clamp((0.59 - localH) / 1.18, 0, 1);
+        const rCone = lerp(0.88, 0.43, tCone);
+        b.normX = Math.cos(ang); b.normZ = Math.sin(ang);
+        b.originX = b.normX * rCone; b.originY = -1.06 + localH; b.originZ = b.normZ * rCone;
+        b.blisterMesh.position.set(b.originX, b.originY, b.originZ);
+        b.globs.forEach((g, idx) => {
+          const spreadAng = ang + (idx - 2) * 0.28 + (Math.random() - 0.5) * 0.2;
+          const outSpd = 0.09 + Math.random() * 0.11;
+          g.vx = Math.cos(spreadAng) * outSpd; g.vy = 0.16 + Math.random() * 0.14; g.vz = Math.sin(spreadAng) * outSpd;
+        });
+      }
+
+      // 5. SOLID INNER CORE
+      let innerCoreMat = null;
+      {
+        const iGeo = new THREE.CylinderGeometry(0.36, 0.004, 0.92, 14, 20, false);
+        const pos = iGeo.attributes.position, norm = iGeo.attributes.normal;
+        for (let i = 0; i < pos.count; i++) {
+          const y = pos.getY(i);
+          if (Math.abs(norm.getY(i)) < 0.5 && y > 0.32) {
+            const lp = 1 + Math.sin(((y - 0.32) / 0.14) * Math.PI) * 0.06;
+            pos.setX(i, pos.getX(i) * lp); pos.setZ(i, pos.getZ(i) * lp);
+          }
+        }
+        iGeo.computeVertexNormals();
+        innerCoreMat = new THREE.ShaderMaterial({
+          extensions: { derivatives: true },
+          uniforms: { uTime: { value: 0 }, uHighlight: highlightUniforms.innerCore },
+          vertexShader: `varying vec3 vPos; varying vec3 vViewPos; varying vec3 vViewDir; varying vec3 vNorm; varying vec3 vObjNorm; void main(){vPos=position;vObjNorm=normal;vec4 mv=modelViewMatrix*vec4(position,1.0);vViewPos=-mv.xyz;vViewDir=normalize(-mv.xyz);vNorm=normalize(normalMatrix*normal);gl_Position=projectionMatrix*mv;}`,
+          fragmentShader: `
+            uniform float uTime; uniform float uHighlight; varying vec3 vPos; varying vec3 vViewPos; varying vec3 vViewDir; varying vec3 vNorm; varying vec3 vObjNorm;
+            ${SHADER_NOISE}
+            void main(){
+              vec3 cO = vec3(0.98,0.46,0.06), wY = vec3(1.0,0.86,0.42), wT = vec3(0.99,0.99,0.92), col;
+              float gr = fbm3(vPos*14.0+vec3(0.0,uTime*0.55,0.0))*0.08;
+              if(vObjNorm.y > 0.5){
+                float r = length(vPos.xz)/0.36;
+                col = mix(wT, wY, smoothstep(0.15,0.78,r + sin(r*16.0-uTime*2.5+gr*8.0)*0.08));
+                col = mix(col, cO, smoothstep(0.75,0.98,r));
+              } else {
+                float fc = dot(normalize(cross(dFdx(vViewPos),dFdy(vViewPos))), normalize(vec3(0.6,0.3,0.7)))*0.08;
+                float t = clamp((0.46-vPos.y)/0.92, 0.0, 1.0);
+                col = mix(mix(cO,wY,smoothstep(0.0,0.36,t+gr+fc)), wT, smoothstep(0.32,0.88,t+fc));
+                col *= 0.45+0.55*smoothstep(0.04,0.24,clamp(dot(normalize(vNorm),vViewDir),0.0,1.0));
+              }
+              gl_FragColor = vec4(col + vec3(0.25,0.95,0.65)*uHighlight*0.32, 1.0);
+            }
+          `
+        });
+        const iMesh = new THREE.Mesh(iGeo, innerCoreMat); iMesh.position.y = -2.09;
+        layerGroups.innerCore.add(iMesh); regPick(iMesh, 'innerCore');
+      }
+      // ================= LABEL MENGAMBANG LAPISAN (pola BAB 02–06) =================
+      // Struktur seragam: lingkaran warna + nomor + nama. Klik label = toggleLayer(k)
+      // (panel info muncul; klik lagi = panel hilang). Anchor adalah anak layer group
+      // sehingga ikut explode, dan proyeksi per-frame mengompensasi rotasi model.
+      // BBox dihitung dari mesh pickable tiap lapisan (bbox group mentah bisa memuat
+      // objek helper yang disembunyikan jauh di bawah, mis. spawn dino di y=-1000).
+      scene.updateMatrixWorld(true);
+      const _TP_V = new THREE.Vector3(), _TP_FWD = new THREE.Vector3(), _TP_RIGHT = new THREE.Vector3(), _TP_UPA = new THREE.Vector3(), _TP_UPB = new THREE.Vector3();
+      const _TP_BOX = new THREE.Box3(), _TP_C = new THREE.Vector3();
+      const labelHost = document.createElement('div');
+      labelHost.id = 'tp3dLabels';
+      document.body.appendChild(labelHost);
+      const layerLabelItems = [];
+      const TP_LABEL_SIDE = { crust: 1, litho: -1, mantle: 1, outerCore: -1, innerCore: 1 };
+      LAYER_ORDER.forEach((k, li) => {
+        const g = layerGroups[k];
+        _TP_BOX.makeEmpty();
+        pickableMeshes.forEach(m => { if (m.userData.layerKey === k) _TP_BOX.expandByObject(m); });
+        if (_TP_BOX.isEmpty()) _TP_BOX.setFromObject(g);
+        _TP_BOX.getCenter(_TP_C);
+        const halfX = (_TP_BOX.max.x - _TP_BOX.min.x) * 0.5;
+        const side = TP_LABEL_SIDE[k] || 1;
+        const anchor = new THREE.Object3D();
+        anchor.position.set(side * (Math.abs(_TP_C.x) + halfX + 0.55), _TP_C.y - wedgeRoot.position.y, _TP_C.z + 0.55);
+        g.add(anchor);
+        const num = String(li + 1).padStart(2, '0');
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'tp-layer-label';
+        el.dataset.layer = k;
+        el.innerHTML = `<span class="tp-dot" style="background:${LAYER_DATA[k].color}"></span><span class="tp-num">${num}</span><span class="tp-name">${LAYER_DATA[k][lang].shortName.replace(/^\s*\d+\.\s*/, '')}</span>`;
+        el.addEventListener('click', (e) => { e.stopPropagation(); toggleLayer(k); });
+        labelHost.appendChild(el);
+        layerLabelItems.push({ key: k, anchor, el });
+      });
+
+      // ================= CAMERA FLIGHT, PICKING & UI WIRING =================
+      const OVERVIEW_POS = new THREE.Vector3(0, 1.35, 8.3);
+      const OVERVIEW_TGT = new THREE.Vector3(0, 0.22, 0);
+      const CAM_PRESETS = {
+        iso:    { pos: OVERVIEW_POS, tgt: OVERVIEW_TGT },
+        top:    { pos: new THREE.Vector3(0, 8.6, 0.02), tgt: OVERVIEW_TGT },
+        bottom: { pos: new THREE.Vector3(0, -7.9, 0.02), tgt: OVERVIEW_TGT }
+      };
+
+      const explodeOffsets = { crust: 0.62, litho: 0.30, mantle: 0.0, outerCore: -0.30, innerCore: -0.62 };
+      const explodeCur = { crust: 0, litho: 0, mantle: 0, outerCore: 0, innerCore: 0 };
+
+      const clock = new THREE.Clock();
+      const LAVA_BRIGHT = new THREE.Color(0xffdd55);
+      const LAVA_MID = new THREE.Color(0xff7722);
+      const LAVA_DEEP = new THREE.Color(0xff4d00);
+      const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+      const easeInOutCubic = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+
+      let flight = null;
+      let followDinoKey = null;
+      const lastFollowPos = new THREE.Vector3();
+      const followOffset = new THREE.Vector3();
+
+      function startFlight(toPos, toTarget, duration = 1.2) {
+        flight = {
+          fromPos: camera.position.clone(), fromTarget: controls.target.clone(),
+          toPos: toPos.clone(), toTarget: toTarget.clone(),
+          t: 0, duration: Math.max(duration, 0.01)
+        };
+      }
+
+      function clearCamActive() {
+        document.querySelectorAll('[data-cam]').forEach(b => b.classList.remove('active'));
+      }
+
+      function zoomToLayer(k) {
+        const cfg = LAYER_FOCUS_CFG[k];
+        if (!cfg) return;
+        followDinoKey = null;
+        clearCamActive();
+        const ty = cfg.baseY;
+        const camPos = new THREE.Vector3(0, ty + Math.sin(cfg.elev) * cfg.dist, Math.cos(cfg.elev) * cfg.dist);
+        startFlight(camPos, new THREE.Vector3(0, ty, 0), 1.25);
+      }
+
+      function zoomToDino(dk) {
+        const d = dinoMap[dk];
+        if (!d) return;
+        clearCamActive();
+        d.root.getWorldPosition(_v1);
+        const dir = _v2.copy(camera.position).sub(_v1);
+        if (dir.lengthSq() < 1e-6) dir.set(0, 0.35, 1);
+        dir.normalize(); dir.y = Math.max(dir.y, 0.3); dir.normalize();
+        const dist = dk === 'mosa' ? 1.3 : (dk === 'ptero' ? 1.4 : 1.0);
+        dir.multiplyScalar(dist);
+        followOffset.copy(dir); // camera sits at this exact offset from the dino
+        startFlight(_v3.copy(_v1).add(dir), _v1, 1.2);
+      }
+
+      function zoomOutOverview() {
+        followDinoKey = null;
+        clearCamActive();
+        startFlight(OVERVIEW_POS, OVERVIEW_TGT, 1.15);
+      }
+
+      function deselectAll() {
+        selectedDino = null; selectedLayer = null; followDinoKey = null;
+        trackRingMesh.visible = false;
+        renderUI();
+      }
+
+      function toggleDino(dk) {
+        if (selectedDino === dk) { deselectAll(); zoomOutOverview(); return; }
+        selectedDino = dk; selectedLayer = null; followDinoKey = dk;
+        renderUI();
+        zoomToDino(dk);
+      }
+
+      function toggleLayer(k) {
+        if (selectedLayer === k) { deselectAll(); zoomOutOverview(); return; }
+        selectedLayer = k; selectedDino = null; followDinoKey = null;
+        renderUI();
+        zoomToLayer(k);
+      }
+
+      // Raycast picking (dinos -> volcano -> layers) + hover cursor + tap-to-close
+      const raycaster = new THREE.Raycaster();
+      const pointerNDC = new THREE.Vector2();
+      let downPos = null;
+
+      function setNDC(e) {
+        pointerNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+        pointerNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      }
+
+      function raycastScene() {
+        raycaster.setFromCamera(pointerNDC, camera);
+        const dHits = raycaster.intersectObjects(dinoPickMeshes, false);
+        if (dHits.length) return { type: 'dino', key: dHits[0].object.userData.dinoKey };
+        if (volcanoHitMesh && raycaster.intersectObject(volcanoHitMesh, false).length) return { type: 'volcano' };
+        const lHits = raycaster.intersectObjects(pickableMeshes, false);
+        if (lHits.length) return { type: 'layer', key: lHits[0].object.userData.layerKey };
+        return null;
+      }
+
+      canvas.addEventListener('pointermove', (e) => {
+        setNDC(e);
+        canvas.classList.toggle('hover-target', Boolean(raycastScene()));
+      });
+      canvas.addEventListener('pointerdown', (e) => { downPos = { x: e.clientX, y: e.clientY }; });
+      canvas.addEventListener('pointerup', (e) => {
+        if (!downPos) return;
+        const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+        downPos = null;
+        if (moved > 7) return;
+        setNDC(e);
+        const hit = raycastScene();
+        if (!hit) {
+          if (selectedDino || selectedLayer) { deselectAll(); zoomOutOverview(); }
+          return;
+        }
+        if (hit.type === 'dino') toggleDino(hit.key);
+        else if (hit.type === 'volcano') triggerVolcanoEruption();
+        else toggleLayer(hit.key);
+      });
+
+      controls.addEventListener('start', () => { flight = null; });
+
+      // Info panel close
+      document.getElementById('infoCloseBtn').addEventListener('click', () => {
+        deselectAll(); zoomOutOverview();
+      });
+
+      // Camera preset buttons
+      function setPreset(key) {
+        const p = CAM_PRESETS[key];
+        if (!p) return;
+        document.querySelectorAll('[data-cam]').forEach(b => b.classList.toggle('active', b.getAttribute('data-cam') === key));
+        followDinoKey = null;
+        startFlight(p.pos, p.tgt, 1.3);
+      }
+      document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => setPreset(b.getAttribute('data-cam'))));
+
+      // Explode slider
+      const explodeSliderEl = document.getElementById('explodeSlider');
+      const explodeValEl = document.getElementById('explodeVal');
+      explodeSliderEl.addEventListener('input', () => {
+        explodeAmount = explodeSliderEl.value / 100;
+        explodeValEl.textContent = explodeSliderEl.value + '%';
+      });
+
+      // Auto spin toggle
+      const autoSpinBtnEl = document.getElementById('autoSpinBtn');
+      autoSpinBtnEl.addEventListener('click', () => {
+        autoSpin = !autoSpin;
+        autoSpinBtnEl.classList.toggle('active', autoSpin);
+      });
+
+      // Reset view
+      document.getElementById('resetViewBtn').addEventListener('click', () => {
+        deselectAll();
+        explodeAmount = 0;
+        explodeSliderEl.value = 0;
+        explodeValEl.textContent = '0%';
+        document.querySelectorAll('[data-cam]').forEach(b => b.classList.toggle('active', b.getAttribute('data-cam') === 'iso'));
+        startFlight(CAM_PRESETS.iso.pos, CAM_PRESETS.iso.tgt, 1.25);
+      });
+
+      // Language pills
+      document.querySelectorAll('[data-lang]').forEach(b => b.addEventListener('click', () => {
+        const next = b.getAttribute('data-lang');
+        if (lang === next) return;
+        lang = next;
+        document.querySelectorAll('[data-lang]').forEach(x => x.classList.toggle('active', x === b));
+        renderUI();
+        if (articleOverlayEl.classList.contains('open')) renderArticle();
+      }));
+
+      // ================= MAIN ANIMATION LOOP =================
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+        const t = clock.elapsedTime;
+
+        if (autoSpin && !flight) wedgeRoot.rotation.y += dt * 0.06;
+
+        // Layer explosion easing + highlight glow easing
+        for (let i = 0; i < LAYER_ORDER.length; i++) {
+          const k = LAYER_ORDER[i];
+          const ty = explodeOffsets[k] * explodeAmount;
+          explodeCur[k] += (ty - explodeCur[k]) * Math.min(1, dt * 7);
+          layerGroups[k].position.y = explodeCur[k];
+          const hl = highlightUniforms[k];
+          hl.value += ((selectedLayer === k ? 1 : 0) - hl.value) * Math.min(1, dt * 6);
+        }
+
+        // (a) Proyeksi label mengambang lapisan → layar (kompensasi rotasi wedgeRoot).
+        // World→view dihitung manual dari posisi & arah kamera: engine THREE bundel
+        // halaman ini tidak selalu menyegarkan camera.matrixWorldInverse untuk project().
+        camera.getWorldDirection(_TP_FWD);
+        _TP_RIGHT.copy(_TP_FWD).cross(_TP_UPA.set(0, 1, 0)).normalize();
+        _TP_UPB.copy(_TP_RIGHT).cross(_TP_FWD).normalize();
+        for (let li = 0; li < layerLabelItems.length; li++) {
+          const item = layerLabelItems[li];
+          item.anchor.getWorldPosition(_TP_V);
+          _TP_V.sub(wedgeRoot.position);
+          if (wedgeRoot.rotation.y) {
+            const _ca = Math.cos(-wedgeRoot.rotation.y), _sa = Math.sin(-wedgeRoot.rotation.y);
+            const _vx = _TP_V.x, _vz = _TP_V.z;
+            _TP_V.x = _vx * _ca + _vz * _sa;
+            _TP_V.z = -_vx * _sa + _vz * _ca;
+          }
+          _TP_V.sub(camera.position);
+          const zc = _TP_V.dot(_TP_FWD);
+          if (zc > 0.001) {
+            const f = 1 / Math.tan((camera.fov || 36) * Math.PI / 360);
+            const ndcX = (f / (camera.aspect || 1)) * (_TP_V.dot(_TP_RIGHT)) / zc;
+            const ndcY = f * (_TP_V.dot(_TP_UPB)) / zc;
+            // Clamp ke dalam viewport: model memenuhi layar, label lapisan terbawah
+            // bisa jatuh di luar tepi — tetap tampil agar selalu bisa diklik.
+            item.el.style.opacity = '1';
+            item.el.style.pointerEvents = 'auto';
+            item.el.style.transform = `translate(-50%,-50%) translate(${
+              Math.max(46, Math.min(window.innerWidth - 46, (ndcX * 0.5 + 0.5) * window.innerWidth))
+            }px, ${
+              Math.max(28, Math.min(window.innerHeight - 28, (-ndcY * 0.5 + 0.5) * window.innerHeight))
+            }px)`;
+          } else {
+            item.el.style.opacity = '0';
+            item.el.style.pointerEvents = 'none';
+          }
+        }
+
+        // Sky: star twinkle + camera-facing halo backglow
+        starMat.uniforms.uTime.value = t;
+        haloMesh.position.copy(camera.position).normalize().multiplyScalar(-40);
+        haloMesh.lookAt(camera.position);
+
+        // Volcano: eruption decay, crater light flicker, pulse ring
+        if (eruptBoost > 0) eruptBoost = Math.max(0, eruptBoost - dt * 0.5);
+        const crustU = layerGroups.crust.userData;
+        if (crustU.topDiscMat) {
+          crustU.topDiscMat.uniforms.uTime.value = t;
+          crustU.topDiscMat.uniforms.uErupt.value = eruptBoost;
+        }
+        if (crustU.cliffWallMat) crustU.cliffWallMat.uniforms.uTime.value = t;
+        if (crustU.underCapMat) crustU.underCapMat.uniforms.uTime.value = t;
+        craterPulseAge += dt;
+        if (craterPulseAge < 0.85) {
+          const pa = craterPulseAge / 0.85;
+          craterPulseMat.opacity = (1 - pa) * 0.7;
+          craterPulseRing.scale.setScalar(1 + pa * 3.4);
+        } else {
+          craterPulseMat.opacity = 0;
+        }
+        if (craterLight) craterLight.intensity = 0.5 + eruptBoost * 1.7 + (0.08 + 0.08 * Math.sin(t * 7.3)) * (0.35 + eruptBoost);
+
+        // Volcano smoke puffs rising & fading
+        if (crustU.smokePuffs) {
+          for (let i = 0; i < crustU.smokePuffs.length; i++) {
+            const sp = crustU.smokePuffs[i];
+            const p = (t * 0.36 + sp.phase) % 1;
+            const drift = 0.10 + p * 0.55;
+            sp.mesh.position.set(
+              VOLC_X * R_DISC + Math.sin(sp.phase * 9.4 + t * 0.4) * drift,
+              2.34 + p * 0.62,
+              VOLC_Z * R_DISC + Math.cos(sp.phase * 7.7 + t * 0.4) * drift
+            );
+            sp.mesh.scale.setScalar(0.45 + p * 1.5);
+            sp.mat.uniforms.uTime.value = t;
+            sp.mat.uniforms.uAlpha.value = 0.75 * (1 - p) * (1 - p);
+            sp.mat.uniforms.uWarmGlow.value = Math.max(0, 1 - p * 2.4) * (0.35 + eruptBoost * 0.8);
+          }
+        }
+
+        // Ambient crater embers drifting upward
+        if (crustU.emberPoints && crustU.emberData) {
+          const eAttr = crustU.emberPoints.geometry.attributes.position;
+          for (let i = 0; i < crustU.emberData.length; i++) {
+            const em = crustU.emberData[i];
+            em.phase = (em.phase + dt * em.speed) % 1;
+            const er = em.phase * 2.4;
+            eAttr.setXYZ(i,
+              VOLC_X * R_DISC + em.vx * er,
+              2.30 + em.phase * em.peakH * 3.2,
+              VOLC_Z * R_DISC + em.vz * er);
+          }
+          eAttr.needsUpdate = true;
+        }
+
+        // Erupting lava bombs (parabolic ballistics + heat coloring)
+        for (let i = 0; i < lavaBombs.length; i++) {
+          const b = lavaBombs[i];
+          if (!b.active) continue;
+          b.age += dt;
+          if (b.age >= b.life) { b.active = false; b.mesh.visible = false; continue; }
+          b.vy -= 3.1 * dt;
+          b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+          if (b.y < 1.85 + evalSurf(clamp(b.x / R_DISC, -1, 1), clamp(b.z / R_DISC, -1, 1)).height) {
+            b.active = false; b.mesh.visible = false; continue;
+          }
+          const la = b.age / b.life;
+          b.mesh.position.set(b.x, b.y, b.z);
+          b.mesh.rotation.x += dt * 6; b.mesh.rotation.y += dt * 4.5;
+          b.mesh.scale.setScalar(b.baseScale * (1 - la * 0.35));
+          b.mat.color.copy(LAVA_MID).lerp(LAVA_BRIGHT, clamp(1.1 - la * 1.4 + eruptBoost * 0.35, 0, 1));
+          b.mat.opacity = 1 - smoothstep(0.75, 1, la);
+        }
+
+        // Eruption spark points
+        let sparkDirty = false;
+        for (let i = 0; i < eruptSparks.length; i++) {
+          const sp = eruptSparks[i];
+          if (!sp.active) continue;
+          sp.age += dt;
+          if (sp.age >= sp.life) { sp.active = false; eruptSparkPosArr[i * 3 + 1] = -999; sparkDirty = true; continue; }
+          sp.vy -= 2.6 * dt;
+          sp.x += sp.vx * dt; sp.y += sp.vy * dt; sp.z += sp.vz * dt;
+          eruptSparkPosArr[i * 3] = sp.x; eruptSparkPosArr[i * 3 + 1] = sp.y; eruptSparkPosArr[i * 3 + 2] = sp.z;
+          sparkDirty = true;
+        }
+        if (sparkDirty) eruptSparkGeo.attributes.position.needsUpdate = true;
+        if (eruptSparkMat) eruptSparkMat.color.copy(LAVA_MID).lerp(LAVA_BRIGHT, 0.4 + eruptBoost * 0.55);
+
+        // Core shader clocks
+        if (outerCoreMat) outerCoreMat.uniforms.uTime.value = t;
+        if (innerCoreMat) innerCoreMat.uniforms.uTime.value = t;
+  
+        // Outer core viscous lava drops sliding down the cone wall
+        for (let i = 0; i < coreLavaDrops.length; i++) {
+          const d = coreLavaDrops[i];
+          d.phase = (d.phase + dt * d.speed) % 1;
+          const pFall = smoothstep(0, 0.85, d.phase);
+          const localH = lerp(0.40, -0.48, pFall) - (d.isUpper ? 0 : 0.08);
+          const tCone = clamp((0.59 - localH) / 1.18, 0, 1);
+          const rr = lerp(0.88, 0.43, tCone) * 1.004;
+          d.mesh.position.set(Math.cos(d.angle) * rr, -1.06 + localH, Math.sin(d.angle) * rr);
+          d.mesh.scale.set(1 - d.phase * 0.25, 1 + d.phase * 0.9, 1 - d.phase * 0.25);
+          d.mat.opacity = (d.phase > 0.85 ? (1 - d.phase) / 0.15 : 1) * 0.95;
+          d.mat.color.copy(LAVA_MID).lerp(LAVA_BRIGHT, 0.35 + 0.35 * Math.sin(t * 3 + i * 1.7));
+        }
+
+        // Outer core mini magma bursts (blister grows, pops into globs)
+        for (let i = 0; i < coreMiniBursts.length; i++) {
+          const b = coreMiniBursts[i];
+          if (!b.active) {
+            b.timer -= dt;
+            if (b.timer <= 0) {
+              b.active = true; b.progress = 0;
+              spawnMiniBurstSite(b);
+              b.blisterMesh.scale.setScalar(0.35);
+              b.blisterMat.opacity = 0;
+              b.globs.forEach(g => { g.mesh.position.set(b.originX, b.originY, b.originZ); g.mat.opacity = 0; });
+            }
+            continue;
+          }
+          b.progress += dt / b.duration;
+          if (b.progress >= 1) {
+            b.active = false; b.timer = 1.8 + Math.random() * 3.2;
+            b.blisterMat.opacity = 0;
+            b.globs.forEach(g => { g.mat.opacity = 0; });
+            continue;
+          }
+          const bp = b.progress;
+          if (bp < 0.52) {
+            const grow = smoothstep(0, 0.52, bp);
+            b.blisterMat.opacity = grow * 0.9;
+            b.blisterMesh.scale.setScalar(0.35 + grow * 0.75);
+          } else {
+            const ft = (bp - 0.52) / 0.48;
+            b.blisterMat.opacity = Math.max(0, 1 - ft * 3) * 0.9;
+            b.blisterMesh.scale.setScalar(1.1 - ft * 0.5);
+            b.globs.forEach(g => {
+              g.vy -= 0.55 * dt;
+              g.mesh.position.x += g.vx * dt * 2.1;
+              g.mesh.position.y += g.vy * dt * 2.1;
+              g.mesh.position.z += g.vz * dt * 2.1;
+              g.mat.opacity = Math.max(0, 1 - ft) * 0.95;
+              g.mesh.scale.setScalar(Math.max(0.2, 1 - ft * 0.35));
+            });
+          }
+        }
+
+        // Land dino AI: T-Rex hunts, herbivores wander & flee along the meadow track
+        for (let i = 0; i < landDinos.length; i++) {
+          const d = landDinos[i];
+          const isTrex = d.key === 'trex';
+          d.stateTimer -= dt;
+          if (d.stateTimer <= 0) {
+            if (isTrex) {
+              if (d.state === 'chase') { d.state = 'wander'; d.stateTimer = 3.5 + Math.random() * 4; d.chaseTarget = null; }
+              else if (Math.random() < 0.72) {
+                d.state = 'chase';
+                d.chaseTarget = herbivores[(Math.random() * herbivores.length) | 0];
+                d.stateTimer = 3.2 + Math.random() * 2.6;
+              } else { d.state = 'wander'; d.stateTimer = 3 + Math.random() * 3; }
+            } else {
+              d.state = 'wander';
+              d.stateTimer = 2.5 + Math.random() * 4;
+              d.targetLane = (Math.random() * 2 - 1) * 0.85;
+            }
+          }
+
+          let speedMul = 1;
+          if (isTrex) {
+            if (d.state === 'chase' && d.chaseTarget) {
+              const gap = wrapAngle(d.chaseTarget.theta - d.theta);
+              d.theta += Math.sign(gap) * Math.min(Math.abs(gap), d.angSpeed * 1.65 * dt);
+              d.targetLane = d.chaseTarget.lane;
+              speedMul = 1.25;
+              if (d.jawPivot) d.jawPivot.rotation.x = 0.45 + Math.sin(t * 9) * 0.25;
+            } else if (d.jawPivot) {
+              d.jawPivot.rotation.x += (0.06 - d.jawPivot.rotation.x) * Math.min(1, dt * 5);
+            }
+          } else {
+            const gapRex = wrapAngle(d.theta - tRexDino.theta);
+            if (tRexDino.state === 'chase' && Math.abs(gapRex) < 0.9 && d.state !== 'flee') {
+              d.state = 'flee'; d.stateTimer = 1.6 + Math.random() * 1.4;
+            }
+            if (d.state === 'flee') speedMul = 1.9;
+          }
+
+          d.theta += d.dir * d.angSpeed * speedMul * dt;
+          d.lane += (d.targetLane - d.lane) * Math.min(1, dt * 2.2);
+          const wob = Math.sin(t * 0.7 + d.phase) * 0.05;
+          const pt = sampleMeadowTrack(d.theta + wob, d.lane);
+          d.nx = pt.nx; d.nz = pt.nz;
+          const ahead = sampleMeadowTrack(d.theta + wob + d.dir * 0.05, d.lane);
+          d.yaw += wrapAngle(Math.atan2(ahead.nx - d.nx, ahead.nz - d.nz) - d.yaw) * Math.min(1, dt * 6);
+          d.root.position.set(d.nx * R_DISC, 1.85 + evalSurf(d.nx, d.nz).height + 0.004, d.nz * R_DISC);
+          d.root.rotation.y = d.yaw;
+
+          d.walk = (d.walk || 0) + dt * d.stride * speedMul;
+          d.legs.forEach((lg, li) => { lg.rotation.x = Math.sin(d.walk + (li % 2) * Math.PI) * 0.5; });
+          if (d.neckPivot) d.neckPivot.rotation.x = Math.sin(d.walk * 0.5) * 0.06;
+          if (d.tailPivot) d.tailPivot.rotation.y = Math.sin(d.walk * 0.5 + 1.1) * 0.16;
+          if (d.bodyGrp) d.bodyGrp.position.y = 0.082 + Math.sin(d.walk * 2) * 0.004;
+        }
+
+        // Amber tracking ring under the followed land dino
+        const followed = followDinoKey ? dinoMap[followDinoKey] : null;
+        if (followed && followed.theta !== undefined) {
+          trackRingMesh.visible = true;
+          trackRingMesh.position.set(followed.nx * R_DISC, followed.root.position.y + 0.012, followed.nz * R_DISC);
+          trackRingMat.opacity = 0.55 + Math.sin(t * 4) * 0.2;
+          const rs = 1 + Math.sin(t * 4) * 0.05;
+          trackRingMesh.scale.set(rs, 1, rs);
+        } else {
+          trackRingMesh.visible = false;
+        }
+  
+        // Mosasaurus: ocean patrol + periodic breach with splash
+        const ms = mosaState;
+        if (ms.active) {
+          ms.progress += dt / ms.duration;
+          const mp = clamp(ms.progress, 0, 1);
+          const arcU = (ms.uStart + ms.jumpDeltaU * mp) % 1;
+          const bPos = oceanLoopCurve.getPointAt(arcU);
+          mosa.root.position.set(bPos.x, bPos.y + Math.sin(mp * Math.PI) * 0.46, bPos.z);
+          const bTan = oceanLoopCurve.getTangentAt(arcU);
+          mosa.root.rotation.y = Math.atan2(bTan.x, bTan.z);
+          mosa.root.rotation.x = -Math.cos(mp * Math.PI) * 0.55;
+          if (mosa.jawPivot) mosa.jawPivot.rotation.x = Math.sin(mp * Math.PI) * 0.5;
+          if (!ms.entrySplashTriggered && mp > 0.04) {
+            ms.entrySplashTriggered = true;
+            triggerWaterSplash(bPos.x, bPos.z, 1.0);
+          }
+          if (mp >= 1) {
+            ms.active = false;
+            ms.u = (ms.uStart + ms.jumpDeltaU) % 1;
+            ms.timer = 3.4 + Math.random() * 4.5;
+            triggerWaterSplash(bPos.x, bPos.z, 0.65);
+          }
+        } else {
+          ms.timer -= dt;
+          ms.u = (ms.u + ms.swimSpeed * dt) % 1;
+          const bPos = oceanLoopCurve.getPointAt(ms.u);
+          mosa.root.position.set(bPos.x, bPos.y + Math.sin(t * 1.7) * 0.012, bPos.z);
+          const bTan = oceanLoopCurve.getTangentAt(ms.u);
+          mosa.root.rotation.y = Math.atan2(bTan.x, bTan.z);
+          mosa.root.rotation.x = Math.sin(t * 0.9) * 0.05;
+          if (mosa.jawPivot) mosa.jawPivot.rotation.x = Math.max(0, Math.sin(t * 0.8)) * 0.12;
+          if (ms.timer <= 0) { ms.active = true; ms.uStart = ms.u; ms.progress = 0; ms.entrySplashTriggered = false; }
+        }
+        const mSwim = t * 5.2;
+        if (mosa.tail1Pivot) mosa.tail1Pivot.rotation.y = Math.sin(mSwim) * 0.35;
+        if (mosa.tail2Pivot) mosa.tail2Pivot.rotation.y = Math.sin(mSwim + 0.6) * 0.5;
+        if (mosa.flippers) mosa.flippers.forEach((f, fi) => { f.grp.rotation.z = Math.sin(mSwim + fi * 1.3) * 0.4 * f.dir; });
+
+        // Water splash particles + expanding rings
+        if (splashActive) {
+          splashElapsed += dt;
+          for (let i = 0; i < splashCount; i++) {
+            const sv = splashVels[i];
+            sv.y -= 2.4 * dt;
+            splashPosArr[i * 3] += sv.x * dt;
+            splashPosArr[i * 3 + 1] += sv.y * dt;
+            splashPosArr[i * 3 + 2] += sv.z * dt;
+          }
+          splashGeo.attributes.position.needsUpdate = true;
+          splashMat.opacity = Math.max(0, 0.95 * (1 - splashElapsed / 1.15));
+          splashRings.forEach(r => {
+            const rn = (splashElapsed - r.delay) / 0.65;
+            if (rn <= 0 || rn >= 1) { r.mat.opacity = 0; return; }
+            r.mesh.scale.setScalar(0.2 + rn * 2.6);
+            r.mat.opacity = (1 - rn) * 0.8 * splashIntensity;
+          });
+          if (splashElapsed > 1.25) {
+            splashActive = false; splashMat.opacity = 0;
+            splashRings.forEach(r => { r.mat.opacity = 0; });
+          }
+        }
+
+        // Pterodactylus: soaring orbit with flapping wings
+        ptero.orbitAngle += dt * 0.5;
+        const paA = ptero.orbitAngle;
+        const prR = 1.12 + Math.sin(t * 0.37) * 0.10;
+        const px = Math.cos(paA) * prR, pz = Math.sin(paA) * prR;
+        ptero.root.position.set(px, 2.72 + Math.sin(t * 0.83) * 0.14, pz);
+        const ax = Math.cos(paA + 0.06) * prR, az = Math.sin(paA + 0.06) * prR;
+        ptero.root.rotation.y = Math.atan2(ax - px, az - pz);
+        ptero.root.rotation.z = Math.sin(paA) * 0.2;
+        const flap = Math.sin(t * 6.5);
+        if (ptero.wingLPivot) ptero.wingLPivot.rotation.z = flap * 0.55;
+        if (ptero.wingRPivot) ptero.wingRPivot.rotation.z = -flap * 0.55;
+        if (ptero.headGrp) ptero.headGrp.rotation.x = Math.sin(t * 3.1) * 0.05;
+
+        // Camera: scripted flight -> dino follow-tracking -> damped orbit
+        if (flight) {
+          flight.t += dt;
+          const fp = clamp(flight.t / flight.duration, 0, 1);
+          const fe = easeInOutCubic(fp);
+          // Keep the destination glued to the dino's live position so the
+          // camera lands beside it, not where it stood when the flight began.
+          const fDino = followDinoKey ? dinoMap[followDinoKey] : null;
+          if (fDino) {
+            fDino.root.getWorldPosition(_v1);
+            flight.toPos.copy(_v1).add(followOffset);
+            flight.toTarget.copy(_v1);
+          }
+          camera.position.lerpVectors(flight.fromPos, flight.toPos, fe);
+          controls.target.lerpVectors(flight.fromTarget, flight.toTarget, fe);
+          if (fp >= 1) {
+            flight = null;
+            if (fDino) lastFollowPos.copy(_v1);
+            else if (followDinoKey && dinoMap[followDinoKey]) dinoMap[followDinoKey].root.getWorldPosition(lastFollowPos);
+          }
+        } else if (followDinoKey && dinoMap[followDinoKey]) {
+          dinoMap[followDinoKey].root.getWorldPosition(_v1);
+          _v2.copy(_v1).sub(lastFollowPos);
+          camera.position.add(_v2);
+          controls.target.add(_v2);
+          lastFollowPos.copy(_v1);
+        }
+        controls.update();
+
+        renderer.render(scene, camera);
+      }
+
+      // ================= ARTIKEL ILMIAH (overlay, pola BAB 02) =================
+      const articleOverlayEl = document.getElementById('articleOverlay');
+      const tpArtBodyEl = document.getElementById('tpArtBody');
+
+      function tpEscHTML(v) {
+        return String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      }
+
+      function tpProfileSection(dataset, key, tagText) {
+        const d = dataset[key][lang];
+        const metrics = (d.metrics || []).map(m => `<div class="tp-art-metric"><div class="l">${tpEscHTML(m.l)}</div><div class="v">${tpEscHTML(m.v)}</div></div>`).join('');
+        const subs = (d.subs || []).map(sb => `<div class="tp-art-sub"><div class="n">${tpEscHTML(sb.n)}</div><div class="m">${tpEscHTML(sb.m)}</div><div class="d">${tpEscHTML(sb.d)}</div></div>`).join('');
+        return `
+          <section class="tp-art-sec">
+            <div class="tp-art-tag"><span>${tpEscHTML(tagText)}</span></div>
+            <div class="tp-art-eyebrow">${tpEscHTML(d.eyebrow)}</div>
+            <h3 class="tp-art-title">${tpEscHTML(d.title)}</h3>
+            <p class="tp-art-desc">${tpEscHTML(d.desc)}</p>
+            <div class="tp-art-metrics">${metrics}</div>
+            <div class="tp-art-subhead">${tpEscHTML(d.subHeading)}</div>
+            ${subs}
+          </section>`;
+      }
+
+      function renderArticle() {
+        const s = UI_STRINGS[lang];
+        document.getElementById('tpArtEyebrow').textContent = s.articleBtn;
+        document.getElementById('tpArtTitle').textContent = s.sub;
+        const groupLayers = lang === 'id' ? 'PROFIL LAPISAN BUMI' : 'EARTH LAYER PROFILES';
+        const groupFauna = lang === 'id' ? 'PROFIL FAUNA PRASEJARAH' : 'PREHISTORIC FAUNA PROFILES';
+        const layerTag = lang === 'id' ? 'PROFIL LAPISAN' : 'LAYER PROFILE';
+        const faunaTag = lang === 'id' ? 'PROFIL FAUNA' : 'FAUNA PROFILE';
+        const introTag = lang === 'id' ? '01 // PENGANTAR' : '01 // INTRODUCTION';
+        let artIndex = 2;
+        let html = `
+          <section class="tp-art-sec">
+            <div class="tp-art-tag"><span>${tpEscHTML(introTag)}</span></div>
+            <h3 class="tp-art-title">${tpEscHTML(s.sub)}</h3>
+            <p class="tp-art-desc">${tpEscHTML(s.articleIntro)}</p>
+          </section>`;
+        html += `<div class="tp-art-group">${tpEscHTML(groupLayers)}</div>`;
+        LAYER_ORDER.forEach((k) => { html += tpProfileSection(LAYER_DATA, k, `${String(artIndex++).padStart(2, '0')} // ${layerTag}`); });
+        html += `<div class="tp-art-group">${tpEscHTML(groupFauna)}</div>`;
+        DINO_ORDER.forEach((k) => { html += tpProfileSection(DINO_DATA, k, `${String(artIndex++).padStart(2, '0')} // ${faunaTag}`); });
+        tpArtBodyEl.innerHTML = html;
+      }
+
+      function tpSetArticleOpen(open) {
+        if (open) renderArticle();
+        articleOverlayEl.classList.toggle('open', open);
+        articleOverlayEl.setAttribute('aria-hidden', open ? 'false' : 'true');
+        document.body.style.overflow = open ? 'hidden' : '';
+      }
+
+      document.getElementById('openArticleOverlayBtn').addEventListener('click', () => tpSetArticleOpen(true));
+      document.getElementById('closeArticleOverlayBtn').addEventListener('click', () => tpSetArticleOpen(false));
+      articleOverlayEl.querySelectorAll('[data-overlay-close]').forEach(el => el.addEventListener('click', () => tpSetArticleOpen(false)));
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && articleOverlayEl.classList.contains('open')) tpSetArticleOpen(false);
+      });
+
+      animate();
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    };
+  </script>
+  <script>
+    // Toggle bilah navigasi samping (sidebar) — sembunyikan / tampilkan
+    (function () {
+      var btn = document.getElementById('navHandleBtn');
+      if (!btn) return;
+      var root = document.documentElement;
+      function apply(closed) {
+        root.classList.toggle('nav-closed', closed);
+        btn.setAttribute('aria-expanded', closed ? 'false' : 'true');
+        btn.setAttribute('aria-label', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        btn.setAttribute('title', closed ? 'Tampilkan navigasi bab' : 'Sembunyikan navigasi bab');
+        try { window.dispatchEvent(new Event('resize')); } catch (e) { }
+      }
+      var stored = null;
+      try { stored = localStorage.getItem('tpNavClosed'); } catch (e) { }
+      // Mobile (≤900px): drawer selalu mulai tertutup agar 3D terlihat penuh
+      var isMobileNav = window.matchMedia('(max-width:900px)').matches;
+      if (isMobileNav || stored === '1') apply(true);
+      btn.addEventListener('click', function () {
+        var closed = !root.classList.contains('nav-closed');
+        apply(closed);
+        try { localStorage.setItem('tpNavClosed', closed ? '1' : '0'); } catch (e) { }
+      });
+    })();
+  </script>
+</body>
+</html>
+
