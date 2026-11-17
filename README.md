@@ -3,7 +3,7 @@
   <p><strong>Ensiklopedia Sains Kebumian & Observatorium Planet 3D Interaktif</strong></p>
   
   <p>
-    <a href="https://USERNAME.github.io/terrapedia/"><strong>🌐 Buka Live Demo »</strong></a>
+    <a href="https://USERNAME.github.io/Terrapedia/"><strong>🌐 Buka Live Demo »</strong></a>
   </p>
 
   ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
