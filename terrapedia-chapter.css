@@ -1,0 +1,550 @@
+/* ============================================================================
+   TERRAPEDIA CHAPTER UI KIT
+   Bahasa desain tunggal untuk landing + 6 halaman bab.
+   Dimuat SETELAH <style> internal tiap file bab (link relatif, satu folder),
+   sehingga selector dengan specificity sama di sini yang menang.
+
+   Isi:
+     1) Token landing (:root salinan) + pemetaan token lama bab
+     2) Penghapusan font monospace (Inter + tabular-nums)
+     3) Tangga z-index tunggal semua bab
+     4) Header kiri atas + kanan atas (btn-ghost, lang-switch, exit)
+     5) Dock bawah standar (1040px, glass-2, max-height, --dock-h)
+     6) Chip selector standar (titik warna, nomor, state aktif)
+     7) Toggle & tombol aksi (pil, dot ON/OFF, aksi utama gradien)
+     8) Slider standar (track gradien aksen, thumb 16px)
+     9) Telemetri & label statistik (gaya .obs-stat landing)
+    10) Navigasi Sebelumnya/Berikutnya (grid 1fr 1fr, kiri/kanan)
+    11) Panel info/inspeksi (z 20, di atas dock, sheet mobile)
+    12) Label 3D (pil kaca Inter)
+    13) Touch-prompt, fokus keyboard, motion, reduced-motion, responsive
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1) TOKEN — salinan persis dari :root landing + pemetaan token bab ke landing
+   --------------------------------------------------------------------------- */
+:root{
+  /* token landing */
+  --bg:#04060f; --ink:#f3f6ff; --muted:#9aa6c4; --muted-2:#6b7796;
+  --line:rgba(150,175,230,.12); --line-strong:rgba(150,175,230,.22);
+  --accent:#5df0a8; --accent-2:#2fd38a; --accent-ink:#032018;
+  --glass:rgba(12,18,38,.55); --glass-2:rgba(16,24,48,.65);
+  --radius:18px; --radius-lg:26px;
+  --ease:cubic-bezier(.22,.7,.2,1);
+  /* tinggi dock di-set JS (ResizeObserver) — fallback sebelum ukur */
+  --dock-h:180px;
+  /* pemetaan token lama bab → nilai landing (tanpa mengubah nama var) */
+  --tp-accent:var(--accent);
+  --terra-accent:var(--accent);
+  --tp-border:var(--line);
+  --tp-border-strong:var(--line-strong);
+  --terra-border:var(--line-strong);
+  --terra-border-subtle:var(--line);
+  --surface:rgba(12,18,38,.62);
+  --surface-2:rgba(16,24,48,.72);
+  --tp-text-main:var(--ink);
+  --tp-text-body:var(--ink);
+  --tp-text-muted:var(--muted);
+  --radius-lg:26px; --radius-md:18px; --radius-sm:999px;
+  --font-mono:var(--font);
+  /* --amber lama dipakai state aktif chip dinosaurus BAB 01 → samakan aksen */
+  --amber:var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   2) TIPOGRAFI — tidak ada monospace di UI; angka memakai tabular-nums
+   --------------------------------------------------------------------------- */
+/* !important di sini (dan hanya di sini untuk font) mengalahkan stylesheet
+   runtime Tailwind CDN yang diinjeksi SETELAH kit ini pada BAB 03 & 05
+   (config default .font-mono = ui-monospace/SFMono). */
+.font-mono,
+.font-mono-tech{
+  font-family:var(--font) !important;
+  font-variant-numeric:tabular-nums;
+}
+.brand-chapter,.brand-sub,.chapter-next-label,.zone-depth,.slider-val,
+#liveDepthReadout,.metric-value,.info-eyebrow,.cap-eyebrow{
+  font-family:var(--font);
+  font-variant-numeric:tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   3) TANGGA Z-INDEX TUNGGAL
+      canvas 0 < label 3D 5 < panel info 20 < dock 30 < header 40 < artikel 100
+      .ui-shell kini z:auto (tanpa stacking context) agar header & dock bisa
+      bersaing langsung di root — panel info tidak pernah menimpa dock.
+   --------------------------------------------------------------------------- */
+.ui-shell{z-index:auto}
+.top-bar{position:relative;z-index:40}
+.bottom-dock{position:relative;z-index:30}
+#selectedLayerPanel,#biomeInfoCard,#hudInfoCard,#magnetoInfoPanel,
+#oceanInfoPanel,.info-popup{z-index:20}
+#articleOverlay{z-index:100}
+#modalToast,#terraToast{z-index:110}
+
+/* ---------------------------------------------------------------------------
+   4) HEADER
+   --------------------------------------------------------------------------- */
+.top-bar{gap:12px}
+.brand-pill{
+  pointer-events:auto;display:inline-flex;align-items:center;gap:14px;
+  padding:12px 16px;border-radius:var(--radius);
+  background:var(--glass);border:1px solid var(--line);
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.75);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  max-width:min(560px,calc(100vw - 240px));
+}
+/* Ikon tile 40px bergaya .card-icon landing */
+.brand-mark{
+  width:40px;height:40px;border-radius:12px;font-size:16px;flex:none;
+  color:var(--accent);background:rgba(93,240,168,.1);
+  border:1px solid rgba(93,240,168,.18);
+}
+.brand-col{gap:5px}
+/* Baris 1: label produk — gaya .card-tag landing */
+.brand-title{
+  font-size:10.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted-2);
+}
+/* Baris 2: judul bab — skala judul 22–26px landing dikompresi clamp agar
+   tetap satu baris di 1280×720; tetap 800 / letter-spacing negatif */
+.brand-chapter{
+  font-size:clamp(15px,1.55vw,21px);font-weight:800;
+  letter-spacing:-.02em;color:var(--ink);
+  max-width:52vw;
+}
+/* Baris 3: deskripsi muted */
+.brand-sub{font-size:12.5px;color:var(--muted)}
+
+.top-controls{gap:10px}
+/* Grup tombol kamera BAB 01 (dipindah dari header ke dock) */
+.cam-group{display:inline-flex;align-items:center;gap:8px;flex:none}
+/* Tombol pil gaya .btn-ghost landing (dipakai tombol Artikel & kamera BAB 01) */
+.cam-btn{
+  min-height:40px;padding:9px 18px;border-radius:999px;
+  font-size:13px;font-weight:600;color:var(--ink);
+  background:rgba(255,255,255,.05);border:1px solid var(--line-strong);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:color .25s var(--ease),background .25s var(--ease),
+             border-color .25s var(--ease),transform .25s var(--ease);
+}
+.cam-btn:hover{
+  color:var(--ink);background:rgba(255,255,255,.1);
+  border-color:var(--line-strong);transform:translateY(-2px);
+}
+.cam-btn.active{
+  color:var(--accent);background:rgba(93,240,168,.12);
+  border-color:rgba(93,240,168,.35);
+}
+/* Sakelar bahasa — persis .lang-switch landing */
+.pill-group{
+  gap:2px;padding:3px;border-radius:999px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line-strong);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.pill-group button{
+  font-size:12px;font-weight:700;letter-spacing:.08em;
+  padding:6px 12px;border-radius:999px;color:var(--muted);
+  transition:color .2s var(--ease),background .2s var(--ease);
+}
+.pill-group button:hover{color:var(--ink)}
+.pill-group button.active{
+  color:var(--accent-ink);
+  background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  box-shadow:0 4px 14px -4px rgba(93,240,168,.55);
+}
+/* Tombol keluar — bulat 40px */
+.exit-btn{
+  width:40px;height:40px;border-radius:999px;
+  color:var(--muted);background:var(--surface-2);
+  border:1px solid var(--line-strong);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:color .25s var(--ease),background .25s var(--ease),
+             border-color .25s var(--ease),transform .25s var(--ease);
+}
+.exit-btn:hover{color:#fda4af;background:rgba(244,63,94,.14);border-color:rgba(251,113,133,.35);transform:translateY(-2px)}
+.exit-btn svg{width:16px;height:16px}
+
+.touch-prompt{
+  font-family:var(--font);font-size:12.5px;color:var(--muted);
+  padding:7px 15px;border-radius:999px;
+  background:var(--glass);border:1px solid var(--line);
+  box-shadow:0 12px 32px rgba(0,0,0,.38);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+
+/* ---------------------------------------------------------------------------
+   5) DOCK BAWAH STANDAR — identik di 6 bab
+   --------------------------------------------------------------------------- */
+.bottom-dock{
+  pointer-events:auto;align-self:center;
+  width:min(1040px,calc(100vw - 32px));max-width:none;
+  background:var(--glass-2);border:1px solid var(--line-strong);
+  border-radius:var(--radius-lg);
+  padding:16px 20px;gap:12px;
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.75);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  /* tidak pernah terpotong tepi bawah: isi melebihi → scroll internal */
+  max-height:min(46vh,420px);overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:rgba(150,175,230,.25) transparent;
+}
+/* scrollbar tipis bergaya modal (menimpa penyembunyi scrollbar global bab) */
+.bottom-dock::-webkit-scrollbar{display:block;width:8px}
+.bottom-dock::-webkit-scrollbar-track{background:transparent}
+.bottom-dock::-webkit-scrollbar-thumb{background:rgba(150,175,230,.22);border-radius:999px}
+/* pemisah baris seragam */
+.controls-row,.chapter-nav-row,.telemetry-row{
+  border-top:1px solid var(--line);padding-top:12px;gap:12px;
+}
+.layer-pills{gap:8px;padding:2px 2px 3px}
+
+/* ---------------------------------------------------------------------------
+   6) CHIP SELECTOR STANDAR — pil 999px, titik warna identitas, state aktif
+      (nama class lama dipetakan tanpa mengubah markup di bab yang tak sentuh)
+   --------------------------------------------------------------------------- */
+.layer-pill-btn,.biome-pill,.structure-pill,.comp-pill,.zone-pill,
+.feature-pill,.layer-btn,.dino-pill{
+  flex:0 0 auto;touch-action:pan-x;
+  min-height:40px;padding:0 16px;border-radius:999px;
+  display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+  font-size:14px;font-weight:600;color:var(--ink);
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  transition:color .25s var(--ease),background .25s var(--ease),
+             border-color .25s var(--ease),transform .25s var(--ease);
+}
+.layer-pill-btn:hover,.biome-pill:hover,.structure-pill:hover,.comp-pill:hover,
+.zone-pill:hover,.feature-pill:hover,.layer-btn:hover,.dino-pill:hover{
+  transform:translateY(-2px);
+  border-color:var(--line-strong);background:rgba(255,255,255,.08);
+}
+/* State aktif — satu aturan untuk semua bab: border aksen, latar hijau tipis,
+   teks aksen. Warna identitas elemen TETAP hanya di titik 8px. */
+.layer-pill-btn.active,.biome-pill.active,.structure-pill.active,.comp-pill.active,
+.zone-pill.active,.feature-pill.active,.layer-btn.active,.dino-pill.active{
+  color:var(--accent);background:rgba(93,240,168,.12);border-color:var(--accent);
+}
+/* Titik warna identitas: ukuran seragam 8px */
+.layer-pill-btn .swatch,.layer-btn .swatch,.biome-3d-pin .pin-dot,.comp-pill .dot,
+.biome-pill .dot-dot,.zone-pill .zone-dot,.scene-btn .dot-dot,.mini-toggle .dot-dot{
+  width:8px;height:8px;border-radius:999px;flex:none;
+}
+/* Chip selector tanpa data warna (Bab 03 bioma? punya; Bab 04 struktur &
+   Bab 06 fitur tidak) → titik aksen tunggal lewat pseudo-element */
+.structure-pill::before,.feature-pill::before{
+  content:"";width:8px;height:8px;border-radius:999px;flex:none;
+  background:var(--accent);
+}
+/* Info sekunder chip (rentang kedalaman) — muted kecil */
+.zone-depth{font-size:11.5px;color:var(--muted)}
+.zone-pill.active .zone-depth{color:var(--accent)}
+/* Nomor urut pada chip (span nomor dari JS bab 04/05) — tabular, samar */
+.structure-pill .font-mono,.comp-pill .font-mono{
+  font-size:11px;font-weight:600;color:var(--muted-2);opacity:1;
+}
+
+/* ---------------------------------------------------------------------------
+   7) TOGGLE & TOMBOL AKSI — pil sama ukuran chip; dot penuh saat ON,
+      titik kosong (outline) saat OFF; tanpa ": ON/OFF" tampilan
+   --------------------------------------------------------------------------- */
+.scene-btn,.mini-toggle{
+  min-height:40px;padding:0 16px;border-radius:999px;
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:600;color:var(--ink);
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  transition:color .25s var(--ease),background .25s var(--ease),
+             border-color .25s var(--ease),transform .25s var(--ease),
+             box-shadow .25s var(--ease);
+}
+.scene-btn:hover,.mini-toggle:hover{
+  color:var(--ink);background:rgba(255,255,255,.08);
+  border-color:var(--line-strong);transform:translateY(-2px);
+}
+.scene-btn.active,.mini-toggle.active{
+  color:var(--accent);background:rgba(93,240,168,.12);
+  border-color:rgba(93,240,168,.35);
+}
+/* Aksi sekunder (Reset Kamera, Fokus Palung) — .btn-outline kecil */
+.scene-btn-neutral{border-color:var(--line-strong)}
+.scene-btn-neutral:hover{border-color:var(--line-strong)}
+/* Aksi utama (Picu Gempa & Erupsi) — .btn-primary kecil landing */
+.quake-btn{
+  color:var(--accent-ink);border-color:transparent;
+  background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  box-shadow:0 10px 30px -8px rgba(93,240,168,.55),inset 0 1px 0 rgba(255,255,255,.4);
+}
+.quake-btn:hover{
+  color:var(--accent-ink);transform:translateY(-2px);
+  background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  box-shadow:0 16px 38px -8px rgba(93,240,168,.7),inset 0 1px 0 rgba(255,255,255,.4);
+}
+.quake-btn svg{color:var(--accent-ink)}
+/* Dot toggle:
+   - ON  : titik penuh. Bab yang dot-nya inline-style warna identitas elemen
+           (magma, partikel, medan…) tetap memakai warna identitas itu.
+   - OFF : titik kosong (cincin outline netral).
+   !important tunggal di sini sengaja dipakai untuk mengalahkan inline
+   style="background:…" pada titik-titik warna bab 04/05 saat OFF. */
+.scene-btn .dot-dot,.mini-toggle .dot-dot{background:rgba(148,163,184,.9)}
+.scene-btn.active .dot-dot,.mini-toggle.active .dot-dot{background:var(--accent);box-shadow:none}
+/* Titik identitas elemen 3D (BAB 04): warna data dipertahankan saat ON */
+.scene-btn.active .dot-magma{background:#fb923c}
+.scene-btn.active .dot-seismic{background:#38bdf8}
+.scene-btn:not(.active) .dot-dot,.mini-toggle:not(.active) .dot-dot{
+  background:transparent !important;
+  box-shadow:inset 0 0 0 1.5px rgba(148,163,184,.75);
+}
+
+/* ---------------------------------------------------------------------------
+   8) SLIDER STANDAR — satu gaya semua bab (track gradien aksen, thumb 16px)
+   --------------------------------------------------------------------------- */
+.range-input,#sliderFlowSpeed,input[type="range"].tp-slider,
+input[type="range"].depth-slider{
+  -webkit-appearance:none;appearance:none;
+  height:6px;border-radius:999px;border:none;outline:none;cursor:pointer;
+  background:linear-gradient(90deg,var(--accent-2),var(--accent));
+}
+.range-input::-webkit-slider-thumb,#sliderFlowSpeed::-webkit-slider-thumb,
+input[type="range"].tp-slider::-webkit-slider-thumb,
+input[type="range"].depth-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--accent);border:2px solid rgba(4,6,15,.9);
+  box-shadow:0 0 0 3px rgba(93,240,168,.18);cursor:pointer;
+}
+.range-input::-moz-range-thumb,#sliderFlowSpeed::-moz-range-thumb,
+input[type="range"].tp-slider::-moz-range-thumb,
+input[type="range"].depth-slider::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;
+  background:var(--accent);border:2px solid rgba(4,6,15,.9);
+  box-shadow:0 0 0 3px rgba(93,240,168,.18);cursor:pointer;
+}
+/* label kiri muted, nilai kanan aksen tabular — gaya .obs-stat landing */
+.slider-lbl,.probe-label,#lblFlowSpeed{
+  font-size:12px;font-weight:600;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap;
+}
+.slider-val,#valFlowSpeed,#liveDepthReadout,#solarWindValue{
+  font-family:var(--font);font-size:12.5px;font-weight:700;
+  color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+/* kotak slider lama dibongkar jadi bagian baris (tanpa kartu di dalam kartu) */
+.slider-wrap,.flow-speed-box,.depth-probe-box{
+  display:inline-flex;align-items:center;gap:10px;
+  padding:0;border:none;background:transparent;
+}
+.tick-row{display:none}
+
+/* ---------------------------------------------------------------------------
+   9) TELEMETRI (BAB 05) & LABEL STATISTIK — gaya .obs-stat landing:
+      label uppercase muted + nilai tebal aksen
+   --------------------------------------------------------------------------- */
+.telemetry-row{align-items:center}
+.pulse-dot{width:6px;height:6px;background:var(--accent)}
+.metric-cell{text-align:left;min-width:56px}
+.metric-label{
+  font-size:9.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted-2);
+}
+.metric-value{
+  font-size:13px;font-weight:700;
+  color:var(--accent) !important; /* mengalahkan utilitas warna Tailwind runtime */
+  font-variant-numeric:tabular-nums;
+}
+/* badge status badai → pill bergaya .card-tag (id menang atas class Tailwind) */
+#stormBadge{
+  font-family:var(--font);font-size:10.5px;font-weight:600;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);background:rgba(93,240,168,.08);
+  border:1px solid rgba(93,240,168,.22);border-radius:999px;
+}
+
+/* ---------------------------------------------------------------------------
+   10) NAVIGASI SEBELUMNYA / BERIKUTNYA
+       Grid dua kolom: kartu yang ada TETAP di sisinya —
+       Bab 01 (tanpa Prev): Berikutnya di kanan; Bab 06 (tanpa Next): Prev kiri.
+   --------------------------------------------------------------------------- */
+.chapter-nav-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}
+.chapter-next-card{
+  display:inline-flex;align-items:center;gap:12px;
+  width:100%;max-width:360px;min-height:56px;padding:8px 10px;
+  border-radius:var(--radius);
+  background:rgba(255,255,255,.04);border:1px solid var(--line);
+  text-decoration:none;
+  transition:transform .25s var(--ease),border-color .25s var(--ease),
+             background .25s var(--ease),box-shadow .25s var(--ease);
+}
+.chapter-next-card.is-prev{justify-self:start}
+.chapter-next-card:not(.is-prev){justify-self:end}
+.chapter-next-card:hover{
+  transform:translateY(-3px);border-color:var(--accent);
+  background:rgba(93,240,168,.06);
+  box-shadow:0 16px 40px -18px rgba(93,240,168,.22);
+}
+/* ikon panah dalam tile 36px bergaya .card-icon */
+.chapter-next-arrow{
+  width:36px;height:36px;border-radius:12px;
+  font-size:15px;flex:none;
+  color:var(--accent);background:rgba(93,240,168,.1);
+  border:1px solid rgba(93,240,168,.18);
+}
+.chapter-next-card:hover .chapter-next-arrow{
+  color:var(--accent);background:rgba(93,240,168,.14);
+  border-color:rgba(93,240,168,.35);
+}
+.chapter-next-text{gap:3px;align-items:flex-start}
+.chapter-next-card:not(.is-prev) .chapter-next-text{align-items:flex-end}
+/* label gaya .card-tag; judul bab Inter 14px/700 */
+.chapter-next-label{
+  font-size:10.5px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted-2);white-space:nowrap;
+}
+.chapter-next-title{
+  font-size:14px;font-weight:700;color:var(--ink);
+  max-width:280px;overflow:hidden;text-overflow:ellipsis;
+  transition:color .25s var(--ease);
+}
+.chapter-next-card:hover .chapter-next-title{color:var(--accent)}
+
+/* ---------------------------------------------------------------------------
+   11) PANEL INFO / INSPEKSI — selalu di ATAS dock, tidak pernah menimpanya
+   --------------------------------------------------------------------------- */
+#selectedLayerPanel,#biomeInfoCard,#hudInfoCard,#magnetoInfoPanel,
+#oceanInfoPanel,.info-popup{
+  z-index:20;right:16px;top:68px;
+  width:min(380px,calc(100vw - 32px));
+  max-height:calc(100dvh - var(--dock-h) - 150px);
+  border-radius:var(--radius);
+  background:var(--glass-2);border:1px solid var(--line-strong);
+  box-shadow:0 30px 80px -30px rgba(0,0,0,.75);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+}
+.info-popup{top:68px}
+/* transisi masuk landing (fade + translateY, 0.5s) */
+#selectedLayerPanel,#biomeInfoCard,#hudInfoCard,#magnetoInfoPanel,
+#oceanInfoPanel,.info-popup{
+  transition:opacity .5s var(--ease),transform .5s var(--ease),visibility .5s;
+}
+/* eyebrow & judul panel gaya kartu landing */
+.info-eyebrow,.cap-eyebrow{
+  font-size:10.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent);
+}
+.info-title{font-size:18px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.info-badge{
+  font-family:var(--font);color:var(--accent);
+  background:rgba(93,240,168,.1);border:1px solid rgba(93,240,168,.18);
+  border-radius:12px;
+}
+/* metrik panel → pill gaya .layer-metric */
+.metric-val{font-family:var(--font)}
+.metric-val,.info-sub,.sublayer-top span:last-child{font-variant-numeric:tabular-nums}
+/* Mobile: panel menjadi bottom-sheet dan dock disingkirkan sementara
+   (:has() — didukung semua browser modern; tanpa JS tambahan) */
+@media (max-width:640px){
+  #selectedLayerPanel,#biomeInfoCard,#hudInfoCard,#magnetoInfoPanel,
+  #oceanInfoPanel,.info-popup{
+    left:0;right:0;top:auto;bottom:0;width:100%;
+    max-height:62dvh;border-radius:18px 18px 0 0;
+    border-left:none;border-top:1px solid var(--line-strong);
+  }
+  body:has(.info-popup.open) .bottom-dock,
+  body:has(#selectedLayerPanel.open) .bottom-dock,
+  body:has(#biomeInfoCard.open) .bottom-dock,
+  body:has(#hudInfoCard.open) .bottom-dock,
+  body:has(#magnetoInfoPanel.open) .bottom-dock,
+  body:has(#oceanInfoPanel.open) .bottom-dock{display:none}
+}
+
+/* ---------------------------------------------------------------------------
+   12) LABEL 3D — pil kaca kecil, Inter 12.5px/600, garis penunjuk aksen
+   --------------------------------------------------------------------------- */
+.tp-3d-label,.hotspot-pin .pin-label,.spatial-label,.hud-pin{
+  border-radius:999px;
+  background:rgba(10,16,30,.78);
+  border:1px solid var(--line-strong);
+  font-family:var(--font);font-size:12.5px;font-weight:600;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.pin-stem,.pin-dot{background:var(--accent)}
+.tp-3d-label.is-selected,.hotspot-pin.active .pin-label{
+  border-color:rgba(93,240,168,.5);
+  background:rgba(93,240,168,.1);color:var(--accent);
+}
+
+/* ---------------------------------------------------------------------------
+   13) FOKUS KEYBOARD, MOTION, REDUCED MOTION, RESPONSIVE
+   --------------------------------------------------------------------------- */
+.top-bar button:focus-visible,.top-bar a:focus-visible,
+.bottom-dock button:focus-visible,.bottom-dock a:focus-visible,
+.bottom-dock input:focus-visible,
+.info-popup button:focus-visible,
+#selectedLayerPanel button:focus-visible,#biomeInfoCard button:focus-visible,
+#hudInfoCard button:focus-visible,#magnetoInfoPanel button:focus-visible,
+#oceanInfoPanel button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+
+/* Target sentuh ≥ 44px pada perangkat sentuh */
+@media (hover:none) and (pointer:coarse){
+  .layer-pill-btn,.biome-pill,.structure-pill,.comp-pill,.zone-pill,
+  .feature-pill,.layer-btn,.dino-pill,.scene-btn,.mini-toggle{min-height:44px}
+}
+
+/* ≤900: dock lebar hampir penuh + margin 12px, safe-area; chip scroll-snap */
+@media (max-width:900px){
+  .bottom-dock{
+    width:calc(100vw - 24px);
+    margin-bottom:env(safe-area-inset-bottom,0px);
+  }
+  .layer-pills{scroll-snap-type:x proximity}
+  .layer-pill-btn,.biome-pill,.structure-pill,.comp-pill,.zone-pill,
+  .feature-pill,.layer-btn,.dino-pill{scroll-snap-align:start}
+  .brand-pill{max-width:calc(100vw - 190px)}
+}
+
+/* ≤720: header & dock lebih ramping (melanjutkan blok mobile bab) */
+@media (max-width:720px){
+  .brand-pill{padding:10px 12px;gap:10px}
+  .brand-mark{width:34px;height:34px;border-radius:11px;font-size:14px}
+  .brand-chapter{font-size:15px;max-width:60vw}
+  .brand-sub{font-size:11.5px}
+  .cam-btn{min-height:38px;padding:7px 13px;font-size:12px}
+  .exit-btn{width:36px;height:36px}
+  .bottom-dock{padding:12px 14px;gap:10px}
+  .controls-row,.chapter-nav-row,.telemetry-row{padding-top:10px}
+  .layer-pill-btn,.biome-pill,.structure-pill,.comp-pill,.zone-pill,
+  .feature-pill,.layer-btn,.dino-pill{min-height:36px;padding:0 13px;font-size:12.5px}
+  .scene-btn,.mini-toggle{min-height:36px;padding:0 13px;font-size:12px}
+  .chapter-next-card{min-height:50px}
+  .chapter-next-title{font-size:12.5px;max-width:200px}
+}
+
+/* ≤640: navigasi bab ringkas — label disembunyikan, judul dipendekkan;
+   kiri/kanan tetap dipertahankan */
+@media (max-width:640px){
+  .chapter-nav-row{gap:8px}
+  .chapter-next-label{display:none}
+  .chapter-next-title{max-width:96px;font-size:12px}
+  .chapter-next-arrow{width:32px;height:32px;border-radius:10px}
+}
+
+/* ≤380: rapatkan lagi */
+@media (max-width:380px){
+  .top-controls{gap:6px}
+  .cam-btn{padding:6px 10px;font-size:11.5px}
+  .layer-pill-btn,.biome-pill,.structure-pill,.comp-pill,.zone-pill,
+  .feature-pill,.layer-btn,.dino-pill{padding:0 11px;font-size:12px}
+  .scene-btn,.mini-toggle{padding:0 11px;font-size:11.5px}
+  .brand-chapter{max-width:150px;font-size:14px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  #selectedLayerPanel,#biomeInfoCard,#hudInfoCard,#magnetoInfoPanel,
+  #oceanInfoPanel,.info-popup,
+  .layer-pill-btn,.biome-pill,.structure-pill,.comp-pill,.zone-pill,
+  .feature-pill,.layer-btn,.dino-pill,.scene-btn,.mini-toggle,
+  .cam-btn,.exit-btn,.chapter-next-card{
+    transition:none;animation:none;
+  }
+  .pulse-dot{animation:none}
+}
